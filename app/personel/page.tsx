@@ -7,12 +7,13 @@ import { Personel } from '@/lib/types'
 
 const GOREVLER: string[] = [
   'Öğretmen', 'Usta Öğretici', 'Koordinatör Öğretmen',
-  'Muhasebe Personeli', 'Temizlik Personeli', 'Başkan', 'Başkan Yrd.', 'Denetim',
+  'Muhasebe Personeli', 'Temizlik Personeli', 'Başkan', 'Başkan Yrd.', 'Denetim Yetkilisi',
 ]
 
 const EMPTY: Partial<Personel> = {
-  ad: '', tc: '', gorev: 'Öğretmen', gorev_kategorisi: 'Öğretmen',
+  ad: '', tc: '', gorev: 'Öğretmen',
   sgk_li: false, vergi_istisnasi: false, iban: '', yillik_matrah: 0,
+  personel_turu: 'kadrolu'
 }
 
 export default function PersonelPage() {
@@ -45,8 +46,7 @@ export default function PersonelPage() {
     const data = {
       ...form,
       ad: form.ad!.trim().toUpperCase(),
-      gorev: form.gorev || form.gorev_kategorisi || 'Öğretmen',
-      gorev_kategorisi: form.gorev_kategorisi || form.gorev || 'Öğretmen',
+      gorev: form.gorev || 'Öğretmen',
     }
     let error
     if (editId) {
@@ -99,9 +99,13 @@ export default function PersonelPage() {
             </div>
             <div style={{ flex: 2, minWidth: 180 }}>
               <label className="form-label">Görevi</label>
-              <select className="form-select" value={form.gorev || form.gorev_kategorisi || 'Öğretmen'} onChange={e => { setF('gorev', e.target.value); setF('gorev_kategorisi', e.target.value) }}>
+              <select className="form-select" value={form.gorev || 'Öğretmen'} onChange={e => { setF('gorev', e.target.value) }}>
                 {GOREVLER.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
+            </div>
+            <div style={{ width: 150 }}>
+              <label className="form-label">Personel SGK No</label>
+              <input className="form-input" value={form.sgk_no || ''} onChange={e => setF('sgk_no', e.target.value)} />
             </div>
           </div>
 
@@ -122,6 +126,13 @@ export default function PersonelPage() {
               <select className="form-select" value={form.vergi_istisnasi ? 'evet' : 'hayir'} onChange={e => setF('vergi_istisnasi', e.target.value === 'evet')}>
                 <option value="hayir">Hayır</option>
                 <option value="evet">Evet</option>
+              </select>
+            </div>
+            <div style={{ width: 130 }}>
+              <label className="form-label">Personel Türü</label>
+              <select className="form-select" value={form.personel_turu || 'kadrolu'} onChange={e => setF('personel_turu', e.target.value)}>
+                <option value="kadrolu">Kadrolu</option>
+                <option value="sgk">SGK'lı</option>
               </select>
             </div>
             <div style={{ width: 180 }}>
@@ -147,40 +158,63 @@ export default function PersonelPage() {
               <thead>
                 <tr>
                   <th>#</th><th>Ad Soyad</th><th>T.C.</th><th>Görevi</th>
-                  <th>SGK</th><th>Vergi İstisnası</th><th>IBAN</th>
+                  <th>Tür</th><th>SGK</th><th>Vergi İstisnası</th><th>IBAN</th>
                   <th className="td-num">Yıllık Matrah (₺)</th><th>İşlem</th>
                 </tr>
               </thead>
               <tbody>
-                {personel.length === 0 ? (
-                  <tr><td colSpan={9}>
-                    <div className="empty-state">
-                      <div className="empty-icon">👩‍🏫</div>
-                      <p>{loading ? 'Yükleniyor...' : 'Personel bulunamadı'}</p>
-                    </div>
-                  </td></tr>
-                ) : (
-                  personel.map((p, i) => (
-                    <tr key={p.id}>
-                      <td style={{ fontSize: 12, color: 'var(--text3)' }}>{i + 1}</td>
-                      <td><strong>{p.ad}</strong></td>
-                      <td style={{ fontSize: 12, color: 'var(--text3)' }}>{p.tc || '-'}</td>
-                      <td><span className="badge badge-blue">{p.gorev_kategorisi || p.gorev}</span></td>
-                      <td><Badge variant={p.sgk_li ? 'green' : 'gray'}>{p.sgk_li ? 'Evet' : 'Hayır'}</Badge></td>
-                      <td><Badge variant={p.vergi_istisnasi ? 'orange' : 'gray'}>{p.vergi_istisnasi ? 'Evet' : 'Hayır'}</Badge></td>
-                      <td style={{ fontSize: 11, color: 'var(--text3)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {p.iban || '-'}
-                      </td>
-                      <td className="td-num">{p.yillik_matrah ? Number(p.yillik_matrah).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) : '-'}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button className="btn btn-secondary btn-sm" onClick={() => duzenle(p)}>✏️</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => sil(p.id)}>🗑️</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                {(() => {
+                  const getPriority = (gorev: string = '') => {
+                    const g = gorev.toLowerCase();
+                    if (g.includes('başkan') && !g.includes('yardımcısı')) return 1;
+                    if (g.includes('yardımcısı') || g.includes('müdür')) return 2;
+                    if (g.includes('denetim')) return 3;
+                    if (g.includes('koordinatör')) return 4;
+                    if (g.includes('öğretmen')) return 5;
+                    if (g.includes('usta')) return 6;
+                    if (g.includes('muhasebe') || g.includes('memur')) return 7;
+                    if (g.includes('temizlik') || g.includes('hizmet')) return 8;
+                    return 9;
+                  };
+
+                  const sorted = [...personel].sort((a, b) => {
+                    const p1 = getPriority(a.gorev);
+                    const p2 = getPriority(b.gorev);
+                    if (p1 !== p2) return p1 - p2;
+                    return (a.ad || '').localeCompare(b.ad || '', 'tr');
+                  });
+
+                  return sorted.length === 0 ? (
+                    <tr><td colSpan={10}>
+                      <div className="empty-state">
+                        <div className="empty-icon">👩‍🏫</div>
+                        <p>{loading ? 'Yükleniyor...' : 'Personel bulunamadı'}</p>
+                      </div>
+                    </td></tr>
+                  ) : (
+                    sorted.map((p, i) => (
+                      <tr key={p.id}>
+                        <td style={{ fontSize: 12, color: 'var(--text3)' }}>{i + 1}</td>
+                        <td><strong>{p.ad}</strong></td>
+                        <td style={{ fontSize: 12, color: 'var(--text3)' }}>{p.tc || '-'}</td>
+                        <td><span className="badge badge-blue">{p.gorev}</span></td>
+                        <td><Badge variant={p.personel_turu === 'kadrolu' ? 'blue' : 'orange'}>{p.personel_turu === 'kadrolu' ? 'Kadrolu' : 'SGK'}</Badge></td>
+                        <td><Badge variant={p.sgk_li ? 'green' : 'gray'}>{p.sgk_li ? 'Evet' : 'Hayır'}</Badge></td>
+                        <td><Badge variant={p.vergi_istisnasi ? 'orange' : 'gray'}>{p.vergi_istisnasi ? 'Evet' : 'Hayır'}</Badge></td>
+                        <td style={{ fontSize: 11, color: 'var(--text3)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {p.iban || '-'}
+                        </td>
+                        <td className="td-num">{p.yillik_matrah ? Number(p.yillik_matrah).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) : '-'}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => duzenle(p)}>✏️</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => sil(p.id)}>🗑️</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  );
+                })()}
               </tbody>
             </table>
           </div>

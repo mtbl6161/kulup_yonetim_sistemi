@@ -19,6 +19,7 @@
 
 * { box-sizing: border-box; }
 
+
 body {
   font-family: 'DM Sans', sans-serif;
   background: var(--bg);
@@ -27,9 +28,12 @@ body {
   min-height: 100vh;
 }
 
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: var(--surface2); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #a5c2ae; border-radius: 10px; border: 1.5px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: #a5c2ae transparent; }
 
 /* DATA TABLE */
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -144,6 +148,84 @@ body {
 
 /* PRINT */
 @media print {
+  @page {
+    size: A4 landscape;
+    margin: 6mm 8mm;
+  }
+
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Sayfa düzeni sıfırla */
+  body, #main-content, main {
+    min-height: auto !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+    color: black !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+  }
+
+  /* UI öğelerini gizle */
   .no-print { display: none !important; }
   aside { display: none !important; }
+  .alert { display: none !important; }
+  .stat-card { display: none !important; }
+
+  /* Sadece baskıda görünsün */
+  .only-print { display: block !important; }
+
+  /* Sidebar margin sıfırla */
+  #main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+  #main-content > div { padding: 0 !important; }
+
+  /* Card çerçevelerini kaldır */
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    background: white !important;
+  }
+
+  /* Print alanı */
+  .print-area {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    page-break-inside: avoid !important;
+    transform-origin: top left;
+  }
+
+  /* Tablo overflow sarıcısını aç */
+  div[style*="overflow-x"] {
+    overflow: visible !important;
+  }
+
+  /* Tablo — doğal layout koru, zoom JS tarafından uygulanır */
+  table {
+    border-collapse: collapse !important;
+    line-height: 1.1 !important;
+  }
+
+  th {
+    padding: 2px 3px !important;
+    border: 0.3px solid #333 !important;
+    background-color: #f0e6d2 !important;
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+  }
+
+  td {
+    padding: 2px 3px !important;
+    border: 0.3px solid #aaa !important;
+    white-space: nowrap !important;
+  }
 }

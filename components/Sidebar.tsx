@@ -24,9 +24,10 @@ const NAV = [
     baslik: 'Personel',
     items: [
       { href: '/personel', label: 'Personel Listesi', icon: '👩‍🏫' },
+      { href: '/siniflar', label: 'Sınıflar', icon: '🏫' },
       { href: '/ders-programi', label: 'Ders Programı', icon: '📅' },
       { href: '/puantaj', label: 'Puantaj', icon: '🕐' },
-      { href: '/bordro', label: 'Bordro', icon: '📊' },
+      { href: '/bordro', label: 'Bordro Özeti', icon: '📊' },
     ],
   },
   {
@@ -34,6 +35,7 @@ const NAV = [
     items: [
       { href: '/hesap-hareketleri', label: 'Hesap Hareketleri', icon: '🏦' },
       { href: '/gelir-gider', label: 'Gelir / Gider Özet', icon: '📈' },
+      { href: '/bilanco', label: 'Bilanço', icon: '📋' },
     ],
   },
 ]
@@ -42,57 +44,80 @@ interface Props {
   ay: number
   yil: number
   onAyChange: (ay: number, yil: number) => void
+  collapsed: boolean
+  setCollapsed: (v: boolean) => void
 }
 
-export default function Sidebar({ ay, yil, onAyChange }: Props) {
+export default function Sidebar({ ay, yil, onAyChange, collapsed, setCollapsed }: Props) {
   const pathname = usePathname()
-  const [collapsed, setCollapsed] = useState(false)
 
   const YILLAR = [2024, 2025, 2026, 2027]
   const AYLAR_LIST = [9,10,11,12,1,2,3,4,5,6]
 
   return (
     <aside
-      className="fixed top-0 left-0 bottom-0 z-30 flex flex-col overflow-y-auto overflow-x-hidden transition-all duration-300"
+      className="fixed top-0 left-0 bottom-0 z-30 flex flex-col transition-all duration-300 overflow-visible"
       style={{
-        width: collapsed ? 56 : 240,
-        minWidth: collapsed ? 56 : 240,
+        width: collapsed ? 64 : 260,
+        minWidth: collapsed ? 64 : 260,
         background: '#2d5a3d',
         color: '#e8f0eb',
+        overflow: 'visible !important'
       }}
     >
-      {/* Toggle */}
-      <button
-        onClick={() => setCollapsed(c => !c)}
-        title="Menüyü Daralt / Genişlet"
-        style={{
-          position: 'absolute', top: 18, right: -13,
-          width: 26, height: 26,
-          background: '#2d5a3d',
-          border: '2px solid rgba(255,255,255,0.25)',
-          borderRadius: '50%', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: 12, zIndex: 200,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-          transform: collapsed ? 'rotate(180deg)' : 'none',
-          transition: 'transform 0.25s',
-        }}
-      >
-        ‹
-      </button>
-
-      {/* Logo */}
-      <div style={{ padding: collapsed ? '16px 0' : '24px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.12)', display: 'flex', justifyContent: collapsed ? 'center' : 'flex-start', alignItems: 'center' }}>
+      <div style={{ 
+        padding: collapsed ? '16px 0' : '20px 16px', 
+        borderBottom: '1px solid rgba(255,255,255,0.12)', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        height: 80,
+        flexShrink: 0
+      }}>
         {collapsed ? (
-          <span style={{ fontSize: 20 }}>🏫</span>
-        ) : (
-          <div>
-            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: 17, fontWeight: 700, color: '#fff', lineHeight: 1.3 }}>
-              Çocuk Kulübü<br />Yönetim Sistemi
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, width: '100%' }}>
+            <span style={{ fontSize: 24 }}>🏫</span>
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              style={{
+                width: 24, height: 24,
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '4px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', fontSize: 14,
+              }}
+            >
+              {collapsed ? '›' : '‹'}
+            </button>
           </div>
+        ) : (
+          <>
+            <div>
+              <div style={{ fontFamily: 'Playfair Display, serif', fontSize: 17, fontWeight: 700, color: '#fff', lineHeight: 1.3 }}>
+                Çocuk Kulübü<br />Yönetim Sistemi
+              </div>
+            </div>
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              title="Menüyü Daralt"
+              style={{
+                width: 28, height: 28,
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '6px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', fontSize: 16,
+                marginLeft: 10
+              }}
+            >
+              ‹
+            </button>
+          </>
         )}
       </div>
+      
+      <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
 
       {/* Ay / Yıl Seçici */}
       {!collapsed && (
@@ -168,6 +193,7 @@ export default function Sidebar({ ay, yil, onAyChange }: Props) {
           MEB Çocuk Kulüpleri Yönergesi
         </div>
       )}
+      </div>
     </aside>
   )
 }

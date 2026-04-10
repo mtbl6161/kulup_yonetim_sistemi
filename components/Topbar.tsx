@@ -15,7 +15,7 @@ export default function Topbar({ title, sub, actions }: Props) {
         borderBottom: '1px solid #d8d0be',
         padding: '14px 28px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        position: 'sticky', top: 0, zIndex: 20,
+        position: 'sticky', top: 0, zIndex: 100,
         boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
       }}
     >

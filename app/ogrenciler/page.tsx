@@ -13,22 +13,53 @@ const EMPTY: Partial<Ogrenci> = {
 
 export default function OgrencilerPage() {
   const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
+  const [personel, setPersonel] = useState<any[]>([])
+  const [siniflar, setSiniflar] = useState<any[]>([])
   const [form, setForm] = useState<Partial<Ogrenci>>(EMPTY)
   const [editId, setEditId] = useState<number | null>(null)
   const [filtre, setFiltre] = useState('')
+  const [sinifFiltre, setSinifFiltre] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
 
   async function load() {
     setLoading(true)
-    // aktif kolonu migration öncesi olmayabilir; filtre kaldırıldı
-    const { data } = await supabase.from('ogrenciler').select('*').order('soyad')
-    setOgrenciler(data || [])
+    const [{ data: ogr }, { data: per }, { data: sin }] = await Promise.all([
+      supabase.from('ogrenciler').select('*').order('soyad'),
+      supabase.from('personel').select('*').order('ad'),
+      supabase.from('siniflar').select('*').eq('aktif', true).order('ad')
+    ])
+    setOgrenciler(ogr || [])
+    setPersonel(per || [])
+    setSiniflar(sin || [])
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
+
+  // Hiyerarşik Sıralama ve Filtreleme Mantığı
+  const ogretmenListesi = personel
+    .filter(p => {
+      const g = (p.gorev || '').toLowerCase()
+      // Sadece ilgili rolleri al
+      return g.includes('başkan') || g.includes('öğretmen') || g.includes('usta') || g.includes('koordinatör')
+    })
+    .sort((a, b) => {
+      const getPriority = (gorev: string = '') => {
+        const g = gorev.toLowerCase()
+        if (g.includes('başkan') && !g.includes('yardımcısı')) return 1
+        if (g.includes('yardımcısı') || g.includes('müdür')) return 2
+        if (g.includes('koordinatör')) return 3
+        if (g.includes('öğretmen')) return 4
+        if (g.includes('usta')) return 5
+        return 6
+      }
+      const p1 = getPriority(a.gorev)
+      const p2 = getPriority(b.gorev)
+      if (p1 !== p2) return p1 - p2
+      return (a.ad || '').localeCompare(b.ad || '', 'tr')
+    })
 
   function setF(key: keyof Ogrenci, val: unknown) {
     setForm(f => ({ ...f, [key]: val }))
@@ -45,7 +76,7 @@ export default function OgrencilerPage() {
       ...form,
       ad: form.ad!.trim().toUpperCase(),
       soyad: form.soyad!.trim().toUpperCase(),
-      ogretmen: form.ogretmen?.trim().toUpperCase() || '',
+      ogretmen: form.ogretmen || '',
     }
     let error
     if (editId) {
@@ -82,7 +113,13 @@ export default function OgrencilerPage() {
 
   const liste = ogrenciler.filter(o => {
     const q = filtre.toLowerCase()
-    return !q || (o.ad + ' ' + o.soyad + ' ' + (o.sinif || '')).toLowerCase().includes(q)
+    const matchSearch = !q || (o.ad + ' ' + o.soyad + ' ' + (o.sinif || '')).toLowerCase().includes(q)
+    const matchSinif = !sinifFiltre || o.sinif === sinifFiltre
+    return matchSearch && matchSinif
+  }).sort((a, b) => {
+    const nameA = (a.ad + ' ' + a.soyad).toLocaleLowerCase('tr')
+    const nameB = (b.ad + ' ' + b.soyad).toLocaleLowerCase('tr')
+    return nameA.localeCompare(nameB, 'tr')
   })
 
   return (
@@ -111,15 +148,25 @@ export default function OgrencilerPage() {
           </div>
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-            <div style={{ flex: 1, minWidth: 100 }}>
+            <div style={{ flex: 1, minWidth: 120 }}>
               <label className="form-label">Sınıf</label>
-              <input className="form-input" placeholder="3/A" value={form.sinif || ''} onChange={e => setF('sinif', e.target.value)} />
+              <select className="form-select" value={form.sinif || ''} onChange={e => setF('sinif', e.target.value)}>
+                <option value="">— Seçilmedi —</option>
+                {siniflar.map((s, i) => (
+                  <option key={i} value={s.ad}>{s.ad}</option>
+                ))}
+              </select>
             </div>
-            <div style={{ flex: 2, minWidth: 140 }}>
+            <div style={{ flex: 2, minWidth: 160 }}>
               <label className="form-label">Öğretmen</label>
-              <input className="form-input" value={form.ogretmen || ''} onChange={e => setF('ogretmen', e.target.value)} />
+              <select className="form-select" value={form.ogretmen || ''} onChange={e => setF('ogretmen', e.target.value)}>
+                <option value="">— Seçilmedi —</option>
+                {ogretmenListesi.map((p, i) => (
+                  <option key={i} value={p.ad}>{p.ad} ({p.gorev})</option>
+                ))}
+              </select>
             </div>
-            <div style={{ width: 130 }}>
+            <div style={{ width: 140 }}>
               <label className="form-label">Kardeş İndirimi</label>
               <select className="form-select" value={form.kardes_indirimi ? 'evet' : 'hayir'} onChange={e => setF('kardes_indirimi', e.target.value === 'evet')}>
                 <option value="hayir">Hayır</option>
@@ -164,17 +211,30 @@ export default function OgrencilerPage() {
 
         {/* Liste */}
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 10 }}>
             <div className="card-title" style={{ marginBottom: 0 }}>
               Öğrenci Listesi ({loading ? '...' : ogrenciler.length})
             </div>
-            <input
-              className="form-input"
-              style={{ width: 220 }}
-              placeholder="🔍 Ara..."
-              value={filtre}
-              onChange={e => setFiltre(e.target.value)}
-            />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <select
+                className="form-select"
+                style={{ width: 160 }}
+                value={sinifFiltre}
+                onChange={e => setSinifFiltre(e.target.value)}
+              >
+                <option value="">Tüm Sınıflar</option>
+                {siniflar.map((s, i) => (
+                  <option key={i} value={s.ad}>{s.ad}</option>
+                ))}
+              </select>
+              <input
+                className="form-input"
+                style={{ width: 220 }}
+                placeholder="🔍 Ara..."
+                value={filtre}
+                onChange={e => setFiltre(e.target.value)}
+              />
+            </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">

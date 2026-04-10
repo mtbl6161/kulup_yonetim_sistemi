@@ -18,6 +18,9 @@ export interface Ayarlar {
   vergi_dairesi: string
   vergi_no: string
   sgk_no: string
+  ssk_sube?: string
+  mudur_unvani?: string
+  imza_url?: string
   gosterge: number
   katsayi: number
   saat_ucreti: number
@@ -41,6 +44,10 @@ export interface Ayarlar {
   dagitim_temizlik?: number
   dagitim_denetim?: number
   tavan_katsayi?: number
+  gv_istisna_sabiti?: number
+  dv_istisna_sabiti?: number
+  duzenleyen_adi?: string
+  duzenleyen_unvani?: string
   updated_at?: string
 }
 
@@ -52,7 +59,7 @@ export type GorevKategorisi =
   | 'Temizlik Personeli'
   | 'Başkan'
   | 'Başkan Yrd.'
-  | 'Denetim'
+  | 'Denetim Yetkilisi'
 
 export interface Ogrenci {
   id: number
@@ -74,8 +81,8 @@ export interface Personel {
   id: number
   ad: string
   tc?: string
+  sgk_no?: string
   gorev: string             // DB kolonunun gerçek adı
-  gorev_kategorisi?: string // migration ile eklendi (gorev'in kopyası)
   kadro_durumu?: string
   sgk_li: boolean
   vergi_istisnasi: boolean
@@ -197,6 +204,7 @@ export interface Yoklama {
 export interface DersProgrami {
   id: number
   kulup_adi: string
+  sinif_id?: number
   ogretmen_id?: number
   gun: number
   seans: 'sabah' | 'ogle'
@@ -205,6 +213,22 @@ export interface DersProgrami {
   ders_no?: number
   ay?: number
   yil?: number
+  created_at?: string
+  ogretmen?: Personel
+}
+
+export interface SinifDefteri {
+  id: number
+  kulup_adi: string
+  sinif_id?: number
+  ogretmen_id?: number
+  gun: number
+  ay: number
+  yil: number
+  seans: 'sabah' | 'ogle'
+  ders_no?: number
+  etkinlik_saati: number
+  durum: 'geldi' | 'gelmedi'
   created_at?: string
   ogretmen?: Personel
 }
@@ -237,11 +261,20 @@ export interface BordroSonuc {
   sgk_issizlik: number
   gv_matrah: number
   gv_oran: number
+  gv_hesaplanan: number
+  gv_istisna: number
   gv: number
+  dv_hesaplanan: number
+  dv_istisna: number
   dv: number
   toplam_kesinti: number
   net: number
   sgk_isveren: number
+  sgk_detay_kisa: number
+  sgk_detay_malulluk: number
+  sgk_detay_saglik: number
+  sgk_detay_issizlik: number
+  sgk_detay_toplam: number
 }
 
 export interface OdemeOzet {
@@ -250,4 +283,13 @@ export interface OdemeOzet {
   odenen: number
   kalan: number
   durum: 'tam' | 'kismi' | 'odenmedi' | 'ucretsiz'
+}
+export interface BordroSatir {
+  personel: Personel
+  toplamSaat: number
+  saatUcreti: number
+  hamBrut: number
+  sonuc: BordroSonuc
+  odendi: boolean
+  bordroId?: number
 }

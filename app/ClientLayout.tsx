@@ -9,12 +9,13 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar ay={ay} yil={yil} onAyChange={setAyYil} />
+      <Sidebar ay={ay} yil={yil} onAyChange={setAyYil} collapsed={collapsed} setCollapsed={setCollapsed} />
       <main
         id="main-content"
         style={{
-          marginLeft: 240,
+          marginLeft: collapsed ? 64 : 260,
           flex: 1,
+          minWidth: 0,
           display: 'flex',
           flexDirection: 'column',
           minHeight: '100vh',

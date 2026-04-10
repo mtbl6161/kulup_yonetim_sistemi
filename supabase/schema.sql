@@ -214,12 +214,16 @@ CREATE TABLE IF NOT EXISTS ders_programi (
   ogretmen_id     BIGINT  REFERENCES personel(id) ON DELETE SET NULL,
   gun             INTEGER NOT NULL CHECK (gun BETWEEN 1 AND 5),
   -- 1=Pazartesi ... 5=Cuma
+  ders_no         INTEGER NOT NULL DEFAULT 1,
+  ay              INTEGER,
+  yil             INTEGER,
   seans           TEXT    DEFAULT 'sabah',
   -- sabah | ogle
   saat            TEXT,
   etkinlik_saati  NUMERIC(4,1) DEFAULT 1,
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
+
 
 -- ============================================================
 -- RLS (Row Level Security) - Geliştirme için kapalı

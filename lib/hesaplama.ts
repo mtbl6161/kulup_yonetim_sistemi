@@ -10,9 +10,10 @@ export const AYLAR = [
 
 export const GUNLER = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma']
 
-export const RESMI_TATILLER: string[] = [
-  '01-01', '04-23', '05-01', '05-19', '07-15', '08-30', '10-29',
+export const RESMI_TATILLER = [
+  '01-01', '04-23', '05-01', '05-19', '07-15', '08-30', '10-29'
 ]
+
 
 // ============================================================
 // Tarih yardımcıları
@@ -29,18 +30,40 @@ export function haftaIciMi(yil: number, ay: number, gun: number): boolean {
   return d.getDay() !== 0 && d.getDay() !== 6
 }
 
-/** Resmi tatil mi? */
-export function tatilMi(ay: number, gun: number): boolean {
+/**
+ * Tarih bir tatil aralığında mı?
+ * @param yil Yıl
+ * @param ay Ay (1-12)
+ * @param gun Gün
+ * @param customTatiller Veritabanından gelen özel tatil listesi
+ */
+export function tatilMi(ay: number, gun: number, yil?: number, customTatiller?: any[]): boolean {
+  // 1. Sabit resmi tatil kontrolü (ay-gün bazlı)
   const str = `${String(ay).padStart(2, '0')}-${String(gun).padStart(2, '0')}`
-  return RESMI_TATILLER.includes(str)
+  if (RESMI_TATILLER.includes(str)) return true
+
+  // 2. Dinamik tatil kontrolü (veritabanı aralıkları bazlı)
+  if (yil && customTatiller && customTatiller.length > 0) {
+    const d = new Date(yil, ay - 1, gun, 12, 0, 0)
+    for (const t of customTatiller) {
+      const bas = new Date(t.baslangic_tarihi)
+      const bit = new Date(t.bitis_tarihi)
+      // Tarihlerin saatlerini sıfırlayıp karşılaştıralım (veya gün bazlı kontrol)
+      bas.setHours(0, 0, 0, 0)
+      bit.setHours(23, 59, 59, 999)
+      if (d >= bas && d <= bit) return true
+    }
+  }
+
+  return false
 }
 
 /** Aydaki iş günü sayısı (haftasonu + tatil hariç) */
-export function isGunuSayisi(yil: number, ay: number): number {
+export function isGunuSayisi(yil: number, ay: number, customTatiller?: any[]): number {
   const toplam = gunSayisi(yil, ay)
   let sayac = 0
   for (let g = 1; g <= toplam; g++) {
-    if (haftaIciMi(yil, ay, g) && !tatilMi(ay, g)) sayac++
+    if (haftaIciMi(yil, ay, g) && !tatilMi(ay, g, yil, customTatiller)) sayac++
   }
   return sayac
 }
@@ -67,12 +90,13 @@ export function ogrenciUcretiHesapla(
   ayarlar: Ayarlar,
   yil: number,
   ay: number,
-  kardesIndirimi: boolean
+  kardesIndirimi: boolean,
+  customTatiller?: any[]
 ): number {
-  const isGunu = isGunuSayisi(yil, ay)
+  const isGunu = isGunuSayisi(yil, ay, customTatiller)
   let ucret = isGunu * ayarlar.gunluk_saat * ayarlar.saat_ucreti
-  if (kardesIndirimi) ucret *= 0.5 // %50 kardeş indirimi
-  return Math.round(ucret * 100) / 100
+  if (kardesIndirimi) ucret *= 0.75 // %25 kardeş indirimi (Excel uyumlu: 0.75 çarpanı)
+  return Math.round(ucret * 100 + 1e-9) / 100
 }
 
 // ============================================================
@@ -104,41 +128,95 @@ export function gelirVergisiHesapla(
     prev = d.ust
     if (matrah <= d.ust) break
   }
-  return { oran: son_oran, tutar: Math.round(vergi * 100) / 100 }
+  return { oran: son_oran, tutar: Math.round(vergi * 100 + 1e-9) / 100 }
+}
+
+// ============================================================
+// Görev Tavan Yüzdeleri (MEB Yönergesi — En Yüksek Devlet Memuru Brüt Aylığının %'si)
+// ============================================================
+export function gorevTavanYuzdesi(gorev: string): number {
+  const g = (gorev || '').toLowerCase()
+  if (g.includes('koordinatör') || g.includes('koordinator')) return 275
+  if (g.includes('usta')) return 400
+  if (g.includes('öğretmen') || g.includes('ogretmen')) return 300
+  if ((g.includes('başkan') || g.includes('baskan')) && !g.includes('yardımcı') && !g.includes('yardimci')) return 275
+  if (g.includes('yardımcı') || g.includes('yardimci')) return 250
+  if (g.includes('muhasebe') || g.includes('memur')) return 80
+  if (g.includes('temizlik') || g.includes('hizmet') || g.includes('bakım')) return 80
+  if (g.includes('denetim')) return 275
+  return 300
+}
+
+export function tavanHesapla(gorev: string, tavanKatsayi: number): number {
+  return Math.round(tavanKatsayi * gorevTavanYuzdesi(gorev) / 100 * 100 + 1e-9) / 100
 }
 
 // ============================================================
 // Bordro hesaplama (tek kişi)
+// gorev : rol adı (tavan uygulaması için)
+// havuzBrut: havuzdan hesaplanan brüt (verilmezse saat × ücret kullanılır)
 // ============================================================
 export function bordroHesapla(
   ayarlar: Ayarlar,
   toplamSaat: number,
   yillikMatrah: number,
-  sgkLi: boolean
+  sgkLi: boolean,
+  gorev?: string,
+  havuzBrut?: number,
+  vergiIstisnasi?: boolean
 ): BordroSonuc {
-  const brut = Math.round(toplamSaat * ayarlar.saat_ucreti * 100) / 100
+  const br0 = havuzBrut !== undefined ? havuzBrut : toplamSaat * ayarlar.saat_ucreti
+  let brut = Math.round(br0 * 100 + 1e-9) / 100
+
+  // Tavan uygulaması
+  if (gorev && ayarlar.tavan_katsayi) {
+    const tavan = tavanHesapla(gorev, ayarlar.tavan_katsayi)
+    brut = Math.min(brut, tavan)
+  }
 
   // SGK kesintileri (sadece SGK'lı personel)
   const sgk_kisi = sgkLi
-    ? Math.round(brut * ayarlar.sgk_kisi_pay * 100) / 100
+    ? Math.round(brut * ayarlar.sgk_kisi_pay * 100 + 1e-9) / 100
     : 0
   const sgk_issizlik = sgkLi
-    ? Math.round(brut * ayarlar.sgk_issizlik_kisi * 100) / 100
+    ? Math.round(brut * ayarlar.sgk_issizlik_kisi * 100 + 1e-9) / 100
     : 0
 
   // GV matrahı = Brüt - SGK kişi payları
-  const gv_matrah = brut - sgk_kisi - sgk_issizlik
+  const gv_matrah = Math.round((brut - sgk_kisi - sgk_issizlik) * 100 + 1e-9) / 100
 
   // Gelir vergisi (kümülatif: yılbaşından bu aya kadarki matrah)
-  const gv_result = gelirVergisiHesapla(
-    gv_matrah + (yillikMatrah || 0),
-    ayarlar.vergi_dilimleri
-  )
   const gv_oran = gvDilimiBul(gv_matrah + (yillikMatrah || 0), ayarlar.vergi_dilimleri)
-  const gv = Math.round(gv_matrah * gv_oran * 100) / 100
+  const gv_hesaplanan = Math.round(gv_matrah * gv_oran * 100 + 1e-9) / 100
+  let gv_istisna = 0
 
-  // Damga vergisi
-  const dv = Math.round(gv_matrah * ayarlar.damga_vergi_orani * 100) / 100
+  // Damga vergisi (Brüt üzerinden - Excel ile uyumlu)
+  const dv_hesaplanan = Math.round(brut * ayarlar.damga_vergi_orani * 100 + 1e-9) / 100
+  let dv_istisna = 0
+
+  // Asgari Ücret Vergi İstisnası (İndirimi)
+  if (vergiIstisnasi) {
+    // GV İstisnası
+    if (ayarlar.gv_istisna_sabiti && ayarlar.gv_istisna_sabiti > 0) {
+      gv_istisna = ayarlar.gv_istisna_sabiti
+    } else if (ayarlar.asgari_ucret) {
+      const asgariMatrah = ayarlar.asgari_ucret * (1 - (ayarlar.sgk_kisi_pay || 0.14) - (ayarlar.sgk_issizlik_kisi || 0.01))
+      gv_istisna = Math.round(asgariMatrah * 0.15 * 100 + 1e-9) / 100
+    }
+    // İstisna, hesaplanan vergiyi aşamaz
+    gv_istisna = Math.round(Math.min(gv_hesaplanan, gv_istisna) * 100 + 1e-9) / 100
+
+    // DV İstisnası
+    if (ayarlar.dv_istisna_sabiti && ayarlar.dv_istisna_sabiti > 0) {
+      dv_istisna = ayarlar.dv_istisna_sabiti
+    } else if (ayarlar.asgari_ucret) {
+      dv_istisna = Math.round(ayarlar.asgari_ucret * ayarlar.damga_vergi_orani * 100 + 1e-9) / 100
+    }
+    dv_istisna = Math.round(Math.min(dv_hesaplanan, dv_istisna) * 100 + 1e-9) / 100
+  }
+
+  const gv = Math.round((gv_hesaplanan - gv_istisna) * 100 + 1e-9) / 100
+  const dv = Math.round((dv_hesaplanan - dv_istisna) * 100 + 1e-9) / 100
 
   // SGK işveren payı
   const sgk_isveren = sgkLi
@@ -148,25 +226,38 @@ export function bordroHesapla(
             ayarlar.sgk_malulluk +
             ayarlar.sgk_saglik +
             ayarlar.sgk_issizlik_isveren) *
-          100
+          100 + 1e-9
       ) / 100
     : 0
 
-  const toplam_kesinti = gv + dv + sgk_kisi + sgk_issizlik
-  const net = Math.round((brut - toplam_kesinti) * 100) / 100
+  const toplam_kesinti = Math.round((gv + dv + sgk_kisi + sgk_issizlik) * 100 + 1e-9) / 100
+  const net = Math.round((brut - toplam_kesinti) * 100 + 1e-9) / 100
 
-  return {
+  const res: BordroSonuc = {
     brut,
     sgk_kisi,
     sgk_issizlik,
     gv_matrah,
     gv_oran,
+    gv_hesaplanan,
+    gv_istisna,
     gv,
+    dv_hesaplanan,
+    dv_istisna,
     dv,
     toplam_kesinti,
     net,
     sgk_isveren,
+    sgk_detay_kisa: Math.round(brut * 0.0225 * 100 + 1e-9) / 100,
+    sgk_detay_malulluk: Math.round(brut * 0.20 * 100 + 1e-9) / 100,
+    sgk_detay_saglik: Math.round(brut * 0.125 * 100 + 1e-9) / 100,
+    sgk_detay_issizlik: Math.round(brut * 0.03 * 100 + 1e-9) / 100,
+    sgk_detay_toplam: 0,
   }
+
+  res.sgk_detay_toplam = Math.round((res.sgk_detay_kisa + res.sgk_detay_malulluk + res.sgk_detay_saglik + res.sgk_detay_issizlik) * 100 + 1e-9) / 100
+
+  return res
 }
 
 // ============================================================
