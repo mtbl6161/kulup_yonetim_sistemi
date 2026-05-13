@@ -8,6 +8,38 @@ export interface VergiDilimi {
   oran: number
 }
 
+export interface Il {
+  id: number
+  ad: string
+  created_at?: string
+}
+
+export interface Okul {
+  id: number
+  ad: string
+  il_id?: number
+  lisans_bitis?: string // ISO Tarih formatı
+  odeme_durumu?: 'aktif' | 'borclu' | 'kapali' | 'deneme' | 'pasif'
+  created_at?: string
+  ogrenci_sayisi?: number
+  personel_sayisi?: number
+  lemonsqueezy_customer_id?: string
+  lemonsqueezy_subscription_id?: string
+}
+
+export type KullaniciRol = 'admin' | 'super_admin' | 'denetim_yetkilisi'
+
+export interface Profil {
+  id: string // UUID
+  okul_id?: number  // admin rolü için
+  il_id?: number    // denetim_yetkilisi rolü için
+  rol: KullaniciRol
+  ad?: string       // Yeni alan
+  soyad?: string    // Yeni alan
+  son_giris?: string // ISO Tarih formatı
+  created_at?: string
+}
+
 export interface Ayarlar {
   id: number
   kurum_adi: string
@@ -48,7 +80,16 @@ export interface Ayarlar {
   dv_istisna_sabiti?: number
   duzenleyen_adi?: string
   duzenleyen_unvani?: string
+  ogrenci_saat_ucreti?: number
+  ogretmen_saat_ucreti?: number // New field for manual teacher rate
+  // SGK e-Bildirge Alanları
+  sgk_sicil_no?: string       // 21 hane
+  sgk_kontrol_no?: string     // 2 hane
+  sgk_araci_no?: string       // 3 hane
+  sgk_kanun_no?: string       // 5 hane (05510 vb)
+  sgk_belge_turu?: string     // 2 hane (01 vb)
   updated_at?: string
+  okul_id?: number
 }
 
 export type GorevKategorisi =
@@ -71,10 +112,15 @@ export interface Ogrenci {
   kardes_indirimi: boolean
   anne_adi?: string
   anne_tel?: string
+  veli_ad?: string          // Yeni alan
   ucretsiz_mi: boolean
   ucretsiz_nedeni?: string
+  gunluk_saat?: number      // Bireysel saat kısıtı
   aktif?: boolean           // migration ile eklendi
+  lemonsqueezy_customer_id?: string
+  lemonsqueezy_subscription_id?: string
   created_at?: string
+  okul_id?: number
 }
 
 export interface Personel {
@@ -93,7 +139,11 @@ export interface Personel {
   kalan_dv_istisnasi?: number
   personel_turu?: string
   aktif?: boolean           // migration ile eklendi
+  koordinator_id?: number | null // migration ile eklendi
+  is_retired?: boolean      // migration ile eklendi
+  email?: string            // migration ile eklendi
   created_at?: string
+  okul_id?: number
 }
 
 export interface Puantaj {
@@ -104,6 +154,7 @@ export interface Puantaj {
   etkinlik_saati?: number   // migration ile eklendi (saat'in kopyası)
   ay?: number               // migration ile eklendi
   yil?: number              // migration ile eklendi
+  okul_id?: number
 }
 
 export interface Tahsilat {
@@ -117,6 +168,7 @@ export interface Tahsilat {
   aciklama?: string
   created_at?: string
   ogrenci?: Ogrenci
+  okul_id?: number
 }
 
 export interface Tahakkuk {
@@ -127,6 +179,7 @@ export interface Tahakkuk {
   dagilim_json?: TahakkukDagilim
   hesaplandi_mi: boolean
   created_at?: string
+  okul_id?: number
 }
 
 export interface TahakkukDagilim {
@@ -162,6 +215,7 @@ export interface Bordro {
   dv_istisna_tutari?: number
   created_at?: string
   personel?: Personel
+  okul_id?: number
 }
 
 export interface Gider {
@@ -174,6 +228,7 @@ export interface Gider {
   ay?: number
   yil?: number
   created_at?: string
+  okul_id?: number
 }
 
 export interface HesapHareketi {
@@ -189,6 +244,7 @@ export interface HesapHareketi {
   ay?: number               // migration ile eklendi
   yil?: number              // migration ile eklendi
   created_at?: string
+  okul_id?: number
 }
 
 export interface Yoklama {
@@ -199,6 +255,7 @@ export interface Yoklama {
   ay?: number               // migration ile eklendi
   yil?: number              // migration ile eklendi
   ogrenci?: Ogrenci
+  okul_id?: number
 }
 
 export interface DersProgrami {
@@ -215,6 +272,7 @@ export interface DersProgrami {
   yil?: number
   created_at?: string
   ogretmen?: Personel
+  okul_id?: number
 }
 
 export interface SinifDefteri {
@@ -231,6 +289,7 @@ export interface SinifDefteri {
   durum: 'geldi' | 'gelmedi'
   created_at?: string
   ogretmen?: Personel
+  okul_id?: number
 }
 
 export interface Tatil {

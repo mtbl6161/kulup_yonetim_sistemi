@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
+.env*.local
+
+# Claude worktrees
+.claude/worktrees/
+
+# Scratch & worksheets
+scratch/
+worksheets/
+
+# PDF dosyalar
+*.pdf

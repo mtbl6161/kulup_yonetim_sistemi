@@ -6,12 +6,14 @@ import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
 import { fmtTL, ayLabel, tarihFmt } from '@/lib/hesaplama'
 import { HesapHareketi } from '@/lib/types'
+import ConfirmModal from '@/components/ConfirmModal'
 
 export default function HesapHareketleriPage() {
   const { ay, yil } = useAy()
   const [hareketler, setHareketler] = useState<HesapHareketi[]>([])
   const [loading, setLoading] = useState(true)
   const [filtre, setFiltre] = useState('hepsi')
+  const [conf, setConf] = useState<{ open: boolean, id: number } | null>(null)
 
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -30,7 +32,11 @@ export default function HesapHareketleriPage() {
 
 
   async function sil(id: number) {
-    if (!confirm('Bu işlemi silmek istediğinizden emin misiniz?')) return
+    setConf({ open: true, id })
+  }
+
+  async function silGercek(id: number) {
+    setConf(null)
     await supabase.from('hesap_hareketleri').delete().eq('id', id)
     load()
   }
@@ -73,9 +79,9 @@ export default function HesapHareketleriPage() {
       <div style={{ padding: 28 }}>
         {/* Özet */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 20 }}>
-          <StatCard label="Toplam Gelir" value={fmtTL(toplamGelir)} sub={`${hareketler.filter(h => h.tur === 'gelir').length} işlem`} variant="orange" />
-          <StatCard label="Toplam Gider" value={fmtTL(toplamGider)} sub={`${hareketler.filter(h => h.tur === 'gider').length} işlem`} variant="red" />
-          <StatCard label="Net Kasa Bakiyesi" value={fmtTL(netBakiye)} sub="Anlık bakiye" variant="teal" />
+          <StatCard title="Toplam Gelir" value={fmtTL(toplamGelir)} trend={`${hareketler.filter(h => h.tur === 'gelir').length} işlem`} variant="orange" />
+          <StatCard title="Toplam Gider" value={fmtTL(toplamGider)} trend={`${hareketler.filter(h => h.tur === 'gider').length} işlem`} variant="red" />
+          <StatCard title="Net Kasa Bakiyesi" value={fmtTL(netBakiye)} trend="Anlık bakiye" variant="teal" />
         </div>
 
 
@@ -148,6 +154,17 @@ export default function HesapHareketleriPage() {
           </div>
         </div>
       </div>
+
+      {conf?.open && (
+        <ConfirmModal
+          baslik="İşlemi Sil?"
+          mesaj="Bu hesap hareketini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
+          onayMetni="Evet, Sil"
+          tehlikeli={true}
+          onOnayla={() => silGercek(conf.id)}
+          onIptal={() => setConf(null)}
+        />
+      )}
     </div>
   )
 }

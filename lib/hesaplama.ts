@@ -91,12 +91,20 @@ export function ogrenciUcretiHesapla(
   yil: number,
   ay: number,
   kardesIndirimi: boolean,
-  customTatiller?: any[]
+  customTatiller?: any[],
+  toplamSaatOverride?: number
 ): number {
+  if (toplamSaatOverride != null && toplamSaatOverride > 0) {
+    // Eğer özel bir TOPLAM SAAT girilmişse, iş günüyle çarpmadan direkt hesapla
+    let ucret = toplamSaatOverride * ayarlar.saat_ucreti
+    if (kardesIndirimi) ucret *= 0.75
+    return ucret
+  }
+
   const isGunu = isGunuSayisi(yil, ay, customTatiller)
   let ucret = isGunu * ayarlar.gunluk_saat * ayarlar.saat_ucreti
-  if (kardesIndirimi) ucret *= 0.75 // %25 kardeş indirimi (Excel uyumlu: 0.75 çarpanı)
-  return Math.round(ucret * 100 + 1e-9) / 100
+  if (kardesIndirimi) ucret *= 0.75 // %25 kardeş indirimi
+  return ucret
 }
 
 // ============================================================
@@ -161,6 +169,7 @@ export function bordroHesapla(
   toplamSaat: number,
   yillikMatrah: number,
   sgkLi: boolean,
+  isRetired: boolean, // New parameter
   gorev?: string,
   havuzBrut?: number,
   vergiIstisnasi?: boolean
@@ -174,20 +183,34 @@ export function bordroHesapla(
     brut = Math.min(brut, tavan)
   }
 
-  // SGK kesintileri (sadece SGK'lı personel)
-  const sgk_kisi = sgkLi
-    ? Math.round(brut * ayarlar.sgk_kisi_pay * 100 + 1e-9) / 100
-    : 0
-  const sgk_issizlik = sgkLi
-    ? Math.round(brut * ayarlar.sgk_issizlik_kisi * 100 + 1e-9) / 100
-    : 0
+  // SGK kesintileri
+  let sgk_kisi = 0
+  let sgk_issizlik = 0
+
+  if (sgkLi) {
+    if (isRetired) {
+      // Emekli çalışan için sadece %7.5 SGDP kesilir, işsizlik kesilmez
+      sgk_kisi = Math.round(brut * 0.075 * 100 + 1e-9) / 100
+      sgk_issizlik = 0
+    } else {
+      sgk_kisi = Math.round(brut * (ayarlar.sgk_kisi_pay || 0.14) * 100 + 1e-9) / 100
+      sgk_issizlik = Math.round(brut * (ayarlar.sgk_issizlik_kisi || 0.01) * 100 + 1e-9) / 100
+    }
+  }
 
   // GV matrahı = Brüt - SGK kişi payları
   const gv_matrah = Math.round((brut - sgk_kisi - sgk_issizlik) * 100 + 1e-9) / 100
 
-  // Gelir vergisi (kümülatif: yılbaşından bu aya kadarki matrah)
-  const gv_oran = gvDilimiBul(gv_matrah + (yillikMatrah || 0), ayarlar.vergi_dilimleri)
-  const gv_hesaplanan = Math.round(gv_matrah * gv_oran * 100 + 1e-9) / 100
+  // Gelir vergisi — Kümülatif fark yöntemi (Kademeli & Vergi mevzuatı uyumlu):
+  // Bu aya atfedilen GV = GV(yılbaşı + bu ay) − GV(yılbaşı)
+  // Bu sayede dilim sınırı bu ayda aşılsa bile sadece aşan kısım üst dilimden vergilenir.
+  const dilimler = ayarlar.vergi_dilimleri || []
+  
+  const gvOnceki = gelirVergisiHesapla(yillikMatrah || 0, dilimler)
+  const gvYeniToplam = gelirVergisiHesapla((yillikMatrah || 0) + gv_matrah, dilimler)
+  
+  const gv_hesaplanan = Math.round((gvYeniToplam.tutar - gvOnceki.tutar) * 100 + 1e-9) / 100
+  const gv_oran = gvYeniToplam.oran // Nihai ulaşılan en üst vergi oranı
   let gv_istisna = 0
 
   // Damga vergisi (Brüt üzerinden - Excel ile uyumlu)
@@ -219,16 +242,28 @@ export function bordroHesapla(
   const dv = Math.round((dv_hesaplanan - dv_istisna) * 100 + 1e-9) / 100
 
   // SGK işveren payı
-  const sgk_isveren = sgkLi
-    ? Math.round(
-        brut *
-          (ayarlar.sgk_kisa_vadeli +
-            ayarlar.sgk_malulluk +
-            ayarlar.sgk_saglik +
-            ayarlar.sgk_issizlik_isveren) *
-          100 + 1e-9
-      ) / 100
-    : 0
+  let sgk_isveren = 0
+  let sgk_detay_kisa = 0
+  let sgk_detay_malulluk = 0
+  let sgk_detay_saglik = 0
+  let sgk_detay_issizlik = 0
+
+  if (sgkLi) {
+    if (isRetired) {
+      // Emekli (SGDP) İşveren Payı: %22.5 SGDP + %2 Kısa Vadeli = %24.5
+      sgk_detay_kisa = Math.round(brut * 0.02 * 100 + 1e-9) / 100
+      sgk_detay_malulluk = Math.round(brut * 0.225 * 100 + 1e-9) / 100
+      sgk_detay_saglik = 0
+      sgk_detay_issizlik = 0
+      sgk_isveren = Math.round((sgk_detay_kisa + sgk_detay_malulluk) * 100 + 1e-9) / 100
+    } else {
+      sgk_detay_kisa = Math.round(brut * (ayarlar.sgk_kisa_vadeli || 0.0225) * 100 + 1e-9) / 100
+      sgk_detay_malulluk = Math.round(brut * (ayarlar.sgk_malulluk || 0.20) * 100 + 1e-9) / 100
+      sgk_detay_saglik = Math.round(brut * (ayarlar.sgk_saglik || 0.125) * 100 + 1e-9) / 100
+      sgk_detay_issizlik = Math.round(brut * (ayarlar.sgk_issizlik_isveren || 0.03) * 100 + 1e-9) / 100
+      sgk_isveren = Math.round((sgk_detay_kisa + sgk_detay_malulluk + sgk_detay_saglik + sgk_detay_issizlik) * 100 + 1e-9) / 100
+    }
+  }
 
   const toplam_kesinti = Math.round((gv + dv + sgk_kisi + sgk_issizlik) * 100 + 1e-9) / 100
   const net = Math.round((brut - toplam_kesinti) * 100 + 1e-9) / 100
@@ -248,10 +283,10 @@ export function bordroHesapla(
     toplam_kesinti,
     net,
     sgk_isveren,
-    sgk_detay_kisa: Math.round(brut * 0.0225 * 100 + 1e-9) / 100,
-    sgk_detay_malulluk: Math.round(brut * 0.20 * 100 + 1e-9) / 100,
-    sgk_detay_saglik: Math.round(brut * 0.125 * 100 + 1e-9) / 100,
-    sgk_detay_issizlik: Math.round(brut * 0.03 * 100 + 1e-9) / 100,
+    sgk_detay_kisa,
+    sgk_detay_malulluk,
+    sgk_detay_saglik,
+    sgk_detay_issizlik,
     sgk_detay_toplam: 0,
   }
 

@@ -2,8 +2,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import Topbar from '@/components/Topbar'
 import { supabase } from '@/lib/supabase'
-import { Sinif, Personel } from '@/lib/types'
+import { Sinif, Personel, Ayarlar } from '@/lib/types'
 import { fmtTL } from '@/lib/hesaplama'
+import ConfirmModal from '@/components/ConfirmModal'
 
 const BOŞ: Omit<Sinif, 'id' | 'created_at'> = {
   ad: '', ogretmen: '', kapasite: 15, aylik_ucret: 0,
@@ -17,17 +18,21 @@ export default function SiniflarPage() {
   const [duzenle, setDuzenle] = useState<Sinif | null>(null)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [ayarlar, setAyarlar] = useState<Ayarlar | null>(null)
+  const [conf, setConf] = useState<{ open: boolean, id: number } | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const [{ data: sin, error: sinErr }, { data: per, error: perErr }] = await Promise.all([
+      const [{ data: sin, error: sinErr }, { data: per, error: perErr }, { data: ayr }] = await Promise.all([
         supabase.from('siniflar').select('*').order('ad'),
-        supabase.from('personel').select('*').order('ad')
+        supabase.from('personel').select('*').order('ad'),
+        supabase.from('ayarlar').select('*').single()
       ])
       if (sinErr) throw sinErr
       if (perErr) throw perErr
       setSiniflar(sin || [])
       setPersonel(per || [])
+      setAyarlar(ayr || null)
     } catch (err: any) {
       setMsg('❌ Veri yükleme hatası: ' + err.message)
     }
@@ -72,7 +77,16 @@ export default function SiniflarPage() {
   async function kaydet() {
     if (!form.ad.trim()) { setMsg('❌ Sınıf adı zorunlu!'); return }
     setSaving(true); setMsg('')
-    const payload = { ad: form.ad.trim(), ogretmen: form.ogretmen || null, kapasite: form.kapasite, aylik_ucret: form.aylik_ucret, yas_grubu: form.yas_grubu || null, aciklama: form.aciklama || null, aktif: form.aktif }
+    const payload = { 
+      ad: form.ad.trim(), 
+      ogretmen: form.ogretmen || null, 
+      kapasite: form.kapasite, 
+      aylik_ucret: form.aylik_ucret, 
+      yas_grubu: form.yas_grubu || null, 
+      aciklama: form.aciklama || null, 
+      aktif: form.aktif,
+      okul_id: ayarlar?.okul_id
+    }
     const { error } = duzenle
       ? await supabase.from('siniflar').update(payload).eq('id', duzenle.id)
       : await supabase.from('siniflar').insert(payload)
@@ -85,7 +99,11 @@ export default function SiniflarPage() {
   }
 
   async function sil(id: number) {
-    if (!confirm('Bu sınıfı silmek istediğinizden emin misiniz?')) return
+    setConf({ open: true, id })
+  }
+
+  async function silGercek(id: number) {
+    setConf(null)
     await supabase.from('siniflar').delete().eq('id', id)
     load()
   }
@@ -107,14 +125,15 @@ export default function SiniflarPage() {
           <div className="card-title">{duzenle ? '✏️ Sınıf Düzenle' : '➕ Yeni Sınıf Ekle'}</div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ flex: 2, minWidth: 180 }}>
-              <label className="form-label">Sınıf / Kulüp Adı *</label>
-              <input className="form-input" placeholder="Güzel Sanatlar..." value={form.ad} onChange={e => setForm(f => ({ ...f, ad: e.target.value }))} />
+              <label htmlFor="sinif-ad" className="form-label">Sınıf / Kulüp Adı *</label>
+              <input id="sinif-ad" className="form-input" required placeholder="Güzel Sanatlar..." value={form.ad} onChange={e => setForm(f => ({ ...f, ad: e.target.value }))} />
             </div>
             <div style={{ flex: 2, minWidth: 160 }}>
-              <label className="form-label">Sorumlu Öğretmen</label>
-              <select 
-                className="form-input" 
-                value={form.ogretmen || ''} 
+              <label htmlFor="sinif-ogretmen" className="form-label">Sorumlu Öğretmen</label>
+              <select
+                id="sinif-ogretmen"
+                className="form-input"
+                value={form.ogretmen || ''}
                 onChange={e => setForm(f => ({ ...f, ogretmen: e.target.value }))}
               >
                 <option value="">— Seçilmedi —</option>
@@ -128,20 +147,20 @@ export default function SiniflarPage() {
               </select>
             </div>
             <div style={{ width: 110 }}>
-              <label className="form-label">Yaş Grubu</label>
-              <input className="form-input" placeholder="5-6 yaş" value={form.yas_grubu || ''} onChange={e => setForm(f => ({ ...f, yas_grubu: e.target.value }))} />
+              <label htmlFor="sinif-yas" className="form-label">Yaş Grubu</label>
+              <input id="sinif-yas" className="form-input" placeholder="5-6 yaş" value={form.yas_grubu || ''} onChange={e => setForm(f => ({ ...f, yas_grubu: e.target.value }))} />
             </div>
             <div style={{ width: 100 }}>
-              <label className="form-label">Kapasite</label>
-              <input className="form-input" type="number" min="1" value={form.kapasite} onChange={e => setForm(f => ({ ...f, kapasite: parseInt(e.target.value) || 15 }))} />
+              <label htmlFor="sinif-kapasite" className="form-label">Kapasite</label>
+              <input id="sinif-kapasite" className="form-input" type="number" min="1" value={form.kapasite} onChange={e => setForm(f => ({ ...f, kapasite: parseInt(e.target.value) || 15 }))} />
             </div>
             <div style={{ width: 130 }}>
-              <label className="form-label">Aylık Ücret (₺)</label>
-              <input className="form-input" type="number" step="0.01" min="0" value={form.aylik_ucret} onChange={e => setForm(f => ({ ...f, aylik_ucret: parseFloat(e.target.value) || 0 }))} />
+              <label htmlFor="sinif-ucret" className="form-label">Aylık Ücret (₺)</label>
+              <input id="sinif-ucret" className="form-input" type="number" step="0.01" min="0" value={form.aylik_ucret} onChange={e => setForm(f => ({ ...f, aylik_ucret: parseFloat(e.target.value) || 0 }))} />
             </div>
             <div style={{ flex: 3, minWidth: 200 }}>
-              <label className="form-label">Açıklama</label>
-              <input className="form-input" placeholder="Opsiyonel açıklama..." value={form.aciklama || ''} onChange={e => setForm(f => ({ ...f, aciklama: e.target.value }))} />
+              <label htmlFor="sinif-aciklama" className="form-label">Açıklama</label>
+              <input id="sinif-aciklama" className="form-input" placeholder="Opsiyonel açıklama..." value={form.aciklama || ''} onChange={e => setForm(f => ({ ...f, aciklama: e.target.value }))} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
@@ -207,6 +226,17 @@ export default function SiniflarPage() {
           </div>
         </div>
       </div>
+
+      {conf?.open && (
+        <ConfirmModal
+          baslik="Sınıfı Sil?"
+          mesaj="Bu sınıfı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
+          onayMetni="Evet, Sil"
+          tehlikeli={true}
+          onOnayla={() => silGercek(conf.id)}
+          onIptal={() => setConf(null)}
+        />
+      )}
     </div>
   )
 }

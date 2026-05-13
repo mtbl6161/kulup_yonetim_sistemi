@@ -25,8 +25,8 @@ export default function GelirGiderPage() {
     })
   }, [])
 
-  const toplamGelir = hareketler.filter(h => h.tur === 'gelir').reduce((s, h) => s + Number(h.tutar), 0)
-  const toplamGider = hareketler.filter(h => h.tur === 'gider').reduce((s, h) => s + Number(h.tutar), 0)
+  const toplamGelir = Math.round(hareketler.filter(h => h.tur === 'gelir').reduce((s, h) => s + Number(h.tutar), 0) * 100) / 100
+  const toplamGider = Math.round(hareketler.filter(h => h.tur === 'gider').reduce((s, h) => s + Number(h.tutar), 0) * 100) / 100
 
   // Aylık özet
   const aylikMap: Record<string, AylikOzet> = {}
@@ -62,9 +62,9 @@ export default function GelirGiderPage() {
       <div style={{ padding: 28 }}>
         {/* Genel özetle */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 20 }}>
-          <StatCard label="Toplam Gelir" value={fmtTL(toplamGelir)} sub="Tüm zamanlar" />
-          <StatCard label="Toplam Gider" value={fmtTL(toplamGider)} sub="Tüm zamanlar" variant="red" />
-          <StatCard label="Net Bakiye" value={fmtTL(toplamGelir - toplamGider)} sub="Anlık bakiye" variant={toplamGelir >= toplamGider ? 'teal' : 'red'} />
+          <StatCard title="Toplam Gelir" value={fmtTL(toplamGelir)} trend="Tüm zamanlar" />
+          <StatCard title="Toplam Gider" value={fmtTL(toplamGider)} trend="Tüm zamanlar" variant="red" />
+          <StatCard title="Net Bakiye" value={fmtTL(toplamGelir - toplamGider)} trend="Anlık bakiye" variant={toplamGelir >= toplamGider ? 'teal' : 'red'} />
         </div>
 
         <div className="card">

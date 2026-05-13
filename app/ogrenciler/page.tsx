@@ -2,41 +2,62 @@
 import { useEffect, useState } from 'react'
 import Topbar from '@/components/Topbar'
 import Badge from '@/components/Badge'
+import ImportModal from '@/components/ImportModal'
+import ConfirmModal from '@/components/ConfirmModal'
 import { supabase } from '@/lib/supabase'
-import { Ogrenci } from '@/lib/types'
+import { logIslem } from '@/lib/audit'
+import { useAuth } from '@/lib/AuthContext'
+import { Ogrenci, Ayarlar, Personel } from '@/lib/types'
+import OgrenciModal from '@/components/OgrenciModal'
+import { Plus, Search } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 
-const EMPTY: Partial<Ogrenci> = {
-  ad: '', soyad: '', tc: '', sinif: '', ogretmen: '',
-  kardes_indirimi: false, anne_adi: '', anne_tel: '',
-  ucretsiz_mi: false, ucretsiz_nedeni: '', aktif: true,
-}
+function OgrencilerIc() {
+  const { profil } = useAuth()
+  const searchParams = useSearchParams()
+  const targetId = searchParams.get('id')
 
-export default function OgrencilerPage() {
   const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
-  const [personel, setPersonel] = useState<any[]>([])
+  const [personel, setPersonel] = useState<Personel[]>([])
   const [siniflar, setSiniflar] = useState<any[]>([])
-  const [form, setForm] = useState<Partial<Ogrenci>>(EMPTY)
-  const [editId, setEditId] = useState<number | null>(null)
+  const [editItem, setEditItem] = useState<Ogrenci | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [silOnayId, setSilOnayId] = useState<number | null>(null)
   const [filtre, setFiltre] = useState('')
   const [sinifFiltre, setSinifFiltre] = useState('')
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [importAcik, setImportAcik] = useState(false)
+  const [ayarlar, setAyarlar] = useState<Ayarlar | null>(null)
 
   async function load() {
     setLoading(true)
-    const [{ data: ogr }, { data: per }, { data: sin }] = await Promise.all([
+    const [{ data: ogr }, { data: per }, { data: sin }, { data: ayr }] = await Promise.all([
       supabase.from('ogrenciler').select('*').order('soyad'),
       supabase.from('personel').select('*').order('ad'),
-      supabase.from('siniflar').select('*').eq('aktif', true).order('ad')
+      supabase.from('siniflar').select('*').eq('aktif', true).order('ad'),
+      supabase.from('ayarlar').select('*').single()
     ])
-    setOgrenciler(ogr || [])
-    setPersonel(per || [])
+    
+    const aktifOgrenciler = (ogr || []).filter(o => o.aktif !== false)
+    setOgrenciler(aktifOgrenciler)
+    setPersonel((per || []).filter(p => p.aktif !== false))
     setSiniflar(sin || [])
+    setAyarlar(ayr || null)
     setLoading(false)
+
+    // URL'den gelen ID varsa modalı aç
+    if (targetId && aktifOgrenciler.length > 0) {
+      const found = aktifOgrenciler.find(o => o.id === Number(targetId))
+      if (found) {
+        setEditItem(found)
+        setIsModalOpen(true)
+      }
+    }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [targetId])
 
   // Hiyerarşik Sıralama ve Filtreleme Mantığı
   const ogretmenListesi = personel
@@ -61,54 +82,37 @@ export default function OgrencilerPage() {
       return (a.ad || '').localeCompare(b.ad || '', 'tr')
     })
 
-  function setF(key: keyof Ogrenci, val: unknown) {
-    setForm(f => ({ ...f, [key]: val }))
-  }
-
-  async function kaydet() {
-    if (!form.ad?.trim() || !form.soyad?.trim()) {
-      setMsg('❌ Ad ve soyad zorunlu!')
-      return
-    }
-    setSaving(true)
-    setMsg('')
-    const data = {
-      ...form,
-      ad: form.ad!.trim().toUpperCase(),
-      soyad: form.soyad!.trim().toUpperCase(),
-      ogretmen: form.ogretmen || '',
-    }
-    let error
-    if (editId) {
-      ;({ error } = await supabase.from('ogrenciler').update(data).eq('id', editId))
-    } else {
-      ;({ error } = await supabase.from('ogrenciler').insert(data))
-    }
-    setSaving(false)
-    if (error) { setMsg('❌ Hata: ' + error.message); return }
-    setMsg('✅ Kaydedildi!')
-    setTimeout(() => setMsg(''), 2000)
-    temizle()
-    load()
-  }
-
   function duzenle(o: Ogrenci) {
-    setEditId(o.id)
-    setForm({ ...o })
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setEditItem(o)
+    setIsModalOpen(true)
   }
 
   async function sil(id: number) {
-    if (!confirm('Öğrenciyi silmek istediğinizden emin misiniz?')) return
-    // aktif varsa false yap, yoksa tamamen sil
-    const { error: upErr } = await supabase.from('ogrenciler').update({ aktif: false } as Record<string, unknown>).eq('id', id)
-    if (upErr) await supabase.from('ogrenciler').delete().eq('id', id)
-    load()
+    const silinen = ogrenciler.find(o => o.id === id)
+    setSilOnayId(null)
+
+    const { error } = await supabase
+      .from('ogrenciler')
+      .delete()
+      .eq('id', id)
+
+    if (!error) {
+      if (silinen) logIslem({ islem: 'sil', tablo: 'ogrenciler', kayit_id: id, aciklama: `${silinen.ad} ${silinen.soyad} silindi` })
+      load()
+      return
+    }
+
+    if (error.code === '23503') {
+      setMsg(`❌ "${silinen?.ad} ${silinen?.soyad}" silinemedi: Bağlı yoklama/tahsilat kayıtları var. Lütfen önce "migration_fix_fk_on_delete_set_null.sql" dosyasını Supabase'de çalıştırın.`)
+    } else {
+      setMsg(`❌ Silme hatası (${error.code}): ${error.message}`)
+    }
+    setTimeout(() => setMsg(''), 10000)
   }
 
-  function temizle() {
-    setEditId(null)
-    setForm(EMPTY)
+  function modalKapat() {
+    setIsModalOpen(false)
+    setEditItem(null)
   }
 
   const liste = ogrenciler.filter(o => {
@@ -126,88 +130,7 @@ export default function OgrencilerPage() {
     <div>
       <Topbar title="Öğrenci Listesi" sub="Kayıt ve yönetim" />
       <div style={{ padding: 28 }}>
-
-        {/* Form */}
-        <div className="card">
-          <div className="card-title">{editId ? '✏️ Öğrenci Düzenle' : '➕ Öğrenci Ekle'}</div>
-          {msg && <div className={`alert ${msg.startsWith('✅') ? 'alert-success' : 'alert-danger'}`}>{msg}</div>}
-
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-            <div style={{ flex: 2, minWidth: 140 }}>
-              <label className="form-label">Ad</label>
-              <input className="form-input" placeholder="Öğrenci adı" value={form.ad || ''} onChange={e => setF('ad', e.target.value)} />
-            </div>
-            <div style={{ flex: 2, minWidth: 140 }}>
-              <label className="form-label">Soyad</label>
-              <input className="form-input" value={form.soyad || ''} onChange={e => setF('soyad', e.target.value)} />
-            </div>
-            <div style={{ width: 130 }}>
-              <label className="form-label">T.C. Kimlik No</label>
-              <input className="form-input" maxLength={11} value={form.tc || ''} onChange={e => setF('tc', e.target.value)} />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-            <div style={{ flex: 1, minWidth: 120 }}>
-              <label className="form-label">Sınıf</label>
-              <select className="form-select" value={form.sinif || ''} onChange={e => setF('sinif', e.target.value)}>
-                <option value="">— Seçilmedi —</option>
-                {siniflar.map((s, i) => (
-                  <option key={i} value={s.ad}>{s.ad}</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ flex: 2, minWidth: 160 }}>
-              <label className="form-label">Öğretmen</label>
-              <select className="form-select" value={form.ogretmen || ''} onChange={e => setF('ogretmen', e.target.value)}>
-                <option value="">— Seçilmedi —</option>
-                {ogretmenListesi.map((p, i) => (
-                  <option key={i} value={p.ad}>{p.ad} ({p.gorev})</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ width: 140 }}>
-              <label className="form-label">Kardeş İndirimi</label>
-              <select className="form-select" value={form.kardes_indirimi ? 'evet' : 'hayir'} onChange={e => setF('kardes_indirimi', e.target.value === 'evet')}>
-                <option value="hayir">Hayır</option>
-                <option value="evet">Evet (%50)</option>
-              </select>
-            </div>
-            <div style={{ flex: 1, minWidth: 120 }}>
-              <label className="form-label">Anne Adı</label>
-              <input className="form-input" value={form.anne_adi || ''} onChange={e => setF('anne_adi', e.target.value)} />
-            </div>
-            <div style={{ flex: 1, minWidth: 120 }}>
-              <label className="form-label">Anne Telefon</label>
-              <input className="form-input" value={form.anne_tel || ''} onChange={e => setF('anne_tel', e.target.value)} />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-            <div style={{ width: 130 }}>
-              <label className="form-label">Ücretsiz mi?</label>
-              <select className="form-select" value={form.ucretsiz_mi ? 'evet' : 'hayir'} onChange={e => setF('ucretsiz_mi', e.target.value === 'evet')}>
-                <option value="hayir">Hayır</option>
-                <option value="evet">Evet</option>
-              </select>
-            </div>
-            {form.ucretsiz_mi && (
-              <div style={{ flex: 2 }}>
-                <label className="form-label">Ücretsiz Nedeni</label>
-                <input className="form-input" value={form.ucretsiz_nedeni || ''} onChange={e => setF('ucretsiz_nedeni', e.target.value)} />
-              </div>
-            )}
-          </div>
-
-          <div style={{ textAlign: 'right', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            {editId && (
-              <button className="btn btn-secondary btn-sm" onClick={temizle}>✕ Temizle</button>
-            )}
-            <button className="btn btn-primary" onClick={kaydet} disabled={saving}>
-              {saving ? '⏳...' : editId ? '💾 Güncelle' : '➕ Kaydet'}
-            </button>
-          </div>
-        </div>
+        {msg && <div className={`alert ${msg.startsWith('✅') ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: 20 }}>{msg}</div>}
 
         {/* Liste */}
         <div className="card">
@@ -227,13 +150,22 @@ export default function OgrencilerPage() {
                   <option key={i} value={s.ad}>{s.ad}</option>
                 ))}
               </select>
-              <input
-                className="form-input"
-                style={{ width: 220 }}
-                placeholder="🔍 Ara..."
-                value={filtre}
-                onChange={e => setFiltre(e.target.value)}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  className="form-input"
+                  style={{ width: 220, paddingLeft: 34 }}
+                  placeholder="Ara..."
+                  value={filtre}
+                  onChange={e => setFiltre(e.target.value)}
+                />
+                <Search size={16} style={{ position: 'absolute', left: 10, top: 10, color: '#aaa' }} />
+              </div>
+              <button className="btn btn-secondary btn-sm" onClick={() => setImportAcik(true)}>
+                📥 Toplu İçe Aktar
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={() => setIsModalOpen(true)}>
+                <Plus size={16} /> Yeni Öğrenci Ekle
+              </button>
             </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
@@ -273,7 +205,7 @@ export default function OgrencilerPage() {
                       <td>
                         <div style={{ display: 'flex', gap: 4 }}>
                           <button className="btn btn-secondary btn-sm" onClick={() => duzenle(o)}>✏️</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => sil(o.id)}>🗑️</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => setSilOnayId(o.id)}>🗑️</button>
                         </div>
                       </td>
                     </tr>
@@ -284,6 +216,54 @@ export default function OgrencilerPage() {
           </div>
         </div>
       </div>
+
+      {importAcik && (
+        <ImportModal
+          tip="ogrenci"
+          mevcutOgrenciler={ogrenciler}
+          onKapat={() => setImportAcik(false)}
+          onTamamlandi={() => { setImportAcik(false); load() }}
+        />
+      )}
+
+      {silOnayId !== null && (() => {
+        const hedef = ogrenciler.find(o => o.id === silOnayId)
+        return (
+          <ConfirmModal
+            baslik="Öğrenciyi Pasife Al"
+            mesaj={`"${hedef?.ad} ${hedef?.soyad}" adlı öğrenciyi listeden kaldırmak istediğinizden emin misiniz? Geçmiş ödeme verileri korunur.`}
+            onayMetni="Evet, Kaldır"
+            iptalMetni="Vazgeç"
+            onOnayla={() => sil(silOnayId)}
+            onIptal={() => setSilOnayId(null)}
+          />
+        )
+      })()}
+
+      {isModalOpen && (
+        <OgrenciModal
+          editItem={editItem}
+          ayarlar={ayarlar}
+          profilOkulId={profil?.okul_id}
+          siniflar={siniflar}
+          ogretmenListesi={ogretmenListesi}
+          onClose={modalKapat}
+          onSaved={() => {
+            modalKapat()
+            load()
+            setMsg('✅ Öğrenci başarıyla kaydedildi.')
+            setTimeout(() => setMsg(''), 3000)
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+export default function OgrencilerPage() {
+  return (
+    <Suspense fallback={<div>Yükleniyor...</div>}>
+      <OgrencilerIc />
+    </Suspense>
   )
 }

@@ -3,9 +3,11 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
-import { SinifDefteri, Personel, Tatil, Sinif } from '@/lib/types'
-import { GUNLER, AYLAR, gunSayisi, tatilMi, ayLabel } from '@/lib/hesaplama'
+import { SinifDefteri, Personel, Tatil, Sinif, Ayarlar } from '@/lib/types'
+import { GUNLER, AYLAR, gunSayisi, tatilMi, ayLabel, haftaIciMi } from '@/lib/hesaplama'
+import { Download } from 'lucide-react'
 import React from 'react'
+import ConfirmModal from '@/components/ConfirmModal'
 
 interface VisibleDay {
   day: number
@@ -14,20 +16,230 @@ interface VisibleDay {
   isCurrentMonth: boolean
 }
 
+// ── Tablo Stilleri ──────────────────────────────────────────
+function thStyle(width: number): React.CSSProperties {
+  return { padding: '12px 6px', color: '#fff', fontWeight: 700, fontSize: 10, border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', width, minWidth: width, boxSizing: 'border-box', verticalAlign: 'middle' }
+}
+const tdStyle: React.CSSProperties = { padding: '4px', border: '1px solid #eee', verticalAlign: 'middle', fontSize: 10, textAlign: 'center', position: 'relative' }
+
+// ── RenderTable Bileşeni (Stabilite için dışarıda) ───────────
+interface RenderTableProps {
+  sinif: Sinif
+  hours: number[]
+  type: 'ders' | 'koord'
+  currentTab: string
+  ayarlar: Ayarlar | null
+  ay: number
+  yil: number
+  visibleDays: VisibleDay[]
+  tatiller: Tatil[]
+  dersGetir: (sinifAd: string, dersNo: number, gun: number, ay: number, yil: number) => SinifDefteri | null
+  durumDegistir: (id: number, current: string) => Promise<void>
+  openPicker: (e: any, day: number, month: number, year: number, sinifId: number, dersNo: number, gunAdi: string) => void
+  fastSil: (e: any, id: number) => void
+}
+
+const RenderTable = ({ 
+  sinif, hours, type, currentTab, ayarlar, ay, yil, visibleDays, tatiller,
+  dersGetir, durumDegistir, openPicker, fastSil
+}: RenderTableProps) => (
+  <div className={`table-print-container ${currentTab === type ? 'tab-active' : 'tab-inactive'} print-area`}>
+    {/* Print Only Header */}
+    <div className="print-only" style={{ marginBottom: 15, textAlign: 'center', borderBottom: '2px solid #333', paddingBottom: 15 }}>
+      <div style={{ fontSize: 16, fontWeight: 900, color: 'var(--danger)', marginBottom: 4 }}>{ayarlar?.kurum_adi?.toUpperCase() || 'ÇOCUK KULÜBÜ'}</div>
+      <h2 style={{ margin: 0, fontSize: 13, fontWeight: 800 }}>{sinif.ad.toUpperCase()} SINIF DEFTERİ - {type === 'ders' ? 'ÖĞRETMEN' : 'KOORDİNATÖR'}</h2>
+      <div style={{ fontSize: 11, fontWeight: 600, marginTop: 2 }}>{ayLabel(ay, yil).toUpperCase()} — (01 {AYLAR[ay]} - {gunSayisi(yil, ay)} {AYLAR[ay]} {yil})</div>
+    </div>
+
+    <div className="scroll-outer" style={{ width: '100%', overflow: 'hidden' }}>
+      <div className="scroll-container" style={{ width: '100%', maxHeight: '600px', overflow: 'auto' }}>
+        <table style={{ width: `${visibleDays.length * 100 + 125}px`, borderCollapse: 'separate', borderSpacing: 0, fontSize: 11, tableLayout: 'fixed' }}>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 20 }}>
+            <tr>
+              <th style={{ ...thStyle(120), position: 'sticky', left: 0, top: 0, zIndex: 30, background: '#1e3d29', borderRight: '2px solid #0f1f15' }}>Saat / Gün</th>
+              {visibleDays.map(vd => {
+                const tatil = tatilMi(vd.month, vd.day, vd.year, tatiller)
+                const hg = new Date(vd.year, vd.month - 1, vd.day, 12).getDay()
+                const isHaftaSonu = hg === 0 || hg === 6
+                const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
+                return (
+                  <th key={`${vd.day}-${vd.month}`} style={{ ...thStyle(100), background: (tatil || isHaftaSonu) ? 'var(--border)' : 'var(--accent)' }}>
+                    {gunAdi}<br /><span style={{ fontSize: 13, fontWeight: 700 }}>{vd.day}</span>
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {hours.map((dersNo, idx) => (
+              <tr key={dersNo}>
+                <td style={{ ...tdStyle, fontWeight: 700, background: 'var(--bg)', position: 'sticky', left: 0, zIndex: 10, borderRight: '2px solid #ddd', color: type === 'koord' ? 'var(--info)' : 'var(--text)' }}>
+                  {type === 'koord' ? 'KOORD' : `${idx + 1}. DERS`}
+                </td>
+                {visibleDays.map(vd => {
+                  const ders = dersGetir(sinif.ad, dersNo, vd.day, vd.month, vd.year)
+                  const tatil = tatilMi(vd.month, vd.day, vd.year, tatiller)
+                  const hg = new Date(vd.year, vd.month - 1, vd.day, 12).getDay()
+                  const isHaftaSonu = hg === 0 || hg === 6
+                  const ogr = ders ? ders.ogretmen as unknown as Personel | null : null
+                  const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
+                  
+                  return (
+                    <td key={`${vd.day}-${vd.month}`} className="program-cell" 
+                      style={{ ...tdStyle, background: (tatil || isHaftaSonu) ? 'var(--border-light)' : '#fff', cursor: (tatil || isHaftaSonu || (!ders && type === 'ders')) ? 'default' : 'pointer' }} 
+                      onClick={(e) => {
+                        if (tatil || isHaftaSonu) return
+                        if (ders) durumDegistir(ders.id, ders.durum)
+                        else if (type === 'koord') openPicker(e, vd.day, vd.month, vd.year, sinif.id, dersNo, gunAdi)
+                        // type==='ders' ise boş hücreye tıklamak bir şey yapmaz (ders programından gelir)
+                      }}
+                    >
+                      <div style={{ width: 100, minWidth: 100, padding: 4 }}>
+                        {(!tatil && !isHaftaSonu) ? (
+                          ders ? (
+                            <div className="cell-content">
+                              {type === 'koord' && <button className="fast-del-mini no-print" onClick={(e) => fastSil(e, ders.id)}>×</button>}
+                                <div style={{ fontWeight: 700, fontSize: 10, color: '#343a40', textDecoration: ders.durum === 'gelmedi' ? 'line-through' : 'none' }}>{ogr?.ad}</div>
+                                <div className={`status-badge ${ders.durum}`}>
+                                  {ders.durum === 'geldi' ? '✓ GELDİ' : '✕ GELMEDİ'}
+                                </div>
+                            </div>
+                          ) : (
+                            type === 'koord'
+                              ? <div className="btn-ata-mini no-print">+</div>
+                              : <div style={{ fontSize: 9, color: '#ccc' }}>—</div>
+                          )
+                        ) : <div style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 600 }}>{isHaftaSonu ? 'H.SONU' : 'TATİL'}</div>}
+                      </div>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+)
+
+// ── RenderWeeklyTable Bileşeni (Haftalık görünüm stabilitesi için) ──
+interface RenderWeeklyTableProps {
+  sinif: Sinif
+  week: VisibleDay[]
+  currentHours: number[]
+  currentTab: 'ders' | 'koord'
+  defter: SinifDefteri[]
+  tatiller: Tatil[]
+  wIndex: number
+  dersGetir: (sinifAd: string, dersNo: number, gun: number, ay: number, yil: number) => SinifDefteri | null
+  durumDegistir: (id: number, current: string) => Promise<void>
+  openPicker: (e: any, day: number, month: number, year: number, sinifId: number, dersNo: number, gunAdi: string) => void
+  fastSil: (e: any, id: number) => void
+}
+
+const RenderWeeklyTable = ({
+  sinif, week, currentHours, currentTab, defter, tatiller, wIndex,
+  dersGetir, durumDegistir, openPicker, fastSil
+}: RenderWeeklyTableProps) => (
+  <div className="week-block">
+    <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--bg)', borderRadius: 6, fontWeight: 700, fontSize: 13, color: 'var(--text2)', borderLeft: '4px solid var(--accent)', display: 'inline-block' }}>
+      📅 {wIndex + 1}. Hafta ({week[0].day} {AYLAR[week[0].month || 1]} - {week[week.length - 1].day} {AYLAR[week[week.length - 1].month || 1]})
+    </div>
+    <div className="scroll-container" style={{ width: '100%', overflowX: 'auto' }}>
+      <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 11 }}>
+        <thead>
+          <tr>
+            <th style={{ ...thStyle(100), background: 'var(--accent)' }}>Saat</th>
+            {week.map(vd => {
+              const tatil = tatilMi(vd.month, vd.day, vd.year, tatiller)
+              const hg = new Date(vd.year, vd.month - 1, vd.day, 12).getDay()
+              const isHaftaSonu = hg === 0 || hg === 6
+              const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
+              return (
+                <th key={`${vd.day}-${vd.month}`} style={{ ...thStyle(100), background: (tatil || isHaftaSonu) ? 'var(--border)' : 'var(--accent)' }}>
+                  {gunAdi}<br /><span style={{ fontSize: 13, fontWeight: 700 }}>{vd.day}</span>
+                </th>
+              )
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {currentHours.map((dersNo, idx) => (
+            <tr key={dersNo}>
+              <td style={{ ...tdStyle, fontWeight: 700, background: 'var(--bg)', color: currentTab === 'koord' ? 'var(--info)' : 'var(--text)' }}>
+                {currentTab === 'koord' ? 'KOORD' : `${idx + 1}. DERS`}
+              </td>
+              {week.map(vd => {
+                const ders = dersGetir(sinif.ad, dersNo, vd.day, vd.month, vd.year)
+                const tatil = tatilMi(vd.month, vd.day, vd.year, tatiller)
+                const hg = new Date(vd.year, vd.month - 1, vd.day, 12).getDay()
+                const isHaftaSonu = hg === 0 || hg === 6
+                const ogr = ders ? ders.ogretmen as unknown as Personel | null : null
+                const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
+                return (
+                  <td key={`${vd.day}-${vd.month}`} className="program-cell" 
+                    style={{ ...tdStyle, background: (tatil || isHaftaSonu) ? 'var(--border-light)' : '#fff', cursor: (tatil || isHaftaSonu || (!ders && currentTab === 'ders')) ? 'default' : 'pointer' }}
+                    onClick={(e) => {
+                      if (tatil || isHaftaSonu) return
+                      if (ders) durumDegistir(ders.id, ders.durum)
+                      else if (currentTab === 'koord') openPicker(e, vd.day, vd.month, vd.year, sinif.id, dersNo, gunAdi)
+                    }}
+                  >
+                    <div style={{ width: 100, minWidth: 100, padding: 4 }}>
+                      {(!tatil && !isHaftaSonu) ? (
+                        ders ? (
+                          <div className="cell-content">
+                            {currentTab === 'koord' && <button className="fast-del-mini no-print" onClick={(e) => fastSil(e, ders.id)}>×</button>}
+                            <div style={{ fontWeight: 700, fontSize: 10, color: '#333', textDecoration: ders.durum === 'gelmedi' ? 'line-through' : 'none' }}>{ogr?.ad}</div>
+                            <div className={`status-badge ${ders.durum}`}>
+                              {ders.durum === 'geldi' ? '✓ GELDİ' : '✕ GELMEDİ'}
+                            </div>
+                          </div>
+                        ) : (
+                          currentTab === 'koord'
+                            ? <div className="btn-ata-mini no-print">+</div>
+                            : <div style={{ fontSize: 9, color: '#ccc' }}>—</div>
+                        )
+                      ) : <div style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 600 }}>{isHaftaSonu ? 'H.SONU' : 'TATİL'}</div>}
+                    </div>
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+)
+
 export default function SinifDefteriPage() {
   const { ay, yil } = useAy()
   const [defter, setDefter] = useState<SinifDefteri[]>([])
   const [personel, setPersonel] = useState<Personel[]>([])
   const [tatiller, setTatiller] = useState<Tatil[]>([])
   const [siniflar, setSiniflar] = useState<Sinif[]>([])
+  const [ayarlar, setAyarlar] = useState<Ayarlar | null>(null)
   const [seciliSinif, setSeciliSinif] = useState<number | null>(null)
   const [msg, setMsg] = useState('')
 
   const [pickerSaving, setPickerSaving] = useState(false)
   const [picker, setPicker] = useState<{ day: number, month: number, year: number, sinifId: number, dersNo: number, rect: DOMRect, gunAdi: string } | null>(null)
-  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
+  const [conf, setConf] = useState<{ 
+    open: boolean, 
+    type: 'sil' | 'kopyala' | 'tatil', 
+    id?: number, 
+    payload?: any,
+    title: string,
+    message: string
+  } | null>(null)
 
-  const [gorunum, setGorunum] = useState<'aylik' | 'haftalik'>('haftalik')
+  const [gorunum, setGorunum] = useState<'aylik' | 'haftalik'>('aylik')
+  const [activeTabs, setActiveTabs] = useState<Record<number, 'ders' | 'koord'>>({})
+
+  const getTab = (id: number) => activeTabs[id] || 'ders'
+  const setTab = (id: number, t: 'ders' | 'koord') => setActiveTabs(prev => ({ ...prev, [id]: t }))
 
   // --- TAKVİM HESAPLAMA ---
   const visibleDays = useMemo(() => {
@@ -46,32 +258,85 @@ export default function SinifDefteriPage() {
 
   const visibleWeeks = useMemo(() => {
     const weeks: VisibleDay[][] = []
-    // İlk 3 hafta: her biri 7 gün
     weeks.push(visibleDays.slice(0, 7))
     weeks.push(visibleDays.slice(7, 14))
     weeks.push(visibleDays.slice(14, 21))
-    // 4. hafta: 22'sinden ay sonuna kadar (7, 8, 9 veya 10 gün olabilir)
     weeks.push(visibleDays.slice(21))
     return weeks
   }, [visibleDays])
 
   const load = useCallback(async () => {
     try {
-      const [{ data: sd, error: sdErr }, { data: per }, { data: tat }, { data: sin }] = await Promise.all([
+      // okulId'yi önce al — tatil filtresinde gerekli
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profil } = await supabase.from('profiller').select('okul_id').eq('id', user?.id).single()
+
+      const [{ data: sd, error: sdErr }, { data: per }, { data: tat }, { data: sin }, { data: ayr }] = await Promise.all([
         supabase.from('sinif_defteri')
           .select('*, ogretmen:personel(id,ad,gorev)')
           .eq('ay', ay)
           .eq('yil', yil)
           .order('gun'),
         supabase.from('personel').select('*').order('ad'),
-        supabase.from('tatiller').select('*'),
+        supabase.from('tatiller').select('*').or(`okul_id.eq.${profil?.okul_id ?? 0},okul_id.is.null`),
         supabase.from('siniflar').select('*').eq('aktif', true).order('ad'),
+        supabase.from('ayarlar').select('*').single()
       ])
       if (sdErr) setMsg('❌ Veri yükleme hatası: ' + sdErr.message)
-      setDefter(sd || [])
+
+      let finalSd = sd || []
+
+      // Otomatik eşitleme: bu ay sınıf defteri boşsa ders programından çek
+      if (finalSd.length === 0) {
+        const currentOkulId = Number(user?.user_metadata?.okul_id || profil?.okul_id || ayr?.okul_id)
+
+        if (currentOkulId && !isNaN(currentOkulId)) {
+          const { data: pr } = await supabase.from('ders_programi').select('*').eq('ay', ay).eq('yil', yil).eq('okul_id', currentOkulId)
+
+          if (pr && pr.length > 0) {
+            const perList = per || []
+            const tatList = tat || []
+            const uniquePayload = new Map<string, object>()
+
+            pr.filter(p => haftaIciMi(p.yil, p.ay, p.gun) && !tatilMi(p.ay, p.gun, p.yil, tatList)).forEach(p => {
+              const key = `${p.gun}-${p.ay}-${p.yil}-${p.kulup_adi}-${p.ders_no || 1}`
+              uniquePayload.set(key, {
+                gun: p.gun, ay: p.ay, yil: p.yil,
+                kulup_adi: p.kulup_adi, sinif_id: p.sinif_id,
+                ogretmen_id: p.ogretmen_id, ders_no: p.ders_no || 1,
+                seans: p.seans || 'sabah', etkinlik_saati: p.etkinlik_saati || 1,
+                durum: 'geldi', okul_id: currentOkulId
+              })
+              const ogr = perList.find((x: any) => x.id === p.ogretmen_id)
+              if (ogr?.koordinator_id) {
+                const kDersNo = (p.ders_no || 1) + 10
+                uniquePayload.set(`${p.gun}-${p.ay}-${p.yil}-${p.kulup_adi}-${kDersNo}`, {
+                  gun: p.gun, ay: p.ay, yil: p.yil,
+                  kulup_adi: p.kulup_adi, sinif_id: p.sinif_id,
+                  ogretmen_id: ogr.koordinator_id, ders_no: kDersNo,
+                  seans: p.seans || 'sabah', etkinlik_saati: p.etkinlik_saati || 1,
+                  durum: 'geldi', okul_id: currentOkulId
+                })
+              }
+            })
+
+            const payload = Array.from(uniquePayload.values())
+            if (payload.length > 0) {
+              await supabase.from('sinif_defteri').delete().match({ ay, yil, okul_id: currentOkulId })
+              const { data: inserted } = await supabase.from('sinif_defteri')
+                .insert(payload)
+                .select('*, ogretmen:personel(id,ad,gorev)')
+              finalSd = inserted || []
+            }
+          }
+        }
+      }
+
+      setDefter(finalSd)
       setPersonel(per || [])
       setTatiller(tat || [])
       setSiniflar(sin || [])
+      setAyarlar(ayr || null)
     } catch (e: any) {
       setMsg('❌ Beklenmeyen hata: ' + (e.message || 'Bilinmiyor'))
     }
@@ -84,27 +349,69 @@ export default function SinifDefteriPage() {
       setPickerSaving(true)
       setMsg('⌛ Aktarım başlıyor...')
       
-      const { data: pr, error: prErr } = await supabase.from('ders_programi').select('*').eq('ay', ay).eq('yil', yil)
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profil } = await supabase.from('profiller').select('okul_id').eq('id', user?.id).single()
+      
+      // En güvenilir ID'yi bul (Metadata > Profil > Ayarlar)
+      const metaOkulId = user?.user_metadata?.okul_id
+      const currentOkulId = Number(metaOkulId || profil?.okul_id || ayarlar?.okul_id)
+
+      if (!currentOkulId || isNaN(currentOkulId)) {
+        throw new Error("Okul kimliği doğrulanamadı. Lütfen tekrar giriş yapmayı deneyin.")
+      }
+
+      const { data: pr, error: prErr } = await supabase.from('ders_programi').select('*').eq('ay', ay).eq('yil', yil).eq('okul_id', currentOkulId)
       if (prErr) throw prErr
       if (!pr || pr.length === 0) {
-        setMsg('ℹ️ Bu ay için ders programı bulunamadı.')
+        setMsg('ℹ️ Ders programında bu ay için veri bulunamadı. Lütfen önce ders programını doldurun.')
         return
       }
 
-      const payload = pr
-        .filter(p => !tatilMi(p.ay, p.gun, p.yil, tatiller)) // TATİL KONTROLÜ
-        .map(p => ({
+      const uniquePayload = new Map()
+      const prData = pr.filter(p => haftaIciMi(p.yil, p.ay, p.gun) && !tatilMi(p.ay, p.gun, p.yil, tatiller))
+
+      prData.forEach(p => {
+        // Anahtar seans içermemeli — kısıtlama (gun, ay, yil, kulup_adi, ders_no, okul_id) üzerinde
+        const key = `${p.gun}-${p.ay}-${p.yil}-${p.kulup_adi}-${p.ders_no || 1}`
+        uniquePayload.set(key, {
           gun: p.gun, ay: p.ay, yil: p.yil,
           kulup_adi: p.kulup_adi,
+          sinif_id: p.sinif_id,
           ogretmen_id: p.ogretmen_id,
           ders_no: p.ders_no || 1,
           seans: p.seans || 'sabah',
           etkinlik_saati: p.etkinlik_saati || 1,
-          durum: 'geldi'
-        }))
+          durum: 'geldi',
+          okul_id: currentOkulId
+        })
 
-      const { error: sdErr } = await supabase.from('sinif_defteri').upsert(payload, { onConflict: 'gun,ay,yil,kulup_adi,ders_no,seans' })
-      if (sdErr) throw sdErr
+        const ogr = personel.find(per => per.id === p.ogretmen_id)
+        if (ogr?.koordinator_id) {
+          const kDersNo = (p.ders_no || 1) + 10
+          const kKey = `${p.gun}-${p.ay}-${p.yil}-${p.kulup_adi}-${kDersNo}`
+          uniquePayload.set(kKey, {
+            gun: p.gun, ay: p.ay, yil: p.yil,
+            kulup_adi: p.kulup_adi,
+            sinif_id: p.sinif_id,
+            ogretmen_id: ogr.koordinator_id,
+            ders_no: kDersNo,
+            seans: p.seans || 'sabah',
+            etkinlik_saati: p.etkinlik_saati || 1,
+            durum: 'geldi',
+            okul_id: currentOkulId
+          })
+        }
+      })
+
+      const finalPayload = Array.from(uniquePayload.values())
+
+      // Mevcutu temizle
+      const { error: delErr } = await supabase.from('sinif_defteri').delete().match({ ay, yil, okul_id: currentOkulId })
+      if (delErr) throw delErr
+
+      // Toplu ekle — migration sonrası onConflict sütunları eşleşecek
+      const { error: insErr } = await supabase.from('sinif_defteri').insert(finalPayload)
+      if (insErr) throw insErr
       
       setMsg('✅ Program başarıyla aktarıldı.')
       load()
@@ -115,18 +422,62 @@ export default function SinifDefteriPage() {
       setTimeout(() => setMsg(''), 5000)
     }
   }
+  function puantajGuncelle(updatedDefter: SinifDefteri[], personelId: number, day: number, month: number, year: number) {
+    const totalHours = updatedDefter
+      .filter(d => d.ogretmen_id === personelId && d.gun === day && d.ay === month && d.yil === year && d.durum === 'geldi')
+      .reduce((sum, d) => sum + (Number(d.etkinlik_saati) || 1), 0)
+    const tarih = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    if (totalHours > 0) {
+      return supabase.from('puantaj').upsert({ personel_id: personelId, tarih, saat: totalHours, okul_id: ayarlar?.okul_id }, { onConflict: 'personel_id,tarih' })
+    }
+    return supabase.from('puantaj').delete().match({ personel_id: personelId, tarih })
+  }
+
+  async function syncPuantajForPersonDay(personelId: number, day: number, month: number, year: number) {
+    const { data: entries, error } = await supabase
+      .from('sinif_defteri').select('etkinlik_saati')
+      .eq('ogretmen_id', personelId).eq('gun', day).eq('ay', month).eq('yil', year).eq('durum', 'geldi')
+    if (error) return
+    const totalHours = entries.reduce((sum, e) => sum + (Number(e.etkinlik_saati) || 1), 0)
+    const tarih = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    if (totalHours > 0) {
+      await supabase.from('puantaj').upsert({ personel_id: personelId, tarih, saat: totalHours, okul_id: ayarlar?.okul_id }, { onConflict: 'personel_id,tarih' })
+    } else {
+      await supabase.from('puantaj').delete().match({ personel_id: personelId, tarih })
+    }
+  }
 
   async function durumDegistir(id: number, mevcutDurum: string) {
     const yeniDurum = mevcutDurum === 'geldi' ? 'gelmedi' : 'geldi'
+
+    const item = defter.find(d => d.id === id)
+    if (!item) return
+
+    // Koordinatör veya ana ders kaydını local state'ten bul
+    const eslesId = (item.ders_no || 0) < 11
+      ? defter.find(d => d.gun === item.gun && d.ay === item.ay && d.yil === item.yil && d.kulup_adi === item.kulup_adi && d.ders_no === (item.ders_no || 1) + 10)?.id
+      : defter.find(d => d.gun === item.gun && d.ay === item.ay && d.yil === item.yil && d.kulup_adi === item.kulup_adi && d.ders_no === (item.ders_no || 11) - 10)?.id
+
+    const guncellenenIdler = new Set([id, ...(eslesId ? [eslesId] : [])])
+
+    // Optimistik güncelleme — anında göster
+    const yeniDefter = defter.map(d => guncellenenIdler.has(d.id) ? ({ ...d, durum: yeniDurum } as SinifDefteri) : d)
+    setDefter(yeniDefter)
+
     try {
-      setPickerSaving(true)
-      const { error } = await supabase.from('sinif_defteri').update({ durum: yeniDurum }).eq('id', id)
-      if (error) throw error
-      load()
+      // DB güncellemeleri paralel
+      await Promise.all([...guncellenenIdler].map(gId => supabase.from('sinif_defteri').update({ durum: yeniDurum }).eq('id', gId)))
+
+      // Puantaj senkronizasyonu paralel — local state'ten hesaplanır, SELECT yok
+      const etkilenenKisiler = [...guncellenenIdler]
+        .map(gId => yeniDefter.find(d => d.id === gId))
+        .filter((d): d is SinifDefteri => !!d)
+        .map(d => ({ personelId: d.ogretmen_id, gun: d.gun, ay: d.ay, yil: d.yil }))
+      await Promise.all(etkilenenKisiler.map(k => puantajGuncelle(yeniDefter, k.personelId!, k.gun, k.ay, k.yil)))
     } catch (err: any) {
+      // Hata durumunda orijinal state'e dön
+      setDefter(defter.map(d => guncellenenIdler.has(d.id) ? ({ ...d, durum: mevcutDurum } as SinifDefteri) : d))
       setMsg('❌ Durum güncelleme hatası: ' + err.message)
-    } finally {
-      setPickerSaving(false)
     }
   }
 
@@ -138,15 +489,31 @@ export default function SinifDefteriPage() {
 
   async function directKaydet(personelId: number, pInfo: { day: number, month: number, year: number, sinifId: number, dersNo: number }) {
     if (tatilMi(pInfo.month, pInfo.day, pInfo.year, tatiller)) {
-      if (!confirm('Seçilen tarih TATİL olarak işaretlenmiş. Yine de kayıt eklemek istiyor musunuz?')) return
+      setConf({
+        open: true,
+        type: 'tatil',
+        payload: { personelId, pInfo },
+        title: 'Tatil Günü Uyarısı',
+        message: 'Seçilen tarih TATİL olarak işaretlenmiş. Yine de kayıt eklemek istiyor musunuz?'
+      })
+      return
     }
+    directKaydetGercek(personelId, pInfo)
+  }
+
+  async function directKaydetGercek(personelId: number, pInfo: { day: number, month: number, year: number, sinifId: number, dersNo: number }) {
+    setConf(null)
     setPicker(null)
     setPickerSaving(true)
     const sinif = siniflar.find(s => s.id === pInfo.sinifId)
     if (!sinif) return
 
     try {
-      const payload = {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profil } = await supabase.from('profiller').select('okul_id').eq('id', user?.id).single()
+      const okulId = profil?.okul_id
+
+      const payload: any = {
         gun: pInfo.day,
         ay: pInfo.month,
         yil: pInfo.year,
@@ -155,11 +522,29 @@ export default function SinifDefteriPage() {
         ders_no: pInfo.dersNo,
         seans: 'sabah',
         durum: 'geldi',
-        etkinlik_saati: 1
+        etkinlik_saati: 1,
+        okul_id: okulId
       }
 
       const { error } = await supabase.from('sinif_defteri').upsert(payload, { onConflict: 'gun,ay,yil,kulup_adi,ders_no,seans' })
       if (error) throw error
+
+      // Puantajı senkronize et
+      await syncPuantajForPersonDay(personelId, pInfo.day, pInfo.month, pInfo.year)
+
+      // ÖĞRETMEN İÇİN KOORDİNATÖR OTOMASYONU
+      const secilenOgr = personel.find(p => p.id === personelId)
+      if (secilenOgr?.koordinator_id && pInfo.dersNo < 11) {
+        const koordDersNo = pInfo.dersNo + 10
+        const koordPayload = {
+          ...payload,
+          ogretmen_id: secilenOgr.koordinator_id,
+          ders_no: koordDersNo
+        }
+        await supabase.from('sinif_defteri').upsert(koordPayload, { onConflict: 'gun,ay,yil,kulup_adi,ders_no,seans' })
+        await syncPuantajForPersonDay(secilenOgr.koordinator_id, pInfo.day, pInfo.month, pInfo.year)
+      }
+
       load()
     } catch (err: any) {
       setMsg('❌ Kayıt hatası: ' + err.message)
@@ -169,8 +554,16 @@ export default function SinifDefteriPage() {
   }
 
   async function koordHaftayiKopyala() {
-    if (!confirm('1. haftadaki (1-7. günler) koordinatör atamaları ayın geri kalanındaki tüm haftalara kopyalanacak. Mevcut koordinatör kayıtları (8-31 arası) silinecek. Emin misiniz?')) return
-    
+    setConf({
+      open: true,
+      type: 'kopyala',
+      title: 'Koordinatör Planını Kopyala',
+      message: '1. haftadaki (1-7. günler) koordinatör atamaları ayın geri kalanındaki tüm haftalara kopyalanacak. Mevcut koordinatör kayıtları (8-31 arası) silinecek. Emin misiniz?'
+    })
+  }
+
+  async function koordHaftayiKopyalaGercek() {
+    setConf(null)
     setPickerSaving(true)
     setMsg('⌛ Koordinatör planlaması kopyalanıyor...')
     
@@ -234,17 +627,42 @@ export default function SinifDefteriPage() {
 
   function fastSil(e: React.MouseEvent, id: number) {
     e.stopPropagation()
-    setDeleteConfirm(id)
+    setConf({
+      open: true,
+      type: 'sil',
+      id,
+      title: 'Defter Kaydını Sil',
+      message: 'Bu ders/koordinatör kaydını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.'
+    })
   }
 
-  async function finishSil() {
-    if (!deleteConfirm) return
-    const id = deleteConfirm
-    setDeleteConfirm(null)
+  async function finishSil(id: number) {
+    setConf(null)
     setPickerSaving(true)
     try {
+      const { data: item } = await supabase.from('sinif_defteri').select('*').eq('id', id).single()
+      if (!item) return
+
       const { error } = await supabase.from('sinif_defteri').delete().eq('id', id)
       if (error) throw error
+      
+      // Puantajı senkronize et
+      await syncPuantajForPersonDay(item.ogretmen_id, item.gun, item.ay, item.yil)
+
+      // Eğer bu bir 'ders' ise ve koordinatörü varsa, onu da sil
+      if ((item.ders_no || 0) < 11) {
+        const koordDersNo = (item.ders_no || 1) + 10
+        const { data: koordItem } = await supabase.from('sinif_defteri')
+          .select('*')
+          .match({ gun: item.gun, ay: item.ay, yil: item.yil, kulup_adi: item.kulup_adi, ders_no: koordDersNo })
+          .single()
+        
+        if (koordItem) {
+          await supabase.from('sinif_defteri').delete().eq('id', koordItem.id)
+          await syncPuantajForPersonDay(koordItem.ogretmen_id, koordItem.gun, koordItem.ay, koordItem.yil)
+        }
+      }
+
       load()
     } catch (err: any) {
       setMsg('❌ Silme hatası: ' + err.message)
@@ -252,8 +670,6 @@ export default function SinifDefteriPage() {
       setPickerSaving(false)
     }
   }
-
-
 
   function dersGetir(sinifAd: string, dersNo: number, d: number, m: number, y: number): SinifDefteri | null {
     const dt = new Date(y, m - 1, d)
@@ -267,6 +683,193 @@ export default function SinifDefteriPage() {
     ) || null
   }
 
+  const handlePdfDownload = async () => {
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+
+    async function loadFontB64(path: string) {
+      const res = await fetch(path)
+      const buf = await res.arrayBuffer()
+      const bytes = new Uint8Array(buf)
+      let binary = ''
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+      return btoa(binary)
+    }
+    const [regularB64, boldB64] = await Promise.all([
+      loadFontB64('/fonts/NotoSans-Regular.ttf'),
+      loadFontB64('/fonts/NotoSans-Bold.ttf'),
+    ])
+
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+    pdf.addFileToVFS('NotoSans-Regular.ttf', regularB64)
+    pdf.addFileToVFS('NotoSans-Bold.ttf', boldB64)
+    pdf.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal', 'Identity-H')
+    pdf.addFont('NotoSans-Bold.ttf', 'NotoSans', 'bold', 'Identity-H')
+    pdf.setFont('NotoSans')
+
+    const PW = pdf.internal.pageSize.getWidth()
+    const PH = pdf.internal.pageSize.getHeight()
+    const M = 10
+    const hedefSiniflar = seciliSinif ? siniflar.filter(s => s.id === seciliSinif) : siniflar
+
+    hedefSiniflar.forEach((sinif, sIdx) => {
+      // Her sınıf için hem öğretmen hem koordinatör defteri
+      ['Ders', 'Koordinatör'].forEach((typeLabel, tIdx) => {
+        if (sIdx > 0 || tIdx > 0) pdf.addPage()
+
+        // Institutional Header
+        pdf.setFontSize(11)
+        pdf.setFont('NotoSans', 'bold')
+        pdf.setTextColor(0, 0, 0)
+        pdf.text(ayarlar?.kurum_adi?.toUpperCase() || 'ÇOCUK KULÜBÜ', PW / 2, 12, { align: 'center' })
+        
+        pdf.setFontSize(9)
+        pdf.text(`${sinif.ad.toUpperCase()} SINIF DEFTERİ - ${typeLabel.toUpperCase()}`, PW / 2, 17, { align: 'center' })
+        pdf.setFont('NotoSans', 'normal')
+        pdf.text(`${ayLabel(ay, yil).toUpperCase()} (${gorunum === 'aylik' ? 'AYLIK' : 'HAFTALIK'})`, PW / 2, 22, { align: 'center' })
+
+        const currentHours = typeLabel === 'Ders' ? [1, 2, 3, 4, 5, 6] : [11, 12, 13, 14, 15, 16]
+
+        if (gorunum === 'aylik') {
+          // --- AYLIK GÖRÜNÜM ---
+          const daysInMonth = gunSayisi(yil, ay)
+          const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1)
+          
+          const headRows: any[] = [[
+            { content: 'Saat / Gün', styles: { halign: 'center', fillColor: [255, 255, 255] } },
+            ...daysArray.map(d => {
+              const dInfo = new Date(yil, ay - 1, d, 12)
+              const hg = dInfo.getDay()
+              const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
+              const isWE = hg === 0 || hg === 6
+              const isT = tatilMi(ay, d, yil, tatiller)
+              return { 
+                content: `${gunAdi}\n${d}`, 
+                styles: { halign: 'center', fillColor: (isWE || isT) ? [245, 245, 245] : [255, 255, 255] } 
+              }
+            })
+          ]]
+
+          const bodyRows = currentHours.map((dersNo, idx) => {
+            return [
+              typeLabel === 'Ders' ? `${idx + 1}. DERS` : 'KOORD.',
+              ...daysArray.map(d => {
+                const ders = dersGetir(sinif.ad, dersNo, d, ay, yil)
+                if (!ders) return ''
+                const ogr = ders.ogretmen as any
+                const status = ders.durum === 'geldi' ? 'GELDİ' : 'GELMEDİ'
+                return `${ogr?.ad || ''}\n(${status})`
+              })
+            ]
+          })
+
+          autoTable(pdf, {
+            head: headRows,
+            body: bodyRows,
+            startY: 28,
+            margin: { top: M, left: M, right: M, bottom: M },
+            styles: { font: 'NotoSans', fontSize: 5, lineWidth: 0.1, lineColor: [40, 40, 40], cellPadding: 0.8, valign: 'middle', textColor: [0, 0, 0] },
+            headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold' },
+            columnStyles: { 0: { cellWidth: 15, fontStyle: 'bold' } },
+            didParseCell: (data) => {
+              if (data.column.index > 0) {
+                const d = daysArray[data.column.index - 1]
+                const isWE = new Date(yil, ay - 1, d, 12).getDay() % 6 === 0
+                const isT = tatilMi(ay, d, yil, tatiller)
+                if (isWE || isT) data.cell.styles.fillColor = [245, 245, 245]
+                if (data.cell.text.some(t => t.includes('GELMEDİ'))) data.cell.styles.textColor = [180, 0, 0]
+              }
+            }
+          })
+        } else {
+          // --- HAFTALIK GÖRÜNÜM ---
+          let currentY = 28
+          visibleWeeks.forEach((week, wIdx) => {
+            pdf.setFont('NotoSans', 'bold')
+            pdf.setFontSize(8)
+            pdf.text(`📅 ${wIdx + 1}. HAFTA (${week[0].day} ${AYLAR[week[0].month || 1]} - ${week[week.length - 1].day} ${AYLAR[week[week.length - 1].month || 1]})`, M, currentY - 2)
+
+            const headRows: any[] = [[
+              { content: 'Saat', styles: { halign: 'center' } },
+              ...week.map(vd => {
+                const hg = new Date(vd.year, vd.month - 1, vd.day).getDay()
+                return { content: `${['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]}\n${vd.day}`, styles: { halign: 'center' } }
+              })
+            ]]
+
+            const bodyRows = currentHours.map((dersNo, idx) => {
+              return [
+                typeLabel === 'Ders' ? `${idx + 1}. DERS` : 'KOORD.',
+                ...week.map(vd => {
+                  const ders = dersGetir(sinif.ad, dersNo, vd.day, vd.month, vd.year)
+                  if (!ders) return ''
+                  const ogr = ders.ogretmen as any
+                  const status = ders.durum === 'geldi' ? 'GELDİ' : 'GELMEDİ'
+                  return `${ogr?.ad || ''}\n(${status})`
+                })
+              ]
+            })
+
+            autoTable(pdf, {
+              head: headRows,
+              body: bodyRows,
+              startY: currentY,
+              margin: { left: M, right: M },
+              styles: { font: 'NotoSans', fontSize: 6.5, lineWidth: 0.1, lineColor: [40, 40, 40], cellPadding: 1.2, valign: 'middle', textColor: [0, 0, 0] },
+              headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold' },
+              columnStyles: { 0: { cellWidth: 20, fontStyle: 'bold' } },
+              didParseCell: (data) => {
+                if (data.column.index > 0) {
+                  const vd = week[data.column.index - 1]
+                  const hg = new Date(vd.year, vd.month - 1, vd.day).getDay()
+                  const isWE = hg === 0 || hg === 6
+                  const isT = tatilMi(vd.month, vd.day, vd.year, tatiller)
+                  if (isWE || isT) data.cell.styles.fillColor = [245, 245, 245]
+                  if (data.cell.text.some(t => t.includes('GELMEDİ'))) data.cell.styles.textColor = [180, 0, 0]
+                }
+              }
+            })
+            currentY = (pdf as any).lastAutoTable.finalY + 12
+            if (currentY > PH - 45 && wIdx < visibleWeeks.length - 1) {
+              pdf.addPage()
+              currentY = 20
+            }
+          })
+        }
+
+        // Signature Blocks (Per Page as these are independent sheets of a dossier)
+        const finalY = (pdf as any).lastAutoTable?.finalY || 150
+        const signY = Math.max(finalY + 12, PH - 35)
+        const duzenleyenAdi   = ayarlar?.duzenleyen_adi   ?? '___________________'
+        const duzenleyenUnvan = ayarlar?.duzenleyen_unvani ?? 'Büro Personeli'
+        const onaylayanAdi    = ayarlar?.mudur_adi         ?? '___________________'
+        const onaylayanUnvan  = 'Okul Müdürü / Kulüp Başkanı'
+
+        pdf.setFontSize(8)
+        pdf.setFont('NotoSans', 'bold')
+        pdf.text('DÜZENLEYEN', M + 40, signY, { align: 'center' })
+        pdf.text('ONAYLAYAN', PW - M - 40, signY, { align: 'center' })
+        pdf.setFontSize(7.5)
+        pdf.text(duzenleyenAdi, M + 40, signY + 6, { align: 'center' })
+        pdf.setFont('NotoSans', 'normal')
+        pdf.setFontSize(7)
+        pdf.text(duzenleyenUnvan, M + 40, signY + 10, { align: 'center' })
+        pdf.line(M + 10, signY + 16, M + 70, signY + 16)
+        pdf.setFont('NotoSans', 'bold')
+        pdf.setFontSize(7.5)
+        pdf.text(onaylayanAdi, PW - M - 40, signY + 6, { align: 'center' })
+        pdf.setFont('NotoSans', 'normal')
+        pdf.setFontSize(7)
+        pdf.text(onaylayanUnvan, PW - M - 40, signY + 10, { align: 'center' })
+        pdf.line(PW - M - 70, signY + 16, PW - M - 10, signY + 16)
+      })
+    })
+
+    const blob = pdf.output('blob')
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+  }
 
   const gorunenSiniflar = seciliSinif ? siniflar.filter(s => s.id === seciliSinif) : siniflar
   const DERS_SAATLERI = [1, 2, 3, 4, 5, 6]
@@ -298,7 +901,9 @@ export default function SinifDefteriPage() {
                 </button>
               ))}
             </div>
-            <button className="btn btn-secondary btn-sm no-print" onClick={() => window.print()}>🖨️ Yazdır</button>
+            <button className="btn btn-sm" onClick={handlePdfDownload} style={{ background: '#ef4444', color: '#fff', border: 'none', fontWeight: 600, padding: '6px 12px', fontSize: 13, borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Download size={14} /> PDF İndir
+            </button>
           </div>
         }
       />
@@ -322,221 +927,84 @@ export default function SinifDefteriPage() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 48 }}>
-          {gorunenSiniflar.map(sinif => (
-            <div key={sinif.id}>
-              <div style={{ padding: '12px 20px', background: '#f8f9fa', borderBottom: '1px solid #eee', borderLeft: '5px solid var(--accent)', borderRadius: '8px 8px 0 0' }}>
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--accent)' }}>{sinif.ad} <span style={{ fontWeight: 400, color: 'var(--text3)', fontSize: 12 }}>({sinif.yas_grubu}) Sınıf Defteri</span></h3>
-              </div>
-
-              {gorunum === 'aylik' && (
-                <div className="scroll-outer" style={{ width: '100%', overflow: 'hidden', borderRadius: '0 0 10px 10px', border: '1px solid #ddd', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
-                  <div className="scroll-container" style={{ width: '100%', maxHeight: '700px', overflow: 'auto', display: 'block' }}>
-                    <table style={{ width: `${visibleDays.length * 80 + 125}px`, minWidth: `${visibleDays.length * 80 + 125}px`, borderCollapse: 'separate', borderSpacing: 0, fontSize: 11, tableLayout: 'fixed' }}>
-                      <thead style={{ position: 'sticky', top: 0, zIndex: 20 }}>
-                        <tr>
-                          <th style={{ ...thStyle(120), position: 'sticky', left: 0, top: 0, zIndex: 30, background: '#1e3d29', borderRight: '2px solid #0f1f15' }}>Ders Saati</th>
-                          {visibleDays.map(vd => {
-                            const tatil = tatilMi(vd.month, vd.day, vd.year, tatiller)
-                            const hg = new Date(vd.year, vd.month - 1, vd.day, 12).getDay()
-                            const isHaftaSonu = hg === 0 || hg === 6
-                            const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
-                            return (
-                              <th key={`${vd.day}-${vd.month}`} style={{ ...thStyle(80), background: (tatil || isHaftaSonu) ? '#c8c0aa' : '#2d5a3d' }}>
-                                {gunAdi}<br /><span style={{ fontSize: 13, fontWeight: 700 }}>{vd.day}</span>
-                              </th>
-                            )
-                          })}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {DERS_SAATLERI.map(dersNo => (
-                          <tr key={dersNo}>
-                            <td style={{ ...tdStyle, fontWeight: 700, background: '#f5f2ec', position: 'sticky', left: 0, zIndex: 10, borderRight: '2px solid #ddd' }}>{dersNo}. DERS</td>
-                            {visibleDays.map(vd => {
-                              const ders = dersGetir(sinif.ad, dersNo, vd.day, vd.month, vd.year)
-                              const tatil = tatilMi(vd.month, vd.day, vd.year, tatiller)
-                              const hg = new Date(vd.year, vd.month - 1, vd.day, 12).getDay()
-                              const isHaftaSonu = hg === 0 || hg === 6
-                              const ogr = ders ? ders.ogretmen as unknown as Personel | null : null
-                              const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
-                              
-                              return (
-                                <td key={`${vd.day}-${vd.month}`} className="program-cell" 
-                                  style={{ ...tdStyle, background: (tatil || isHaftaSonu) ? '#e0dbd0' : ders ? (ders.durum === 'gelmedi' ? '#fff1f0' : '#f0fff4') : '#fff', cursor: (tatil || isHaftaSonu) ? 'default' : 'pointer' }} 
-                                  onClick={(e) => {
-                                    if (tatil || isHaftaSonu) return
-                                    if (ders) durumDegistir(ders.id, ders.durum)
-                                    else openPicker(e, vd.day, vd.month, vd.year, sinif.id, dersNo, gunAdi)
-                                  }}
-                                >
-                                  <div style={{ width: 80, minWidth: 80 }}>
-                                    {(!tatil && !isHaftaSonu) ? (
-                                      ders ? (
-                                        <div className="cell-content">
-                                          <div style={{ fontWeight: 700, fontSize: 10, color: ders.durum === 'gelmedi' ? '#333' : '#333', textDecoration: ders.durum === 'gelmedi' ? 'line-through' : 'none' }}>{ogr?.ad}</div>
-                                          <div className={`status-badge ${ders.durum}`}>{ders.durum === 'geldi' ? '✓ GELDİ' : '✕ GELMEDİ'}</div>
-                                        </div>
-                                      ) : (
-                                        <div className="btn-ata-mini">+</div>
-                                      )
-                                    ) : <div style={{ fontSize: 8, color: '#999' }}>{isHaftaSonu ? 'H.SONU' : 'TATİL'}</div>}
-                                  </div>
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        ))}
-                        {KOORD_SAATLERI.map((dersNo) => (
-                          <tr key={dersNo}>
-                            <td style={{ ...tdStyle, fontWeight: 700, background: '#f5f2ec', position: 'sticky', left: 0, zIndex: 10, borderRight: '2px solid #ddd', color: 'var(--accent)' }}>Koordinatör</td>
-                            {visibleDays.map(vd => {
-                              const ders = dersGetir(sinif.ad, dersNo, vd.day, vd.month, vd.year)
-                              const tatil = tatilMi(vd.month, vd.day, vd.year, tatiller)
-                              const hg = new Date(vd.year, vd.month - 1, vd.day, 12).getDay()
-                              const isHaftaSonu = hg === 0 || hg === 6
-                              const ogr = ders ? ders.ogretmen as unknown as Personel | null : null
-                              const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
-                              return (
-                                <td key={`${vd.day}-${vd.month}`} className="program-cell" 
-                                  style={{ ...tdStyle, background: (tatil || isHaftaSonu) ? '#e0dbd0' : ders ? '#ebf4ff' : '#fff', cursor: (tatil || isHaftaSonu) ? 'default' : 'pointer' }}
-                                  onClick={(e) => {
-                                    if (tatil || isHaftaSonu) return
-                                    if (ders) durumDegistir(ders.id, ders.durum)
-                                    else openPicker(e, vd.day, vd.month, vd.year, sinif.id, dersNo, gunAdi)
-                                  }}
-                                >
-                                  <div style={{ width: 80, minWidth: 80 }}>
-                                    {(!tatil && !isHaftaSonu) ? (
-                                      ders ? (
-                                        <div className="cell-content">
-                                          <button className="fast-del-mini" onClick={(e) => fastSil(e, ders.id)}>×</button>
-                                          <div style={{ fontWeight: 700, fontSize: 10, color: '#0369a1' }}>{ogr?.ad}</div>
-                                          <div className={`status-badge ${ders.durum}`} style={{ background: ders.durum === 'geldi' ? '#0369a1' : '#c53030' }}>{ders.durum === 'geldi' ? '✓ GELDİ' : '✕ GELMEDİ'}</div>
-                                        </div>
-                                      ) : (
-                                        <div className="btn-ata-mini">+</div>
-                                      )
-                                    ) : <div style={{ fontSize: 8, color: '#999' }}>{isHaftaSonu ? 'H.SONU' : 'TATİL'}</div>}
-                                  </div>
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+          {gorunenSiniflar.map(sinif => {
+            const currentTab = getTab(sinif.id)
+            
+            return (
+              <div key={sinif.id} className="sinif-block" style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)', background: '#fff' }}>
+                <div className="no-print" style={{ padding: '16px 20px', background: '#f8f9fa', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>
+                    {sinif.ad} <span style={{ fontWeight: 400, color: 'var(--text3)', fontSize: 13 }}>({sinif.yas_grubu})</span>
+                  </h3>
+                  
+                  {/* Tab Selector */}
+                  <div style={{ display: 'flex', background: 'var(--bg)', padding: 3, borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <button 
+                      onClick={() => setTab(sinif.id, 'ders')}
+                      style={{ 
+                        border: 'none', padding: '6px 16px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                        background: currentTab === 'ders' ? 'var(--accent)' : 'transparent',
+                        color: currentTab === 'ders' ? '#fff' : 'var(--text2)',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      🏫 Öğretmen Defteri
+                    </button>
+                    <button 
+                      onClick={() => setTab(sinif.id, 'koord')}
+                      style={{ 
+                        border: 'none', padding: '6px 16px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                        background: currentTab === 'koord' ? 'var(--info)' : 'transparent',
+                        color: currentTab === 'koord' ? '#fff' : 'var(--text2)',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      👔 Koordinatör Defteri
+                    </button>
                   </div>
                 </div>
-              )}
 
-              {gorunum === 'haftalik' && (
-                <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 32, background: '#fff', borderRadius: '0 0 10px 10px', border: '1px solid #ddd' }}>
-                  {visibleWeeks.map((week, wIndex) => (
-                    <div key={wIndex} className="week-block">
-                      <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--surface2)', borderRadius: 6, fontWeight: 700, fontSize: 12, color: 'var(--text2)', borderLeft: '4px solid var(--accent)', display: 'inline-block' }}>
-                        📅 {wIndex + 1}. Hafta ({week[0].day} {AYLAR[week[0].month || 1]} - {week[week.length - 1].day} {AYLAR[week[week.length - 1].month || 1]})
-                      </div>
-                      <div className="scroll-container" style={{ width: '100%', overflowX: 'auto' }}>
-                        <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 11 }}>
-                          <thead>
-                            <tr>
-                              <th style={{ ...thStyle(100), background: '#2d5a3d' }}>Saat</th>
-                              {week.map(vd => {
-                                const tatil = tatilMi(vd.month, vd.day, vd.year, tatiller)
-                                const hg = new Date(vd.year, vd.month - 1, vd.day, 12).getDay()
-                                const isHaftaSonu = hg === 0 || hg === 6
-                                const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
-                                return (
-                                  <th key={`${vd.day}-${vd.month}`} style={{ ...thStyle(80), background: (tatil || isHaftaSonu) ? '#c8c0aa' : '#2d5a3d' }}>
-                                    {gunAdi}<br /><span style={{ fontSize: 13, fontWeight: 700 }}>{vd.day}</span>
-                                  </th>
-                                )
-                              })}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {DERS_SAATLERI.map(dersNo => (
-                              <tr key={dersNo}>
-                                <td style={{ ...tdStyle, fontWeight: 700, background: '#f5f2ec' }}>{dersNo}. DERS</td>
-                                {week.map(vd => {
-                                  const ders = dersGetir(sinif.ad, dersNo, vd.day, vd.month, vd.year)
-                                  const tatil = tatilMi(vd.month, vd.day, vd.year, tatiller)
-                                  const hg = new Date(vd.year, vd.month - 1, vd.day, 12).getDay()
-                                  const isHaftaSonu = hg === 0 || hg === 6
-                                  const ogr = ders ? ders.ogretmen as unknown as Personel | null : null
-                                  const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
-                                  return (
-                                    <td key={`${vd.day}-${vd.month}`} className="program-cell" 
-                                      style={{ ...tdStyle, background: (tatil || isHaftaSonu) ? '#e0dbd0' : ders ? (ders.durum === 'gelmedi' ? '#fff1f0' : '#f0fff4') : '#fff', cursor: (tatil || isHaftaSonu) ? 'default' : 'pointer' }}
-                                      onClick={(e) => {
-                                        if (tatil || isHaftaSonu) return
-                                        if (ders) durumDegistir(ders.id, ders.durum)
-                                        else openPicker(e, vd.day, vd.month, vd.year, sinif.id, dersNo, gunAdi)
-                                      }}
-                                    >
-                                      <div style={{ width: 80, minWidth: 80 }}>
-                                        {(!tatil && !isHaftaSonu) ? (
-                                          ders ? (
-                                            <div className="cell-content">
-                                              <div style={{ fontWeight: 700, fontSize: 10, color: ders.durum === 'gelmedi' ? '#333' : '#333', textDecoration: ders.durum === 'gelmedi' ? 'line-through' : 'none' }}>{ogr?.ad}</div>
-                                              <div className={`status-badge ${ders.durum}`}>{ders.durum === 'geldi' ? '✓ GELDİ' : '✕ GELMEDİ'}</div>
-                                            </div>
-                                          ) : (
-                                            <div className="btn-ata-mini">+</div>
-                                          )
-                                        ) : <div style={{ fontSize: 8, color: '#999' }}>{isHaftaSonu ? 'H.SONU' : 'TATİL'}</div>}
-                                      </div>
-                                    </td>
-                                  )
-                                })}
-                              </tr>
-                            ))}
-                            {KOORD_SAATLERI.map((dersNo) => (
-                              <tr key={dersNo}>
-                                <td style={{ ...tdStyle, fontWeight: 700, background: '#f5f2ec', color: 'var(--accent)' }}>Koordinatör</td>
-                                {week.map(vd => {
-                                  const ders = dersGetir(sinif.ad, dersNo, vd.day, vd.month, vd.year)
-                                  const tatil = tatilMi(vd.month, vd.day, vd.year, tatiller)
-                                  const hg = new Date(vd.year, vd.month - 1, vd.day, 12).getDay()
-                                  const isHaftaSonu = hg === 0 || hg === 6
-                                  const ogr = ders ? ders.ogretmen as unknown as Personel | null : null
-                                  const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
-                                  return (
-                                    <td key={`${vd.day}-${vd.month}`} className="program-cell" 
-                                      style={{ ...tdStyle, background: (tatil || isHaftaSonu) ? '#e0dbd0' : ders ? '#ebf4ff' : '#fff', cursor: (tatil || isHaftaSonu) ? 'default' : 'pointer' }}
-                                      onClick={(e) => {
-                                        if (tatil || isHaftaSonu) return
-                                        if (ders) durumDegistir(ders.id, ders.durum)
-                                        else openPicker(e, vd.day, vd.month, vd.year, sinif.id, dersNo, gunAdi)
-                                      }}
-                                    >
-                                      <div style={{ width: 80, minWidth: 80 }}>
-                                        {(!tatil && !isHaftaSonu) ? (
-                                          ders ? (
-                                            <div className="cell-content">
-                                              <button className="fast-del-mini" onClick={(e) => fastSil(e, ders.id)}>×</button>
-                                              <div style={{ fontWeight: 700, fontSize: 10, color: '#0369a1' }}>{ogr?.ad}</div>
-                                              <div className={`status-badge ${ders.durum}`} style={{ background: ders.durum === 'geldi' ? '#0369a1' : '#c53030' }}>{ders.durum === 'geldi' ? '✓ GELDİ' : '✕ GELMEDİ'}</div>
-                                            </div>
-                                          ) : (
-                                            <div className="btn-ata-mini">+</div>
-                                          )
-                                        ) : <div style={{ fontSize: 8, color: '#999' }}>{isHaftaSonu ? 'H.SONU' : 'TATİL'}</div>}
-                                      </div>
-                                    </td>
-                                  )
-                                })}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+                {gorunum === 'aylik' && (
+                  <RenderTable 
+                    sinif={sinif} 
+                    hours={currentTab === 'ders' ? DERS_SAATLERI : KOORD_SAATLERI} 
+                    type={currentTab} 
+                    currentTab={currentTab} 
+                    ayarlar={ayarlar} 
+                    ay={ay} 
+                    yil={yil} 
+                    visibleDays={visibleDays} 
+                    tatiller={tatiller}
+                    dersGetir={dersGetir}
+                    durumDegistir={durumDegistir}
+                    openPicker={openPicker}
+                    fastSil={fastSil}
+                  />
+                )}
+
+                {gorunum === 'haftalik' && (
+                  <div className="no-print" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 32, background: '#fff' }}>
+                    {visibleWeeks.map((week, wIndex) => (
+                      <RenderWeeklyTable 
+                        key={wIndex}
+                        sinif={sinif}
+                        week={week}
+                        currentHours={currentTab === 'ders' ? DERS_SAATLERI : KOORD_SAATLERI}
+                        currentTab={currentTab}
+                        defter={defter}
+                        tatiller={tatiller}
+                        wIndex={wIndex}
+                        dersGetir={dersGetir}
+                        durumDegistir={durumDegistir}
+                        openPicker={openPicker}
+                        fastSil={fastSil}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
 
       <div className="no-print" style={{ marginTop: 60, padding: '30px 0', borderTop: '1px dashed var(--border)', textAlign: 'center' }}>
@@ -569,93 +1037,189 @@ export default function SinifDefteriPage() {
       </div>
 
       {picker && (
-        <div className="picker-overlay" onClick={() => setPicker(null)}>
-          <div className="fast-picker" style={{ 
-            top: picker.rect.bottom + 300 > window.innerHeight ? picker.rect.top - 310 : picker.rect.bottom + 5, 
-            left: Math.min(picker.rect.left, window.innerWidth - 220) 
-          }} onClick={e => e.stopPropagation()}>
-            <div className="picker-header text-xs text-muted-foreground uppercase tracking-wider">{picker.day} {AYLAR[picker.month || 1]} - Seçim</div>
-            <div className="picker-list">
-              {personel
-                .filter(p => {
+        <div
+          className="picker-overlay"
+          onClick={() => setPicker(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 9000 }}
+        >
+          <div
+            className="fast-picker"
+            style={{
+              position: 'fixed',
+              top: (
+                picker.rect.bottom + 320 > window.innerHeight
+                  ? picker.rect.top - 320
+                  : picker.rect.bottom + 6
+              ),
+              left: Math.min(
+                Math.max(picker.rect.left, 8),
+                window.innerWidth - 230
+              ),
+              zIndex: 9999,
+              width: 220,
+              maxHeight: 300,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="picker-header">
+              {picker.day} {AYLAR[picker.month || 1]} — {picker.dersNo >= 11 ? 'Koordinatör Seç' : 'Öğretmen Seç'}
+            </div>
+            <div className="picker-list" style={{ overflowY: 'auto', flex: 1 }}>
+              {(() => {
+                const filtered = personel.filter(p => {
                   const g = (p.gorev || '').toLowerCase()
                   if (picker.dersNo >= 11) {
-                    return g.includes('koordinatör')
+                    return g.includes('koordinatör') || g.includes('koord') || g.includes('başkan')
                   }
-                  return !['muhasebeci', 'muhasebe', 'temizlik'].some(keyword => g.includes(keyword))
+                  return !['muhasebe', 'temizlik', 'başkan', 'denetim'].some(kw => g.includes(kw))
                 })
-                .map(p => (
-                <button key={p.id} className="picker-item" onClick={() => directKaydet(p.id, picker)}>
-                  {p.ad} <span style={{fontSize:10, opacity:0.6}}>- {p.gorev}</span>
-                </button>
-              ))}
+                if (filtered.length === 0) {
+                  return (
+                    <div style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text3)', textAlign: 'center' }}>
+                      {picker.dersNo >= 11 ? 'Koordinatör öğretmen bulunamadı' : 'Personel bulunamadı'}
+                    </div>
+                  )
+                }
+                return filtered.map(p => (
+                  <button key={p.id} className="picker-item" onClick={() => directKaydet(p.id, picker)}>
+                    {p.ad} <span style={{ fontSize: 10, opacity: 0.6 }}>- {p.gorev}</span>
+                  </button>
+                ))
+              })()}
             </div>
           </div>
         </div>
       )}
 
-      {deleteConfirm && (
-        <div className="picker-overlay" style={{ background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(2px)' }} onClick={() => setDeleteConfirm(null)}>
-          <div className="fast-picker" style={{ position: 'relative', top: 0, left: 0, width: 320, padding: 24, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 40, marginBottom: 16 }}>⚠️</div>
-            <h3 style={{ margin: '0 0 8px 0', color: 'var(--text)' }}>Emin misiniz?</h3>
-            <p style={{ margin: '0 0 24px 0', color: 'var(--text3)', fontSize: 13 }}>Bu koordinatörlük atamasını silmek istediğinizden emin misiniz?</p>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setDeleteConfirm(null)}>Vazgeç</button>
-              <button className="btn btn-danger" style={{ flex: 1, background: '#d00000' }} onClick={finishSil}>Evet, Sil</button>
-            </div>
-          </div>
-        </div>
+      {conf?.open && (
+        <ConfirmModal
+          baslik={conf.title}
+          mesaj={conf.message}
+          onayMetni={conf.type === 'sil' ? 'Evet, Sil' : conf.type === 'kopyala' ? 'Evet, Kopyala' : 'Evet, Devam Et'}
+          tehlikeli={conf.type === 'sil' || conf.type === 'kopyala'}
+          onOnayla={() => {
+            if (conf.type === 'sil') finishSil(conf.id!)
+            else if (conf.type === 'kopyala') koordHaftayiKopyalaGercek()
+            else if (conf.type === 'tatil') directKaydetGercek(conf.payload.personelId, conf.payload.pInfo)
+          }}
+          onIptal={() => setConf(null)}
+        />
       )}
-
-
 
       <style jsx>{`
-        .scroll-container { scrollbar-width: thick; scrollbar-color: #2d5a3d #e0e0e0; overflow: auto; }
-        .scroll-container::-webkit-scrollbar { height: 14px !important; display: block !important; }
-        .scroll-container::-webkit-scrollbar-track { background: #f8f9fa !important; }
-        .scroll-container::-webkit-scrollbar-thumb { background: #2d5a3d !important; border-radius: 8px; border: 3px solid #f8f9fa; }
+        :global(.scroll-container) { scrollbar-width: thick; scrollbar-color: var(--accent) #e0e0e0; overflow: auto; }
+        :global(.scroll-container::-webkit-scrollbar) { height: 12px !important; display: block !important; }
+        :global(.scroll-container::-webkit-scrollbar-track) { background: var(--bg) !important; }
+        :global(.scroll-container::-webkit-scrollbar-thumb) { background: var(--border) !important; border-radius: 8px; border: 3px solid var(--bg); }
         
-        .program-cell { cursor: pointer; transition: all 0.2s; min-height: 60px; position: relative; }
-        .program-cell:hover { background: #fffcf0 !important; box-shadow: inset 0 0 0 1px rgba(45,90,61,0.1); }
+        :global(.program-cell) { cursor: pointer; transition: all 0.2s; min-height: 60px; position: relative; }
+        :global(.program-cell:hover) { background: #fffcf0 !important; box-shadow: inset 0 0 0 1px rgba(45,90,61,0.1); }
         
-        .btn-ata-mini { width: 26px; height: 26px; border-radius: 50%; border: 1px dashed #ccc; background: #fff; cursor: pointer; color: #999; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; }
-        .btn-ata-mini:hover { background: var(--accent); color: #fff; border-style: solid; transform: scale(1.1); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        :global(.btn-ata-mini) { width: 26px; height: 26px; border-radius: 50%; border: 1px dashed #ccc; background: #fff; cursor: pointer; color: #999; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        :global(.btn-ata-mini:hover) { background: var(--accent); color: #fff; border-style: solid; transform: scale(1.1); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         
-        .cell-content { position: relative; width: 100%; height: 100%; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; }
-        .fast-del-mini { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; background: #fff; color: #e53e3e; border: 1px solid #fed7d7; border-radius: 50%; font-size: 10px; display: none; align-items: center; justify-content: center; cursor: pointer; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
-        .program-cell:hover .fast-del-mini { display: flex; }
-        .fast-del-mini:hover { background: #e53e3e; color: #fff; transform: scale(1.1); }
+        :global(.cell-content) { position: relative; width: calc(100% - 6px); height: 100%; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; margin: 0 3px; background: #f8f9fa; border: 1.5px solid #dee2e6; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); transition: border-color 0.15s; }
+        :global(.program-cell:hover .cell-content) { border-color: #adb5bd; }
         
-        .status-badge { margin-top: 4px; padding: 2px 6px; border-radius: 10px; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px; }
-        .status-badge.geldi { background: #2d5a3d; color: #fff; }
-        .status-badge.gelmedi { background: #c53030; color: #fff; }
+        :global(.fast-del-mini) { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; background: #fff; color: #e53e3e; border: 1px solid #eee; border-radius: 50%; font-size: 12px; display: none; align-items: center; justify-content: center; cursor: pointer; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: all 0.2s; }
+        :global(.program-cell:hover .fast-del-mini) { display: flex; }
+        :global(.fast-del-mini:hover) { background: #ef4444; color: #fff; border-color: #ef4444; transform: scale(1.1); }
         
-        .picker-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.02); }
-        .fast-picker { position: absolute; background: #fff; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); border: 1px solid #eee; width: 220px; z-index: 1001; animation: popIn 0.2s ease-out; }
-        .picker-header { padding: 10px 14px; background: #f9f9f9; font-size: 10px; font-weight: 800; border-bottom: 1px solid #eee; color: #666; }
-        .picker-list { max-height: 250px; overflow-y: auto; padding: 6px; }
-        .picker-item { width: 100%; text-align: left; padding: 10px 14px; background: none; border: none; font-size: 13px; cursor: pointer; border-radius: 8px; transition: all 0.1s; display: flex; flex-direction: column; }
-        .picker-item:hover { background: #f0fdf4; color: var(--accent); }
+        :global(.status-badge) { margin-top: 4px; padding: 2px 6px; border-radius: 10px; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px; display: inline-block; }
+        :global(.status-badge.geldi) { background: var(--accent); color: #fff; }
+        :global(.status-badge.gelmedi) { background: #c53030; color: #fff; }
 
+        :global(.add-btn-dash) { 
+          color: var(--border); 
+          font-size: 20px; 
+          font-weight: 300; 
+          opacity: 0.5; 
+          transition: all 0.2s;
+        }
+        :global(.program-cell:hover .add-btn-dash) { color: var(--accent); opacity: 1; transform: scale(1.2); }
+        
         @keyframes popIn {
           from { transform: scale(0.95); opacity: 0; }
           to { transform: scale(1); opacity: 1; }
         }
 
+        /* ── Picker ─────────────────────────────────── */
+        .picker-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 9000;
+          background: transparent;
+        }
+        .fast-picker {
+          background: #ffffff;
+          border-radius: 12px;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10);
+          border: 1px solid #e5e7eb;
+          overflow: hidden;
+          animation: popIn 0.15s ease;
+          min-width: 200px;
+        }
+        .picker-header {
+          padding: 10px 14px;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: var(--accent);
+          background: #f8faf8;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        .picker-list {
+          max-height: 260px;
+          overflow-y: auto;
+          padding: 4px 0;
+        }
+        .picker-item {
+          display: block;
+          width: 100%;
+          padding: 9px 14px;
+          text-align: left;
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--text1, #111);
+          border-radius: 0;
+          transition: background 0.12s;
+        }
+        .picker-item:hover {
+          background: #f0fdf4;
+          color: var(--accent);
+        }
+
+        .print-only { display: none; }
+
+        @media screen {
+          :global(.tab-inactive) { display: none; }
+        }
+
         @media print {
-          .no-print { display: none !important; }
-          .card { border: none !important; box-shadow: none !important; }
-          .scroll-outer { border: 1px solid #eee !important; overflow: visible !important; }
-          .scroll-container { max-height: none !important; overflow: visible !important; }
-          table { width: 100% !important; table-layout: auto !important; }
+          @page { size: A4 landscape; margin: 10mm; }
+          :global(.no-print) { display: none !important; }
+          .print-only { display: block !important; }
+          :global(.scroll-outer) { overflow: visible !important; border: 1px solid #000 !important; border-radius: 0 !important; width: 100% !important; }
+          :global(.scroll-container) { max-height: none !important; height: auto !important; overflow: visible !important; width: 100% !important; }
+          table { width: 100% !important; table-layout: auto !important; border: 1px solid #000 !important; border-collapse: collapse !important; }
+          th, td { border: 1px solid #000 !important; color: #000 !important; position: static !important; }
+          th { background: #f0f0f0 !important; color: #000 !important; }
+          :global(.sinif-block) { border: none !important; margin-bottom: 0 !important; padding: 0 !important; overflow: visible !important; break-after: page; }
+          :global(.tab-inactive) { display: block !important; }
+          :global(.print-spacer) { display: block !important; height: 30px !important; }
+          :global(.table-print-container) { break-inside: avoid; margin-bottom: 20px; width: 100%; overflow: visible !important; }
+          body { background: #fff !important; padding: 0 !important; margin: 0 !important; overflow: visible !important; }
+          .card { box-shadow: none !important; border: none !important; overflow: visible !important; }
+          :global(.print-area) { zoom: 1 !important; transform: none !important; overflow: visible !important; }
+          :global(.status-badge) { border: 1px solid #000 !important; color: #000 !important; background: transparent !important; }
         }
       `}</style>
     </div>
   )
 }
-
-function thStyle(width: number): React.CSSProperties {
-  return { padding: '12px 6px', color: '#fff', fontWeight: 700, fontSize: 10, border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', width, minWidth: width, boxSizing: 'border-box', verticalAlign: 'middle' }
-}
-const tdStyle: React.CSSProperties = { padding: '4px', border: '1px solid #eee', verticalAlign: 'middle', fontSize: 10, textAlign: 'center', position: 'relative' }

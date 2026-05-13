@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
+import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
 import {
   AYLAR, fmtTL, fmt, isGunuSayisi, saatUcretiHesapla,
@@ -26,6 +27,7 @@ const TAVAN_KATEGORILER = [
 
 export default function BilancoPage() {
   const { ay, yil } = useAy()
+  const { okul } = useAuth()
   const [ayarlar, setAyarlar] = useState<Ayarlar | null>(null)
   const [toplamGelir, setToplamGelir] = useState(0)
   const [ogrenciSayisi, setOgrenciSayisi] = useState(0)
@@ -47,7 +49,7 @@ export default function BilancoPage() {
       supabase.from('tahsilat').select('tutar, ogrenci_id').eq('ay', Number(ay)).eq('yil', Number(yil)),
       supabase.from('bordro').select('toplam_saat').eq('ay', Number(ay)).eq('yil', Number(yil)),
       supabase.from('siniflar').select('id').eq('aktif', true),
-      supabase.from('tatiller').select('*'),
+      supabase.from('tatiller').select('*').or(`okul_id.eq.${okul?.id ?? 0},okul_id.is.null`),
     ])
 
     setAyarlar(ayr)
@@ -177,7 +179,7 @@ export default function BilancoPage() {
 
           {/* BAŞLIK */}
           <div style={{ textAlign: 'center', marginBottom: 20 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#c0392b', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--danger)', letterSpacing: 0.5, textTransform: 'uppercase' }}>
               {ayarlar.kurum_adi || 'KULÜP ADI TANIMLANMAMIŞ'}
             </div>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#333', marginTop: 6 }}>
@@ -229,7 +231,7 @@ export default function BilancoPage() {
 
           {/* AYLIK TAHAKKUK TABLOSU */}
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, background: '#2d5a3d', color: '#fff', padding: '5px 10px', marginBottom: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, background: 'var(--accent)', color: '#fff', padding: '5px 10px', marginBottom: 0 }}>
               AYLIK TAHAKKUK TOPLAMI
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>

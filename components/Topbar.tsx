@@ -11,7 +11,7 @@ export default function Topbar({ title, sub, actions }: Props) {
     <div
       className="no-print"
       style={{
-        background: '#fffef9',
+        background: 'var(--surface)',
         borderBottom: '1px solid #d8d0be',
         padding: '14px 28px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -24,7 +24,7 @@ export default function Topbar({ title, sub, actions }: Props) {
           {title}
         </div>
         {sub && (
-          <div style={{ fontSize: 12, color: '#8a8070', marginTop: 2 }}>{sub}</div>
+          <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{sub}</div>
         )}
       </div>
       {actions && (

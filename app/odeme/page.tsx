@@ -1,14 +1,18 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Topbar from '@/components/Topbar'
 import Badge from '@/components/Badge'
 import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
 import { fmtTL, ayLabel, isGunuSayisi, tarihFmt } from '@/lib/hesaplama'
 import { Ogrenci, Tahsilat, Ayarlar } from '@/lib/types'
+import { logIslem } from '@/lib/audit'
+import { useAuth } from '@/lib/AuthContext'
+import ConfirmModal from '@/components/ConfirmModal'
 
 export default function OdemePage() {
   const { ay, yil } = useAy()
+  const { okul, profil } = useAuth()
   const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
   const [tahsilatlar, setTahsilatlar] = useState<Tahsilat[]>([])
   const [siniflar, setSiniflar] = useState<any[]>([])
@@ -28,6 +32,9 @@ export default function OdemePage() {
   const [dekont, setDekont] = useState('')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [progress, setProgress] = useState<{ current: number; total: number; name: string } | null>(null)
+  const cancelRef = useRef(false)
+  const [conf, setConf] = useState<{ open: boolean, type: 'sil' | 'toplu', id?: number, title: string, message: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -36,7 +43,7 @@ export default function OdemePage() {
       supabase.from('tahsilat').select('*').eq('ay', ay).eq('yil', yil).order('tarih', { ascending: false }),
       supabase.from('ayarlar').select('*').single(),
       supabase.from('siniflar').select('*'),
-      supabase.from('tatiller').select('*')
+      supabase.from('tatiller').select('*').or(`okul_id.eq.${okul?.id ?? 0},okul_id.is.null`)
     ])
     setOgrenciler(ogr || [])
     setTahsilatlar(tah || [])
@@ -67,10 +74,13 @@ export default function OdemePage() {
       // Bu ayın tüm tahsilatlarını topla ve tahakkuk tablosunu güncelle
       const { data: tahs } = await supabase.from('tahsilat').select('tutar').eq('ay', ay).eq('yil', yil)
       const toplam = (tahs || []).reduce((s, t) => s + Number(t.tutar), 0)
+
+      const okulId = okul?.id || profil?.okul_id
       
       await supabase.from('tahakkuk').upsert({
-        ay, yil, toplam_gelir: toplam, hesaplandi_mi: true
-      }, { onConflict: 'ay,yil' })
+        ay, yil, toplam_gelir: toplam, hesaplandi_mi: true,
+        okul_id: okulId
+      }, { onConflict: 'ay,yil,okul_id' })
     } catch (e) {
       console.error('Tahakkuk guncelleme hatasi:', e)
     }
@@ -80,11 +90,18 @@ export default function OdemePage() {
     if (o.ucretsiz_mi) return 0
     if (!ayarlar) return 0
 
+    if (o.gunluk_saat != null && o.gunluk_saat > 0) {
+      // Eğer öğrenciye özel TOPLAM ders saati girilmişse (örn. 60 saat)
+      let u = o.gunluk_saat * (ayarlar.saat_ucreti || 0)
+      if (o.kardes_indirimi) u *= 0.75
+      return u
+    }
+
     const isGunu = isGunuSayisi(yil, ay, tatiller)
     let u = isGunu * (ayarlar.gunluk_saat || 6) * (ayarlar.saat_ucreti || 0)
     
     if (o.kardes_indirimi) u *= 0.75
-    return Math.round(u * 100) / 100
+    return u // Hassas hesaplama için yuvarlamayı kaldırıyoruz
   }
 
   function odened(oId: number): number {
@@ -95,9 +112,11 @@ export default function OdemePage() {
     if (!ogrenciId || !tutar || !tarih) { setMsg('❌ Öğrenci, tutar ve tarih zorunlu!'); return }
     setSaving(true)
     setMsg('')
-    // Ödemeyi HER ZAMAN üst menüde seçili olan ay/yıla kaydet (Kritik Fix)
     const ayX = ay
     const yilX = yil
+    // okul_id'yi güvenli al
+    const okulId = okul?.id ?? profil?.okul_id
+    if (!okulId) { setMsg('❌ Oturum bilgisi eksik, sayfayı yenileyin.'); setSaving(false); return }
 
     // Mükerrer Ödeme Kontrolü
     const { data: mevcut } = await supabase.from('tahsilat')
@@ -117,20 +136,45 @@ export default function OdemePage() {
       tutar: parseFloat(tutar),
       tarih, aciklama, dekont_no: dekont,
       ay: ayX, yil: yilX,
+      okul_id: okulId
     }
     const { data: tahNew, error: e1 } = await supabase.from('tahsilat').insert(tahsData).select().single()
-    if (e1) { setMsg('❌ Hata: ' + e1.message); setSaving(false); return }
+    if (e1) { setMsg('❌ Tahsilat hatası: ' + e1.message); setSaving(false); return }
 
-    // Hesap hareketlerine ekle
+    // Hesap hareketlerine ekle (GELİR)
     const ogr = ogrenciler.find(o => o.id === parseInt(ogrenciId))
-    await supabase.from('hesap_hareketleri').insert({
+    const aciklamaMetni = `Öğrenci ödemesi: ${ogr ? ogr.ad + ' ' + ogr.soyad : ''} ${aciklama || ''}`.trim()
+    
+    const { error: hErr1 } = await supabase.from('hesap_hareketleri').insert({
       tarih, tutar: parseFloat(tutar), tur: 'gelir',
-      aciklama: `Öğrenci ödemesi: ${ogr ? ogr.ad + ' ' + ogr.soyad : ''} ${aciklama || ''}`.trim(),
+      aciklama: aciklamaMetni,
       dekont_no: dekont, kaynak: 'tahsilat', kaynak_id: tahNew?.id,
       ay: ay, yil: yil,
+      okul_id: okulId
     })
+    if (hErr1) console.error('Hesap hareketi (gelir) eklenemedi:', hErr1.message)
+
+    // OTOMATİK DENGELEME: Giderler tablosuna ve hareketlerine Ekle
+    const dagitimAciklama = `Kurum Havuzu Dağıtımı (${ogr ? ogr.ad + ' ' + ogr.soyad : ''})`
+    const { data: gidNew, error: gErr } = await supabase.from('giderler').insert({
+      tarih, tutar: parseFloat(tutar), kategori: 'Kurum Havuzu Dağıtımı',
+      aciklama: dagitimAciklama, dekont_no: dekont,
+      ay: ay, yil: yil,
+      okul_id: okulId
+    }).select().single()
+    if (gErr) console.error('Gider eklenemedi:', gErr.message)
+
+    const { error: hErr2 } = await supabase.from('hesap_hareketleri').insert({
+      tarih, tutar: parseFloat(tutar), tur: 'gider',
+      aciklama: dagitimAciklama,
+      dekont_no: dekont, kaynak: 'giderler', kaynak_id: gidNew?.id,
+      ay: ay, yil: yil,
+      okul_id: okulId
+    })
+    if (hErr2) console.error('Hesap hareketi (gider) eklenemedi:', hErr2.message)
 
     setSaving(false)
+    if (ogr) logIslem({ islem: 'ekle', tablo: 'tahsilat', kayit_id: tahNew?.id, aciklama: `${ogr.ad} ${ogr.soyad} için ödeme kaydedildi (${parseFloat(tutar).toLocaleString('tr-TR')} ₺)` })
     setMsg('✅ Ödeme kaydedildi!')
     setTimeout(() => setMsg(''), 2500)
     setTutar(''); setAciklama(''); setDekont('')
@@ -139,34 +183,52 @@ export default function OdemePage() {
     tahakkukGuncelle()
   }
 
+  const formRef = useRef<HTMLDivElement>(null)
+
   function hizliOdemeDoldur(o: Ogrenci) {
     const k = gereken(o) - odened(o.id)
     if (k <= 0) { setMsg('ℹ️ Bu öğrencinin borcu bulunmamaktadır.'); return }
     setOgrenciId(String(o.id))
     setTutar(String(k))
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     setMsg(`💡 ${o.ad} için ödeme formu dolduruldu.`)
   }
 
   async function topluOdemeKaydet() {
     if (secilenler.length === 0) return
-    const onayla = confirm(`${secilenler.length} öğrenci için borç kapama ödemesi oluşturulacak. Emin misiniz?`)
-    if (!onayla) return
+    setConf({
+      open: true,
+      type: 'toplu',
+      title: 'Toplu Ödeme Onayı',
+      message: `${secilenler.length} öğrenci için borç kapama ödemesi oluşturulacak. Emin misiniz?`
+    })
+  }
+
+  async function topluOdemeGercek() {
+    setConf(null)
+    const okulId = okul?.id ?? profil?.okul_id
+    if (!okulId) { setMsg('❌ Oturum bilgisi eksik, sayfayı yenileyin.'); return }
 
     setSaving(true)
-    setMsg('🔄 Toplu ödemeler işleniyor...')
+    cancelRef.current = false
+    
+    const seciliOgrenciler = ogrenciler.filter(o => secilenler.includes(o.id))
+    setProgress({ current: 0, total: seciliOgrenciler.length, name: '' })
     
     try {
-      // Ödemeyi HER ZAMAN üst menüde seçili olan ay/yıla kaydet (Kritik Fix)
       const ayX = ay
       const yilX = yil
-
-      const seciliOgrenciler = ogrenciler.filter(o => secilenler.includes(o.id))
       
+      let count = 0
+      let processedCount = 0
       for (const o of seciliOgrenciler) {
-        // Önce ödemesi var mı bak
+        if (cancelRef.current) {
+          break
+        }
+        count++
+        setProgress({ current: count, total: seciliOgrenciler.length, name: `${o.ad} ${o.soyad}` })
         const { data: v } = await supabase.from('tahsilat').select('id').eq('ogrenci_id', o.id).eq('ay', ayX).eq('yil', yilX).maybeSingle()
-        if (v) continue // Varsa atla
+        if (v) continue
 
         const k = gereken(o) - odened(o.id)
         if (k <= 0) continue
@@ -177,19 +239,46 @@ export default function OdemePage() {
           tarih,
           aciklama: `${ayLabel(ayX, yilX)} Toplu Ödeme`,
           ay: ayX,
-          yil: yilX
+          yil: yilX,
+          okul_id: okulId
         }).select().single()
 
         if (!error && tahNew) {
+          processedCount++
+          const aciklamaMetni = `Toplu Ödeme: ${o.ad} ${o.soyad}`
+          // Gelir Hareketi
           await supabase.from('hesap_hareketleri').insert({
             tarih, tutar: k, tur: 'gelir',
-            aciklama: `Toplu Ödeme: ${o.ad} ${o.soyad}`,
+            aciklama: aciklamaMetni,
             kaynak: 'tahsilat', kaynak_id: tahNew.id,
-            ay: ay, yil: yil
+            ay: ay, yil: yil,
+            okul_id: okulId
+          })
+
+          // Gider ve Dağıtım Hareketi
+          const dagitimAciklama = `Kurum Havuzu Dağıtımı (Toplu: ${o.ad} ${o.soyad})`
+          const { data: gidNew } = await supabase.from('giderler').insert({
+            tarih, tutar: k, kategori: 'Kurum Havuzu Dağıtımı',
+            aciklama: dagitimAciklama,
+            ay: ay, yil: yil,
+            okul_id: okulId
+          }).select().single()
+
+          await supabase.from('hesap_hareketleri').insert({
+            tarih, tutar: k, tur: 'gider',
+            aciklama: dagitimAciklama,
+            kaynak: 'giderler', kaynak_id: gidNew?.id,
+            ay: ay, yil: yil,
+            okul_id: okulId
           })
         }
       }
-      setMsg(`✅ ${secilenler.length} adet ödeme başarıyla kaydedildi!`)
+
+      if (cancelRef.current) {
+        setMsg(`⚠️ İşlem kullanıcı tarafından durduruldu. ${processedCount} adet ödeme kaydedildi.`)
+      } else {
+        setMsg(`✅ ${processedCount} adet ödeme başarıyla kaydedildi!`)
+      }
       setSecilenler([])
       load()
       tahakkukGuncelle()
@@ -197,24 +286,64 @@ export default function OdemePage() {
       setMsg('❌ Hata: ' + err.message)
     } finally {
       setSaving(false)
+      setProgress(null)
     }
   }
 
   async function tahsilatSil(id: number) {
-    if (!confirm('Bu ödeme kaydını ve bağlı kasa hareketini silmek istediğinizden emin misiniz?')) return
-    
-    setMsg('🔄 Siliniyor...')
-    // 1. Ödeme kaydını sil
-    const { error: e1 } = await supabase.from('tahsilat').delete().eq('id', id)
-    if (e1) { setMsg('❌ Hata: ' + e1.message); return }
+    setConf({
+      open: true,
+      type: 'sil',
+      id,
+      title: 'Ödeme İptal Onayı',
+      message: 'Bu ödeme kaydını ve bağlı kasa hareketini silmek istediğinizden emin misiniz?'
+    })
+  }
 
-    // 2. Kasa hareketini sil (Mutabakat)
-    await supabase.from('hesap_hareketleri').delete().eq('kaynak', 'tahsilat').eq('kaynak_id', id)
+  async function tahsilatSilGercek(id: number) {
+    setConf(null)
+    setMsg('🔄 Siliniyor...')
     
-    setMsg('✅ Ödeme ve kasa hareketi başarıyla silindi.')
-    setTimeout(() => setMsg(''), 2500)
-    load()
-    tahakkukGuncelle()
+    try {
+      // 1. Tahsilat kaydını al (silmeden önce bilgilerine ihtiyacımız var)
+      const { data: tahs, error: fErr } = await supabase.from('tahsilat').select('*, ogrenciler(ad, soyad)').eq('id', id).single()
+      if (fErr || !tahs) throw new Error('Tahsilat kaydı bulunamadı')
+
+      const ads = `${tahs.ogrenciler.ad} ${tahs.ogrenciler.soyad}`
+      const tag = `Kurum Havuzu Dağıtımı (${ads})`
+
+      // 2. Tahsilat kaydını sil
+      const { error: e1 } = await supabase.from('tahsilat').delete().eq('id', id)
+      if (e1) throw e1
+
+      // 3. Gelir hareketini sil (tahsilat_id bazlı)
+      await supabase.from('hesap_hareketleri').delete().eq('kaynak', 'tahsilat').eq('kaynak_id', id)
+
+      // 4. Gider hareketini ve Giderler tablosundaki karşılığını sil (Dağıtım dengesi için)
+      // Önce giderler tablosundan bul ve sil (aciklama ve tutar eşleşmesiyle)
+      const { data: gid, error: gFindErr } = await supabase.from('giderler')
+        .select('id')
+        .eq('aciklama', tag)
+        .eq('tutar', tahs.tutar)
+        .eq('tarih', tahs.tarih)
+        .maybeSingle()
+
+      if (gid) {
+        await supabase.from('giderler').delete().eq('id', gid.id)
+        await supabase.from('hesap_hareketleri').delete().eq('kaynak', 'giderler').eq('kaynak_id', gid.id)
+      } else {
+        // Giderler tablosunda yoksa bile hesap_hareketleri'nden açıklamaya göre temizle (fallback)
+        await supabase.from('hesap_hareketleri').delete().eq('aciklama', tag).eq('tur', 'gider')
+      }
+      
+      setMsg('✅ Ödeme ve tüm dağıtım kayıtları başarıyla silindi.')
+      load()
+      tahakkukGuncelle()
+    } catch (err: any) {
+      setMsg('❌ Hata: ' + (err.message || 'Silme işlemi tamamlanamadı'))
+    }
+    
+    setTimeout(() => setMsg(''), 4000)
   }
 
   const ozet = ogrenciler.map(o => {
@@ -275,13 +404,41 @@ export default function OdemePage() {
         </div>
 
         {/* Ödeme kayıt formu */}
-        <div className="card">
+        <div ref={formRef} className="card">
           <div className="card-title">💰 Ödeme Kaydet</div>
-          {msg && <div className={`alert ${msg.startsWith('✅') ? 'alert-success' : 'alert-danger'}`}>{msg}</div>}
+          {msg && !progress && <div className={`alert ${msg.startsWith('✅') ? 'alert-success' : 'alert-danger'}`}>{msg}</div>}
+          {progress && (
+            <div className="alert alert-info" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 20px', alignItems: 'stretch' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 14 }}>🔄 <strong>{progress.name}</strong> işleniyor...</span>
+                <span className="fw-600" style={{ fontSize: 15, color: 'var(--info)' }}>{progress.current} / {progress.total}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 15, width: '100%' }}>
+                <div className="prog-bar" style={{ flex: 1, height: 10, marginTop: 0, background: 'rgba(0,0,0,0.08)' }}>
+                  <div className="prog-fill" style={{ width: `${(progress.current / progress.total) * 100}%`, boxShadow: '0 0 10px rgba(45,90,61,0.3)' }}></div>
+                </div>
+                <button 
+                  className="btn" 
+                  onClick={() => (cancelRef.current = true)}
+                  style={{ 
+                    height: 28, padding: '0 14px', fontSize: 12,
+                    background: 'white', color: 'var(--danger)',
+                    border: '1px solid var(--danger-border)',
+                    borderRadius: 6, transition: 'all 0.2s',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                  }}
+                  onMouseOver={(e) => { e.currentTarget.style.background = 'var(--danger-light)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                  onMouseOut={(e) => { e.currentTarget.style.background = 'white'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                >
+                  🛑 İşlemi Durdur
+                </button>
+              </div>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
             <div style={{ flex: 2, minWidth: 200 }}>
-              <label className="form-label">Öğrenci</label>
-              <select className="form-select" value={ogrenciId} onChange={e => {
+              <label htmlFor="odeme-ogrenci" className="form-label">Öğrenci</label>
+              <select id="odeme-ogrenci" className="form-select" required value={ogrenciId} onChange={e => {
                 setOgrenciId(e.target.value)
                 if (e.target.value) {
                   const o = ogrenciler.find(o => o.id === parseInt(e.target.value))
@@ -297,20 +454,20 @@ export default function OdemePage() {
               </select>
             </div>
             <div style={{ width: 130 }}>
-              <label className="form-label">Tutar (₺)</label>
-              <input className="form-input" type="number" step="0.01" min="0" value={tutar} onChange={e => setTutar(e.target.value)} />
+              <label htmlFor="odeme-tutar" className="form-label">Tutar (₺)</label>
+              <input id="odeme-tutar" className="form-input" required type="number" step="0.01" min="0" value={tutar} onChange={e => setTutar(e.target.value)} />
             </div>
             <div style={{ width: 150 }}>
-              <label className="form-label">Tarih</label>
-              <input className="form-input" type="date" value={tarih} onChange={e => setTarih(e.target.value)} />
+              <label htmlFor="odeme-tarih" className="form-label">Tarih</label>
+              <input id="odeme-tarih" className="form-input" required type="date" value={tarih} onChange={e => setTarih(e.target.value)} />
             </div>
             <div style={{ width: 120 }}>
-              <label className="form-label">Dekont No</label>
-              <input className="form-input" value={dekont} onChange={e => setDekont(e.target.value)} />
+              <label htmlFor="odeme-dekont" className="form-label">Dekont No</label>
+              <input id="odeme-dekont" className="form-input" value={dekont} onChange={e => setDekont(e.target.value)} />
             </div>
             <div style={{ flex: 2, minWidth: 160 }}>
-              <label className="form-label">Açıklama</label>
-              <input className="form-input" placeholder="Ödeme açıklaması" value={aciklama} onChange={e => setAciklama(e.target.value)} />
+              <label htmlFor="odeme-aciklama" className="form-label">Açıklama</label>
+              <input id="odeme-aciklama" className="form-input" placeholder="Ödeme açıklaması" value={aciklama} onChange={e => setAciklama(e.target.value)} />
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -390,7 +547,14 @@ export default function OdemePage() {
                         }}
                       />
                     </td>
-                    <td><strong>{r.ogrenci.ad} {r.ogrenci.soyad}</strong></td>
+                    <td>
+                      <strong>{r.ogrenci.ad} {r.ogrenci.soyad}</strong>
+                      {r.ogrenci.gunluk_saat && (
+                        <span style={{ fontSize: 9, marginLeft: 8, padding: '1px 4px', background: '#e9ecef', borderRadius: 4, color: '#495057', border: '1px solid #dee2e6' }}>
+                          {r.ogrenci.gunluk_saat} Saat
+                        </span>
+                      )}
+                    </td>
                     <td>{r.ogrenci.sinif || '-'}</td>
                     <td className="td-num">{fmtTL(r.gereken)}</td>
                     <td className="td-num">{fmtTL(r.odenen)}</td>
@@ -408,27 +572,29 @@ export default function OdemePage() {
                         ) : (
                           <Badge variant="red">❌ Ödenmedi</Badge>
                         )}
-                        {r.tahsilatId && (
-                          <button 
-                            className="btn btn-danger btn-sm" 
-                            style={{ padding: '0 4px', fontSize: 10, borderRadius: 4 }}
-                            onClick={() => tahsilatSil(r.tahsilatId!)}
-                            title="Ödemeyi İptal Et (Geri Al)"
-                          >
-                            🗑️
-                          </button>
-                        )}
                       </div>
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      <button 
-                        className="btn btn-secondary btn-sm" 
-                        title="Ödeme Formunu Doldur"
-                        onClick={() => hizliOdemeDoldur(r.ogrenci)}
-                        disabled={r.kalan <= 0}
-                      >
-                        💰 Öde
-                      </button>
+                      {r.tahsilatId ? (
+                        <button 
+                          className="btn btn-outline-danger btn-sm" 
+                          title="Ödemeyi İptal Et"
+                          onClick={() => tahsilatSil(r.tahsilatId!)}
+                          style={{ minWidth: 80 }}
+                        >
+                          ✖️ İptal Et
+                        </button>
+                      ) : (
+                        <button 
+                          className="btn btn-secondary btn-sm" 
+                          title="Ödeme Formunu Doldur"
+                          onClick={() => hizliOdemeDoldur(r.ogrenci)}
+                          disabled={r.kalan <= 0}
+                          style={{ minWidth: 80 }}
+                        >
+                          💰 Öde
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -498,6 +664,19 @@ export default function OdemePage() {
             </div>
           </div>
         </div>
+      )}
+      {conf?.open && (
+        <ConfirmModal
+          baslik={conf.title}
+          mesaj={conf.message}
+          onayMetni={conf.type === 'sil' ? 'Evet, İptal Et' : 'Evet, Öde'}
+          tehlikeli={conf.type === 'sil'}
+          onOnayla={() => {
+            if (conf.type === 'sil') tahsilatSilGercek(conf.id!)
+            else if (conf.type === 'toplu') topluOdemeGercek()
+          }}
+          onIptal={() => setConf(null)}
+        />
       )}
     </div>
   )

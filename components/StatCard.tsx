@@ -1,18 +1,21 @@
+import React from 'react'
+
 interface Props {
-  label: string
+  title: string
   value: string | number
-  sub?: string
+  trend?: string
   variant?: 'default' | 'orange' | 'red' | 'teal'
-  icon?: string
+  icon?: React.ReactNode
+  color?: string
 }
 
-export default function StatCard({ label, value, sub, variant = 'default', icon }: Props) {
+export default function StatCard({ title, value, trend, variant = 'default', icon, color }: Props) {
   return (
-    <div className={`stat-card ${variant !== 'default' ? variant : ''}`}>
-      {icon && <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>}
-      <div className="stat-label">{label}</div>
+    <div className={`stat-card ${variant !== 'default' ? variant : ''}`} style={{ borderLeft: color ? `4px solid ${color}` : undefined }}>
+      {icon && <div style={{ fontSize: 20, marginBottom: 8, color: color }}>{icon}</div>}
+      <div className="stat-label">{title}</div>
       <div className="stat-value">{value}</div>
-      {sub && <div className="stat-sub">{sub}</div>}
+      {trend && <div className="stat-sub">{trend}</div>}
     </div>
   )
 }
