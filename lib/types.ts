@@ -298,6 +298,7 @@ export interface Tatil {
   baslangic_tarihi: string
   bitis_tarihi: string
   tip: string
+  okul_id: number | null
   created_at?: string
 }
 
