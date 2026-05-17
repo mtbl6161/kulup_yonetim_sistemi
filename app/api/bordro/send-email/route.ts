@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { rateLimit } from '@/lib/rate-limit'
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 
 function escape(str: unknown): string {
   return String(str ?? '')
@@ -20,7 +20,6 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await adminClient.auth.getUser(token)
   if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
 
-  // Saatte 100 e-posta limiti
   const { allowed, remaining } = rateLimit(`email:${user.id}`, 100, 60 * 60 * 1000)
   if (!allowed) {
     return NextResponse.json({ error: 'Saatlik e-posta limitine ulaştınız (100 adet).' }, { status: 429 })
@@ -34,9 +33,9 @@ export async function POST(request: NextRequest) {
     }
 
     const safePersonelAd = escape(personelAd)
-    const safeAy = escape(ay)
-    const safeYil = escape(yil)
-    const safeKurumAdi = escape(kurumAdi)
+    const safeAy         = escape(ay)
+    const safeYil        = escape(yil)
+    const safeKurumAdi   = escape(kurumAdi)
 
     const html = `
       <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
@@ -52,45 +51,32 @@ export async function POST(request: NextRequest) {
       </div>
     `
 
-    // Dosya adını çok basit tutalım (Örn: Bordro_Ahmet_Yilmaz.pdf)
-    const simpleAd = safePersonelAd.replace(/[^a-zA-Z0-9]/g, '_')
+    const simpleAd    = safePersonelAd.replace(/[^a-zA-Z0-9]/g, '_')
     const safeFilename = `Bordro_${simpleAd}_${safeAy}_${safeYil}.pdf`
+    const base64Data   = pdfBase64.replace(/^data:application\/pdf;base64,/, '')
 
-    // Eğer base64 verisinin başında 'data:application/pdf;base64,' gibi bir tanım varsa onu temizlemeliyiz.
-    // Aksi takdirde PDF bozuk oluşur ve Gmail virüs sanıp maili sessizce siler.
-    const base64Data = pdfBase64.replace(/^data:application\/pdf;base64,/, '')
+    const resend = new Resend(process.env.RESEND_API_KEY)
 
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 465,
-      secure: Number(process.env.SMTP_PORT) === 465,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    })
-
-    const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || 'Klüp360 <destek@klup360.com>',
+    const { data, error } = await resend.emails.send({
+      from: process.env.RESEND_FROM || 'Klüp360 <destek@klup360.com>',
       to: email,
-      subject: subject || `${safeAy} ${safeYil} Maas Bordrosu - Klup360`,
+      subject: subject || `${safeAy} ${safeYil} Maaş Bordrosu`,
       html,
       attachments: [{
         filename: safeFilename,
-        content: Buffer.from(base64Data, 'base64'),
-        contentType: 'application/pdf'
-      }]
+        content: base64Data,
+      }],
     })
 
-    console.log('✅ SMTP Send Success:', {
-      messageId: info.messageId,
-      accepted: info.accepted,
-      rejected: info.rejected
-    })
+    if (error) {
+      console.error('❌ Resend Error:', error)
+      return NextResponse.json({ error: 'Mail gönderilemedi', details: error.message }, { status: 500 })
+    }
 
-    return NextResponse.json({ success: true, remaining, messageId: info.messageId })
+    console.log('✅ Resend Send Success:', data?.id)
+    return NextResponse.json({ success: true, remaining, messageId: data?.id })
   } catch (err: any) {
-    console.error('❌ SMTP ERROR:', err)
+    console.error('❌ Send Email Error:', err)
     return NextResponse.json({ error: 'Sistem hatası', details: err.message }, { status: 500 })
   }
 }

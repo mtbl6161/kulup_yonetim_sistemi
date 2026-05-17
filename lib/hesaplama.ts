@@ -46,11 +46,11 @@ export function tatilMi(ay: number, gun: number, yil?: number, customTatiller?: 
   if (yil && customTatiller && customTatiller.length > 0) {
     const d = new Date(yil, ay - 1, gun, 12, 0, 0)
     for (const t of customTatiller) {
-      const bas = new Date(t.baslangic_tarihi)
-      const bit = new Date(t.bitis_tarihi)
-      // Tarihlerin saatlerini sıfırlayıp karşılaştıralım (veya gün bazlı kontrol)
-      bas.setHours(0, 0, 0, 0)
-      bit.setHours(23, 59, 59, 999)
+      // "2026-05-26" formatını UTC değil yerel saat olarak parse et
+      const [basY, basM, basD] = (t.baslangic_tarihi as string).split('T')[0].split('-').map(Number)
+      const [bitY, bitM, bitD] = (t.bitis_tarihi as string).split('T')[0].split('-').map(Number)
+      const bas = new Date(basY, basM - 1, basD, 0, 0, 0)
+      const bit = new Date(bitY, bitM - 1, bitD, 23, 59, 59, 999)
       if (d >= bas && d <= bit) return true
     }
   }

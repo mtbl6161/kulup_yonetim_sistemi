@@ -149,11 +149,10 @@ export default function DashboardPage() {
     }
   }, [])
 
-  const checkDenetciDurumu = useCallback(async () => {
-    if (!session?.access_token) return
+  const checkDenetciDurumu = useCallback(async (token: string) => {
     try {
       const res = await fetch('/api/denetci/durum', {
-        headers: { Authorization: `Bearer ${session.access_token}` }
+        headers: { Authorization: `Bearer ${token}` }
       })
       const data = await res.json()
       setDenetciDurumu(data.status ?? 'yok')
@@ -161,7 +160,7 @@ export default function DashboardPage() {
       console.error('Denetçi durumu kontrol edilemedi:', e)
       setDenetciDurumu('yok')
     }
-  }, [session?.access_token])
+  }, [])
 
   async function openDenetciModal() {
     // il_id'yi önce okul kaydından doldur
@@ -207,8 +206,11 @@ export default function DashboardPage() {
   useEffect(() => {
     loadData()
     loadDuyuru()
-    checkDenetciDurumu()
-  }, [loadData, loadDuyuru, checkDenetciDurumu])
+  }, [loadData, loadDuyuru])
+
+  useEffect(() => {
+    if (session?.access_token) checkDenetciDurumu(session.access_token)
+  }, [session?.access_token, checkDenetciDurumu])
 
   function odenen(o: Ogrenci) {
     return tahsilatlar.filter(t => t.ogrenci_id === o.id).reduce((s, t) => s + Number(t.tutar), 0)
