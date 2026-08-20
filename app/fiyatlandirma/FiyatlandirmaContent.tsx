@@ -10,8 +10,8 @@ const YILLIK_AYLIK = Math.round(YILLIK_TOPLAM / 12)
 
 const ozellikler = [
   'Öğrenci yönetimi', 'Personel yönetimi', 'Sınıf tanımları', 'Ders programı',
-  'Sınıf defteri & devam', 'Puantaj takibi', 'Otomatik bordro hesabı', 'Bordro e-posta gönderimi',
-  'Ödeme & tahsilat takibi', 'Gelir / gider raporları', 'Bilanço', 'Hesap hareketleri',
+  'Sınıf defteri ve devam', 'Puantaj takibi', 'Otomatik bordro hesabı', 'Bordro e-posta gönderimi',
+  'Ödeme ve tahsilat takibi', 'Gelir / gider raporları', 'Bilanço', 'Hesap hareketleri',
   'Kurumsal ayarlar', 'Akıllı uyarılar', 'MEB mevzuatına tam uyum',
 ]
 

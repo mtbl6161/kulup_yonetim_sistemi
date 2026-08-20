@@ -50,13 +50,13 @@ const audit = [
   { icon: Building2, title: 'Okul bazlı izleme', desc: 'Bağlı her kulübün dosyasına inin; mevcut öğrenci ve kapasite kontrolleri anlık hesaplanır.' },
   { icon: FileText, title: 'Resmi bordro görüntüleme', desc: 'Beyan edilen aylık bordroları ve MEB katsayı doğrulamalarını salt-okunur inceleyin.' },
   { icon: BarChart2, title: 'Finansal şeffaflık', desc: 'Gelir-gider tabloları ve aidat tahsilat oranları yasal denetim formatında hazırdır.' },
-  { icon: Calendar, title: 'Sınıf defteri & yoklama', desc: 'Hangi öğretmenin hangi sınıfta derste olduğunu fiili devam defterinden inceleyin.' },
+  { icon: Calendar, title: 'Sınıf defteri ve yoklama', desc: 'Hangi öğretmenin hangi sınıfta derste olduğunu fiili devam defterinden inceleyin.' },
   { icon: UserCheck, title: 'Mutlak salt-okunur erişim', desc: 'Denetim yetkilisi veriyi değiştiremez veya silemez. Veri %100 şeffaflıkla yansır.' },
 ]
 
 const trust = [
   { icon: Shield, title: 'Şifreli altyapı', desc: 'Tüm verileriniz 256-bit şifrelenmiş olarak bulutta saklanır; izniniz olmadan kimse erişemez.' },
-  { icon: CheckCircle, title: 'MEB & SGK uyumu', desc: 'Bordro algoritmaları MEB katsayıları ve SGK güncellemelerine endekslidir. Yasal risk sıfır.' },
+  { icon: CheckCircle, title: 'MEB ve SGK uyumu', desc: 'Bordro algoritmaları MEB katsayıları ve SGK güncellemelerine endekslidir. Yasal risk sıfır.' },
   { icon: Building2, title: 'Çoklu kurum mimarisi', desc: 'Birden fazla işletmenizi tek hesapta birleştirin; her kurumun verisi mutlak izoledir.' },
   { icon: Activity, title: 'Gerçek zamanlı senkron', desc: 'Bir kayıt girdiğinizde ekiptekilerin ekranına anında düşer. Aynı anda beraber çalışın.' },
   { icon: Zap, title: 'Proaktif bildirimler', desc: 'Geciken ödemeler, kritik eksiklikler ve yaklaşan tahsilatlar size sistemden bildirilir.' },
@@ -119,7 +119,7 @@ export default function TanitimPage() {
           </Link>
 
           <div className="tz-nav-links">
-            <Link href="/rehber" className="tz-nav-tool">Rehber & Araçlar</Link>
+            <Link href="/rehber" className="tz-nav-tool">Rehber ve Araçlar</Link>
             <Link href="/fiyatlandirma">Fiyatlandırma</Link>
             <Link href="/tanitim/kullanim-kosullari">Koşullar</Link>
             <Link href="/tanitim/iletisim">İletişim</Link>
@@ -458,7 +458,7 @@ export default function TanitimPage() {
             </div>
           </div>
           <div className="tz-footer-links">
-            <Link href="/rehber">Rehber & Araçlar</Link>
+            <Link href="/rehber">Rehber ve Araçlar</Link>
             <Link href="/fiyatlandirma">Fiyatlandırma</Link>
             <Link href="/tanitim/kullanim-kosullari">Kullanım Koşulları</Link>
             <Link href="/tanitim/gizlilik-politikasi">Gizlilik</Link>

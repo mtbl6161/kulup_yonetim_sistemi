@@ -6,7 +6,7 @@ import { Home } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 
 const LINKS = [
-  { href: '/rehber', label: 'Rehber & Araçlar', tool: true },
+  { href: '/rehber', label: 'Rehber ve Araçlar', tool: true },
   { href: '/fiyatlandirma', label: 'Fiyatlandırma' },
   { href: '/tanitim/kullanim-kosullari', label: 'Koşullar' },
   { href: '/tanitim/iletisim', label: 'İletişim' },

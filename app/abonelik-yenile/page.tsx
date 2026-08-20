@@ -46,7 +46,7 @@ function AbonelikYenileIc() {
     'Dijital Yoklama ve Bildirim Sistemi',
     'Otomatik Tahsilat ve Gelir Takibi',
     'Detaylı Puantaj ve Bordro Analizi',
-    'Anlık WhatsApp & Bildirim Entegrasyonu'
+    'Anlık WhatsApp ve Bildirim Entegrasyonu'
   ]
 
   return (

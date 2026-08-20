@@ -69,7 +69,7 @@ const rehberler = [
   },
   {
     href: '/rehber/belgeler',
-    title: 'Belgeler & Şablonlar',
+    title: 'Belgeler ve Şablonlar',
     desc: 'Dilekçe, sözleşme ve bütçe tablosu şablonları (Word/Excel indir).',
   },
 ]
@@ -81,7 +81,7 @@ export default function Page() {
       <section className="pub-hero">
         <div className="pub-container">
           <span className="pub-badge"><span className="pub-badge-dot" /> Ücretsiz araçlar ve rehber</span>
-          <h1 className="pub-h1">Çocuk Kulübü <span className="pub-grad">Rehberi & Araçları</span></h1>
+          <h1 className="pub-h1">Çocuk Kulübü <span className="pub-grad">Rehberi ve Araçları</span></h1>
           <p className="pub-lead">
             MEB çocuk kulüpleri için ihtiyacınız olan tüm ücretsiz hesaplama araçları ve rehber
             içerikleri tek sayfada. Kayıt gerekmez.

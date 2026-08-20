@@ -86,7 +86,7 @@ export default function Page() {
                 Öğrenciden alınacak ücret için <Link href="/cocuk-kulubu-aidat-hesaplama">aidat hesaplama</Link>,
                 personel net maaşı için <Link href="/cocuk-kulubu-bordro-hesaplama">bordro hesaplama</Link>,
                 gelirin paylaştırılması için <Link href="/cocuk-kulubu-butce-tablosu">örnek bütçe tablosu</Link>
-                araçlarını kullanabilirsiniz. Tümü <Link href="/rehber">Rehber &amp; Araçlar</Link> sayfasında.
+                araçlarını kullanabilirsiniz. Tümü <Link href="/rehber">Rehber ve Araçlar</Link> sayfasında.
               </p>
               <h2>Puantajı otomatik ücrete çevirin</h2>
               <p>
