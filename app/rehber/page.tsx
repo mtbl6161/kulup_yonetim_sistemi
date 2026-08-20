@@ -67,6 +67,11 @@ const rehberler = [
     title: 'Sıkça Sorulan Sorular',
     desc: 'Bordro, aidat, saat ücreti ve açılış hakkında yanıtlar.',
   },
+  {
+    href: '/rehber/belgeler',
+    title: 'Belgeler & Şablonlar',
+    desc: 'Dilekçe, sözleşme ve bütçe tablosu şablonları (Word/Excel indir).',
+  },
 ]
 
 export default function Page() {

@@ -75,6 +75,10 @@ export default function Page() {
             </p>
 
             <h2>Gerekli temel evraklar</h2>
+            <p>
+              Hazır <Link href="/rehber/belgeler">dilekçe, sözleşme ve bütçe tablosu şablonlarını</Link>{' '}
+              ücretsiz indirerek işlemlerinizi hızlandırabilirsiniz.
+            </p>
             <ul>
               <li>Yönetim kurulu kararı (karar defteri)</li>
               <li>Açılış oluru / onay yazısı</li>
