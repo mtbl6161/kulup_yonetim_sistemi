@@ -84,7 +84,23 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
   }
 
   async function kaydet() {
-    if (!form.ad?.trim()) { setMsg('❌ Ad zorunlu!'); return }
+    if (!form.ad?.trim()) { setMsg('❌ Adı Soyadı zorunlu!'); return }
+
+    const tcTemiz = (form.tc || '').trim()
+    if (!tcTemiz) { setMsg('❌ T.C. Kimlik No zorunlu!'); return }
+    if (!/^\d{11}$/.test(tcTemiz)) { setMsg('❌ T.C. Kimlik No 11 haneli rakam olmalıdır!'); return }
+
+    if (!form.meslek_kodu?.trim()) { setMsg('❌ Meslek Kodu zorunlu!'); return }
+    if (!form.email?.trim()) { setMsg('❌ E-posta Adresi zorunlu!'); return }
+
+    const ibanTemiz = (form.iban || '').trim().replace(/\s/g, '').toUpperCase()
+    if (!ibanTemiz) { setMsg('❌ IBAN Numarası zorunlu!'); return }
+    if (!ibanTemiz.startsWith('TR')) { setMsg('❌ IBAN numarası "TR" ile başlamalıdır!'); return }
+
+    if (!form.personel_turu) { setMsg('❌ Personel Türü zorunlu!'); return }
+    if (form.sgk_li === undefined || form.sgk_li === null) { setMsg('❌ SGK\'lı mı? seçimi zorunlu!'); return }
+    if (form.is_retired === undefined || form.is_retired === null) { setMsg('❌ Emekli mi? seçimi zorunlu!'); return }
+    if (form.vergi_istisnasi === undefined || form.vergi_istisnasi === null) { setMsg('❌ Vergi İstisnası seçimi zorunlu!'); return }
 
     const okulId = profilOkulId ?? ayarlar?.okul_id
     if (!okulId) { setMsg('❌ Okul bilgisi bulunamadı.'); return }
@@ -92,37 +108,25 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
     setSaving(true)
     setMsg('')
 
-    // IBAN TR kontrolü
-    if (form.iban && form.iban.trim().length > 0) {
-      const ibanTemiz = form.iban.trim().toUpperCase()
-      if (!ibanTemiz.startsWith('TR')) {
-        setMsg('❌ IBAN numarası "TR" ile başlamalıdır!')
-        setSaving(false)
-        return
-      }
-    }
-
     // TC tekrar kontrolü
-    if (form.tc && form.tc.trim().length > 0) {
-      const tcTemiz = form.tc.trim()
-      let tcQuery = supabase
-        .from('personel')
-        .select('id, ad')
-        .eq('tc', tcTemiz)
-        .eq('okul_id', okulId)
-      if (editItem) tcQuery = tcQuery.neq('id', editItem.id)
-      const { data: mevcut } = await tcQuery
-      if (mevcut && mevcut.length > 0) {
-        setMsg(`❌ Bu T.C. Kimlik No zaten kayıtlı: ${mevcut[0].ad}`)
-        setSaving(false)
-        return
-      }
+    let tcQuery = supabase
+      .from('personel')
+      .select('id, ad')
+      .eq('tc', tcTemiz)
+      .eq('okul_id', okulId)
+    if (editItem) tcQuery = tcQuery.neq('id', editItem.id)
+    const { data: mevcut } = await tcQuery
+    if (mevcut && mevcut.length > 0) {
+      setMsg(`❌ Bu T.C. Kimlik No zaten kayıtlı: ${mevcut[0].ad}`)
+      setSaving(false)
+      return
     }
 
     const data = {
       ...form,
       ad: form.ad!.trim().toUpperCase(),
-      tc: form.tc?.trim() || null,
+      tc: tcTemiz,
+      iban: ibanTemiz,
       gorev: form.gorev || 'Öğretmen',
       koordinator_id: form.koordinator_id || null,
       okul_id: okulId
@@ -192,56 +196,74 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Adı Soyadı</label>
+              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                Adı Soyadı <span style={{ color: '#dc2626' }}>*</span>
+              </label>
               <input className="form-input" style={{ width: '100%' }} required value={form.ad || ''} onChange={e => setF('ad', e.target.value)} placeholder="Örn: AHMET YILMAZ" />
             </div>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>T.C. Kimlik No</label>
+              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                T.C. Kimlik No <span style={{ color: '#dc2626' }}>*</span>
+              </label>
               <input className="form-input" style={{ width: '100%' }} maxLength={11} value={form.tc || ''} onChange={e => setF('tc', e.target.value)} placeholder="11 hane" />
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Görevi</label>
+              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                Görevi <span style={{ color: '#dc2626' }}>*</span>
+              </label>
               <select className="form-select" style={{ width: '100%' }} value={form.gorev || 'Öğretmen'} onChange={e => setF('gorev', e.target.value)}>
                 {GOREVLER.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
             </div>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Meslek Kodu</label>
+              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                Meslek Kodu <span style={{ color: '#dc2626' }}>*</span>
+              </label>
               <input className="form-input" style={{ width: '100%' }} value={form.meslek_kodu || ''} onChange={e => setF('meslek_kodu', e.target.value)} placeholder="SGK Meslek Kodu" />
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>E-posta Adresi</label>
+              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                E-posta Adresi <span style={{ color: '#dc2626' }}>*</span>
+              </label>
               <input className="form-input" style={{ width: '100%' }} type="email" value={form.email || ''} onChange={e => setF('email', e.target.value)} placeholder="ornek@mail.com" />
             </div>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>IBAN Numarası</label>
+              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                IBAN Numarası <span style={{ color: '#dc2626' }}>*</span>
+              </label>
               <input className="form-input" style={{ width: '100%' }} value={form.iban || ''} onChange={e => setF('iban', e.target.value)} placeholder="TR..." />
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Personel Türü</label>
+              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                Personel Türü <span style={{ color: '#dc2626' }}>*</span>
+              </label>
               <select className="form-select" style={{ width: '100%' }} value={form.personel_turu || 'kadrolu'} onChange={e => setF('personel_turu', e.target.value)}>
                 <option value="kadrolu">Kadrolu</option>
                 <option value="sgk">SGK'lı</option>
               </select>
             </div>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>SGK'lı mı?</label>
+              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                SGK'lı mı? <span style={{ color: '#dc2626' }}>*</span>
+              </label>
               <select className="form-select" style={{ width: '100%' }} value={form.sgk_li ? 'evet' : 'hayir'} onChange={e => setF('sgk_li', e.target.value === 'evet')}>
                 <option value="hayir">Hayır</option>
                 <option value="evet">Evet</option>
               </select>
             </div>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Emekli mi?</label>
+              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                Emekli mi? <span style={{ color: '#dc2626' }}>*</span>
+              </label>
               <select className="form-select" style={{ width: '100%' }} value={form.is_retired ? 'evet' : 'hayir'} onChange={e => setF('is_retired', e.target.value === 'evet')}>
                 <option value="hayir">Hayır</option>
                 <option value="evet">Evet</option>
@@ -251,7 +273,9 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Vergi İstisnası</label>
+              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                Vergi İstisnası <span style={{ color: '#dc2626' }}>*</span>
+              </label>
               <select className="form-select" style={{ width: '100%' }} value={form.vergi_istisnasi ? 'evet' : 'hayir'} onChange={e => setF('vergi_istisnasi', e.target.value === 'evet')}>
                 <option value="hayir">Hayır</option>
                 <option value="evet">Evet</option>

@@ -9,7 +9,7 @@ import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
 import { Ogrenci, Ayarlar, Personel } from '@/lib/types'
 import OgrenciModal from '@/components/OgrenciModal'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, GraduationCap, RotateCcw } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
@@ -30,6 +30,7 @@ function OgrencilerIc() {
   const [msg, setMsg] = useState('')
   const [importAcik, setImportAcik] = useState(false)
   const [ayarlar, setAyarlar] = useState<Ayarlar | null>(null)
+  const [listeTuru, setListeTuru] = useState<'aktif' | 'arsiv'>('aktif')
 
   async function load() {
     setLoading(true)
@@ -40,14 +41,14 @@ function OgrencilerIc() {
       supabase.from('ayarlar').select('*').single()
     ])
     
-    const aktifOgrenciler = (ogr || []).filter(o => o.aktif !== false)
-    setOgrenciler(aktifOgrenciler)
+    setOgrenciler(ogr || [])
     setPersonel((per || []).filter(p => p.aktif !== false))
     setSiniflar(sin || [])
     setAyarlar(ayr || null)
     setLoading(false)
 
     // URL'den gelen ID varsa modalı aç
+    const aktifOgrenciler = (ogr || []).filter(o => o.aktif !== false)
     if (targetId && aktifOgrenciler.length > 0) {
       const found = aktifOgrenciler.find(o => o.id === Number(targetId))
       if (found) {
@@ -93,20 +94,35 @@ function OgrencilerIc() {
 
     const { error } = await supabase
       .from('ogrenciler')
-      .delete()
+      .update({ aktif: false })
       .eq('id', id)
 
     if (!error) {
-      if (silinen) logIslem({ islem: 'sil', tablo: 'ogrenciler', kayit_id: id, aciklama: `${silinen.ad} ${silinen.soyad} silindi` })
+      if (silinen) logIslem({ islem: 'sil', tablo: 'ogrenciler', kayit_id: id, aciklama: `${silinen.ad} ${silinen.soyad} arşive kaldırıldı` })
       load()
       return
     }
 
-    if (error.code === '23503') {
-      setMsg(`❌ "${silinen?.ad} ${silinen?.soyad}" silinemedi: Bağlı yoklama/tahsilat kayıtları var. Lütfen önce "migration_fix_fk_on_delete_set_null.sql" dosyasını Supabase'de çalıştırın.`)
-    } else {
-      setMsg(`❌ Silme hatası (${error.code}): ${error.message}`)
+    setMsg(`❌ Silme hatası: ${error.message}`)
+    setTimeout(() => setMsg(''), 10000)
+  }
+
+  async function geriYukle(id: number) {
+    const geriYuklenen = ogrenciler.find(o => o.id === id)
+    const { error } = await supabase
+      .from('ogrenciler')
+      .update({ aktif: true })
+      .eq('id', id)
+
+    if (!error) {
+      if (geriYuklenen) logIslem({ islem: 'guncelle', tablo: 'ogrenciler', kayit_id: id, aciklama: `${geriYuklenen.ad} ${geriYuklenen.soyad} arşivden geri yüklendi` })
+      load()
+      setMsg('✅ Öğrenci başarıyla geri yüklendi.')
+      setTimeout(() => setMsg(''), 3000)
+      return
     }
+
+    setMsg(`❌ Geri yükleme hatası: ${error.message}`)
     setTimeout(() => setMsg(''), 10000)
   }
 
@@ -116,10 +132,11 @@ function OgrencilerIc() {
   }
 
   const liste = ogrenciler.filter(o => {
+    const matchAktif = listeTuru === 'aktif' ? o.aktif !== false : o.aktif === false
     const q = filtre.toLowerCase()
     const matchSearch = !q || (o.ad + ' ' + o.soyad + ' ' + (o.sinif || '')).toLowerCase().includes(q)
     const matchSinif = !sinifFiltre || o.sinif === sinifFiltre
-    return matchSearch && matchSinif
+    return matchAktif && matchSearch && matchSinif
   }).sort((a, b) => {
     const nameA = (a.ad + ' ' + a.soyad).toLocaleLowerCase('tr')
     const nameB = (b.ad + ' ' + b.soyad).toLocaleLowerCase('tr')
@@ -136,9 +153,18 @@ function OgrencilerIc() {
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 10 }}>
             <div className="card-title" style={{ marginBottom: 0 }}>
-              Öğrenci Listesi ({loading ? '...' : ogrenciler.length})
+              Öğrenci Listesi ({loading ? '...' : liste.length})
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
+              <select
+                className="form-select"
+                style={{ width: 180 }}
+                value={listeTuru}
+                onChange={e => setListeTuru(e.target.value as any)}
+              >
+                <option value="aktif">Aktif Öğrenciler</option>
+                <option value="arsiv">Silinenler / Arşiv</option>
+              </select>
               <select
                 className="form-select"
                 style={{ width: 160 }}
@@ -180,7 +206,7 @@ function OgrencilerIc() {
                 {liste.length === 0 ? (
                   <tr><td colSpan={10}>
                     <div className="empty-state">
-                      <div className="empty-icon">👨‍🎓</div>
+                      <div className="empty-icon"><GraduationCap size={48} style={{ color: 'var(--text3)' }} /></div>
                       <p>{loading ? 'Yükleniyor...' : 'Öğrenci bulunamadı'}</p>
                     </div>
                   </td></tr>
@@ -203,10 +229,16 @@ function OgrencilerIc() {
                       <td>{o.anne_adi || '-'}</td>
                       <td>{o.anne_tel || '-'}</td>
                       <td>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button className="btn btn-secondary btn-sm" onClick={() => duzenle(o)}>✏️</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => setSilOnayId(o.id)}>🗑️</button>
-                        </div>
+                        {listeTuru === 'aktif' ? (
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => duzenle(o)} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28 }} title="Düzenle"><Pencil size={14} /></button>
+                            <button className="btn btn-danger btn-sm" onClick={() => setSilOnayId(o.id)} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28 }} title="Sil ve Arşivle"><Trash2 size={14} /></button>
+                          </div>
+                        ) : (
+                          <button className="btn btn-success btn-sm" onClick={() => geriYukle(o.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 8px' }} title="Arşivden Geri Yükle">
+                            <RotateCcw size={13} /> Geri Yükle
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -230,10 +262,10 @@ function OgrencilerIc() {
         const hedef = ogrenciler.find(o => o.id === silOnayId)
         return (
           <ConfirmModal
-            baslik="Öğrenciyi Pasife Al"
-            mesaj={`"${hedef?.ad} ${hedef?.soyad}" adlı öğrenciyi listeden kaldırmak istediğinizden emin misiniz? Geçmiş ödeme verileri korunur.`}
-            onayMetni="Evet, Kaldır"
-            iptalMetni="Vazgeç"
+            baslik="Öğrenciyi Sil ve Arşive Kaldır"
+            mesaj={`"${hedef?.ad} ${hedef?.soyad}" adlı öğrenciyi silmek istediğinizden emin misiniz? Öğrenci listeden kaldırılır ancak geçmiş dönemlerdeki tüm ödeme ve yoklama verileri ismiyle beraber korunmaya devam eder. Dilediğiniz zaman "Silinenler / Arşiv" seçeneğinden öğrenciyi tüm geçmiş bilgileriyle birlikte geri yükleyebilirsiniz.`}
+            onayMetni="Evet, Sil ve Arşivle"
+            iptalMetni="İptal"
             onOnayla={() => sil(silOnayId)}
             onIptal={() => setSilOnayId(null)}
           />

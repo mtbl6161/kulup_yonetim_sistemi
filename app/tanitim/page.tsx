@@ -1,1100 +1,800 @@
 'use client'
 import Link from 'next/link'
+import { useEffect, useRef } from 'react'
 import {
-  Users, Calendar, BookOpen, Clock, BarChart3, Wallet,
+  Users, Calendar, BookOpen, Clock, Wallet, BarChart3,
   Landmark, TrendingUp, FileText, Settings, GraduationCap,
-  School, ClipboardList, CheckCircle, Shield, Zap,
-  ArrowRight, Star, Building2, ChevronRight, Eye, MapPin,
-  Activity, BarChart2, UserCheck, User as UserIcon
+  School, CheckCircle, Shield, Zap, ArrowRight, ArrowUpRight,
+  Building2, Eye, MapPin, Activity, BarChart2, UserCheck,
 } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 
+/* ----------------------------------------------------------------- data */
+
 const features = [
-  {
-    icon: Users,
-    title: 'Öğrenci Yönetimi',
-    desc: 'Kayıt, devam takibi, sınıf atama ve veli bilgileri tek ekranda.',
-  },
-  {
-    icon: GraduationCap,
-    title: 'Personel Yönetimi',
-    desc: 'Öğretmen ve personel bilgileri, görev atamaları, iletişim kayıtları.',
-  },
-  {
-    icon: Calendar,
-    title: 'Ders Programı',
-    desc: 'Haftalık ders planlaması, sınıf ve öğretmen bazlı program takibi.',
-  },
-  {
-    icon: BookOpen,
-    title: 'Sınıf Defteri',
-    desc: 'Günlük devam kaydı, yoklama ve gözlem notları dijital ortamda.',
-  },
-  {
-    icon: Clock,
-    title: 'Puantaj',
-    desc: 'Personel çalışma saatlerini otomatik hesapla, aylık puantaj oluştur.',
-  },
-  {
-    icon: FileText,
-    title: 'Bordro',
-    desc: 'MEB katsayılarına göre tam otomatik maaş hesaplama ve e-posta gönderimi.',
-  },
-  {
-    icon: Wallet,
-    title: 'Ödeme Takibi',
-    desc: 'Öğrenci aidat ve kurs ücretlerini tahsil et, gecikmeleri izle.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Gelir / Gider',
-    desc: 'Tüm finansal hareketler, kategori bazlı raporlar ve grafikler.',
-  },
-  {
-    icon: Landmark,
-    title: 'Bilanço',
-    desc: 'Yıllık mali durum, aktif/pasif dengesi, kurumsal finansal rapor.',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Hesap Hareketleri',
-    desc: 'Kasa ve banka hareketleri, dönem bazlı akış analizi.',
-  },
-  {
-    icon: School,
-    title: 'Sınıf Tanımları',
-    desc: 'Sınıf oluştur, öğretmen ata, kapasite ve program ayarla.',
-  },
-  {
-    icon: Settings,
-    title: 'Kurumsal Ayarlar',
-    desc: 'SGK, vergi, katsayı ve tüm bordo parametrelerini tek yerden yönet.',
-  },
+  { icon: Users, title: 'Öğrenci Yönetimi', desc: 'Kayıt, devam takibi, sınıf atama ve veli bilgileri tek ekranda.' },
+  { icon: GraduationCap, title: 'Personel Yönetimi', desc: 'Öğretmen ve personel bilgileri, görev atamaları, iletişim kayıtları.' },
+  { icon: Calendar, title: 'Ders Programı', desc: 'Haftalık ders planlaması, sınıf ve öğretmen bazlı program takibi.' },
+  { icon: BookOpen, title: 'Sınıf Defteri', desc: 'Günlük devam kaydı, yoklama ve gözlem notları dijital ortamda.' },
+  { icon: Clock, title: 'Puantaj', desc: 'Personel çalışma saatlerini otomatik hesapla, aylık puantaj oluştur.' },
+  { icon: FileText, title: 'Bordro', desc: 'MEB katsayılarına göre tam otomatik maaş hesaplama ve e-posta gönderimi.' },
+  { icon: Wallet, title: 'Ödeme Takibi', desc: 'Öğrenci aidat ve kurs ücretlerini tahsil et, gecikmeleri izle.' },
+  { icon: BarChart3, title: 'Gelir / Gider', desc: 'Tüm finansal hareketler, kategori bazlı raporlar ve grafikler.' },
+  { icon: Landmark, title: 'Bilanço', desc: 'Yıllık mali durum, aktif/pasif dengesi, kurumsal finansal rapor.' },
+  { icon: TrendingUp, title: 'Hesap Hareketleri', desc: 'Kasa ve banka hareketleri, dönem bazlı akış analizi.' },
+  { icon: School, title: 'Sınıf Tanımları', desc: 'Sınıf oluştur, öğretmen ata, kapasite ve program ayarla.' },
+  { icon: Settings, title: 'Kurumsal Ayarlar', desc: 'SGK, vergi, katsayı ve tüm bordro parametrelerini tek yerden yönet.' },
 ]
 
 const stats = [
-  { value: '12+', label: 'Modül' },
-  { value: '100%', label: 'MEB Uyumlu' },
-  { value: 'Otomatik', label: 'Bordro Hesabı' },
-  { value: 'Güvenli', label: 'Bulut Altyapı' },
+  { value: '12+', label: 'Entegre Modül' },
+  { value: '%100', label: 'MEB Uyumlu' },
+  { value: '0,3 sn', label: 'Bordro Hesabı' },
+  { value: '256-bit', label: 'Şifreli Altyapı' },
+]
+
+const contrast = [
+  { bad: 'Karışık Excel tabloları', good: 'Tek merkezi sistem', goodDesc: 'Her modülün birbirine bağlı olduğu bütünleşik mimari.' },
+  { bad: 'Manuel maaş hesapları', good: 'Saniyeler içinde bordro', goodDesc: 'Güncel MEB katsayılarıyla sıfır hata payı.' },
+  { bad: 'Geciken aidat tespiti', good: 'Zamanında tahsilat', goodDesc: 'Vadesi geçen ödemeler için otomatik uyarılar.' },
 ]
 
 const steps = [
-  {
-    num: '01',
-    title: 'Kurumunuzu Kaydedin',
-    desc: 'Birkaç dakikada okul bilgilerinizi ve SGK/vergi parametrelerinizi tanımlayın.',
-  },
-  {
-    num: '02',
-    title: 'Personel ve Öğrencileri Girin',
-    desc: 'Mevcut verilerinizi içe aktarın ya da sıfırdan kayıt oluşturun.',
-  },
-  {
-    num: '03',
-    title: 'Yönetimi Otomatikleştirin',
-    desc: 'Bordro, tahsilat, devam ve raporlar artık tek tıkla hazır.',
-  },
+  { num: '01', title: 'Kurumunuzu kaydedin', desc: 'Birkaç dakikada okul bilgilerinizi ve SGK / vergi parametrelerinizi tanımlayın.' },
+  { num: '02', title: 'Personel ve öğrencileri girin', desc: 'Mevcut verilerinizi içe aktarın ya da sıfırdan kayıt oluşturun.' },
+  { num: '03', title: 'Yönetimi otomatikleştirin', desc: 'Bordro, tahsilat, devam ve raporlar artık tek tıkla hazır.' },
 ]
+
+const audit = [
+  { icon: MapPin, title: 'İl / İlçe geneli özet', desc: 'Bölgedeki toplam öğrenci, personel ve operasyon verilerini kuşbakışı tek ekranda görün.' },
+  { icon: Building2, title: 'Okul bazlı izleme', desc: 'Bağlı her kulübün dosyasına inin; mevcut öğrenci ve kapasite kontrolleri anlık hesaplanır.' },
+  { icon: FileText, title: 'Resmi bordro görüntüleme', desc: 'Beyan edilen aylık bordroları ve MEB katsayı doğrulamalarını salt-okunur inceleyin.' },
+  { icon: BarChart2, title: 'Finansal şeffaflık', desc: 'Gelir-gider tabloları ve aidat tahsilat oranları yasal denetim formatında hazırdır.' },
+  { icon: Calendar, title: 'Sınıf defteri & yoklama', desc: 'Hangi öğretmenin hangi sınıfta derste olduğunu fiili devam defterinden inceleyin.' },
+  { icon: UserCheck, title: 'Mutlak salt-okunur erişim', desc: 'Denetim yetkilisi veriyi değiştiremez veya silemez. Veri %100 şeffaflıkla yansır.' },
+]
+
+const trust = [
+  { icon: Shield, title: 'Şifreli altyapı', desc: 'Tüm verileriniz 256-bit şifrelenmiş olarak bulutta saklanır; izniniz olmadan kimse erişemez.' },
+  { icon: CheckCircle, title: 'MEB & SGK uyumu', desc: 'Bordro algoritmaları MEB katsayıları ve SGK güncellemelerine endekslidir. Yasal risk sıfır.' },
+  { icon: Building2, title: 'Çoklu kurum mimarisi', desc: 'Birden fazla işletmenizi tek hesapta birleştirin; her kurumun verisi mutlak izoledir.' },
+  { icon: Activity, title: 'Gerçek zamanlı senkron', desc: 'Bir kayıt girdiğinizde ekiptekilerin ekranına anında düşer. Aynı anda beraber çalışın.' },
+  { icon: Zap, title: 'Proaktif bildirimler', desc: 'Geciken ödemeler, kritik eksiklikler ve yaklaşan tahsilatlar size sistemden bildirilir.' },
+  { icon: TrendingUp, title: 'Otomatik raporlama', desc: 'Aylık, dönemlik veya anlık mali bilançolarınızı saniyeler içinde çekin.' },
+]
+
+/* ----------------------------------------------------------------- page */
 
 export default function TanitimPage() {
   const { user, profil } = useAuth()
-  return (
-    <div style={{ fontFamily: 'DM Sans, sans-serif', color: '#1a1a14', background: '#f5f2ec', minHeight: '100vh' }}>
+  const rootRef = useRef<HTMLDivElement>(null)
 
-      {/* NAV */}
-      <nav style={{
-        position: 'sticky', top: 0, zIndex: 100,
-        background: 'rgba(245,242,236,0.92)', backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid #d8d0be',
-        padding: '0 40px', height: 64,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'linear-gradient(135deg,#2d5a3d,#1e4229)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <ClipboardList size={20} color="white" />
-          </div>
-          <span style={{ fontFamily: 'Playfair Display, serif', fontWeight: 700, fontSize: 20, color: '#2d5a3d' }}>
-            Klüp360
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <Link href="/tanitim/kullanim-kosullari" style={{ fontSize: 14, fontWeight: 500, color: '#5a5748', textDecoration: 'none' }}>Koşullar</Link>
-          <Link href="/tanitim/gizlilik-politikasi" style={{ fontSize: 14, fontWeight: 500, color: '#5a5748', textDecoration: 'none' }}>Gizlilik</Link>
-          <Link href="/tanitim/iade-politikasi" style={{ fontSize: 14, fontWeight: 500, color: '#5a5748', textDecoration: 'none' }}>İade</Link>
-          <Link href="/tanitim/iletisim" style={{ fontSize: 14, fontWeight: 500, color: '#5a5748', textDecoration: 'none' }}>İletişim</Link>
-          <Link href="/fiyatlandirma" style={{
-            padding: '8px 18px', borderRadius: 10, fontSize: 14, fontWeight: 500,
-            color: '#5a5748', textDecoration: 'none',
-          }}>
-            Fiyatlandırma
+  // Robust scroll-reveal. This app scrolls inside a nested overflow:auto
+  // container (globals set html/body overflow:hidden), so the observer must be
+  // rooted to that container — not the viewport — to fire reliably.
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    root.classList.add('tz-js')
+    const els = Array.from(root.querySelectorAll<HTMLElement>('.tz-reveal'))
+    const revealAll = () => els.forEach(el => el.classList.add('tz-in'))
+
+    if (!('IntersectionObserver' in window)) { revealAll(); return }
+
+    // Find the scrollable ancestor (falls back to viewport root = null).
+    let scroller: HTMLElement | null = root.parentElement
+    while (scroller) {
+      const oy = getComputedStyle(scroller).overflowY
+      if ((oy === 'auto' || oy === 'scroll') && scroller.scrollHeight > scroller.clientHeight + 4) break
+      scroller = scroller.parentElement
+    }
+
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('tz-in')
+          io.unobserve(e.target)
+        }
+      })
+    }, { root: scroller, threshold: 0.1, rootMargin: '0px 0px -8% 0px' })
+
+    els.forEach(el => io.observe(el))
+    // Failsafe: never leave content hidden if the observer misbehaves.
+    const failsafe = window.setTimeout(revealAll, 2500)
+    return () => { io.disconnect(); window.clearTimeout(failsafe) }
+  }, [])
+
+  const panelUrl = profil?.rol === 'super_admin' ? '/yonetim' : (profil?.rol === 'denetim_yetkilisi' ? '/denetim' : '/')
+
+  return (
+    <div ref={rootRef} className="tz">
+      <style>{CSS}</style>
+
+      {/* ---------------------------------------------------------- NAV */}
+      <nav className="tz-nav">
+        <div className="tz-nav-inner">
+          <Link href="/tanitim" className="tz-brand">
+            <img src="/logo.png" alt="Klüp360" className="tz-brand-mark" />
+            <span className="tz-brand-name">Klüp<span className="tz-brand-360">360</span></span>
           </Link>
-          
-          {user ? (() => {
-            const panelUrl = profil?.rol === 'super_admin' ? '/yonetim' : (profil?.rol === 'denetim_yetkilisi' ? '/denetim' : '/')
-            return (
-              <Link href={panelUrl} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '6px 14px', borderRadius: 99,
-                background: 'white', border: '1px solid #d8d0be',
-                textDecoration: 'none', transition: 'all 0.2s',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = '#2d5a3d'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = '#d8d0be'; e.currentTarget.style.transform = 'translateY(0)' }}
-            >
-              <div style={{
-                width: 32, height: 32, borderRadius: '50%',
-                background: 'linear-gradient(135deg, #2d5a3d, #1e4229)',
-                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 13, fontWeight: 700
-              }}>
-                {user.email?.[0].toUpperCase()}
-              </div>
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#1a1a14' }}>Panele Dön</span>
-            </Link>
-          )
-        })() : (
-            <>
-              <Link href="/signup" style={{
-                padding: '8px 18px', borderRadius: 10, fontSize: 14, fontWeight: 500,
-                color: '#2d5a3d', border: '1px solid #2d5a3d', textDecoration: 'none',
-              }}>
-                Kayıt Ol
+
+          <div className="tz-nav-links">
+            <Link href="/rehber" className="tz-nav-tool">Rehber & Araçlar</Link>
+            <Link href="/fiyatlandirma">Fiyatlandırma</Link>
+            <Link href="/tanitim/kullanim-kosullari">Koşullar</Link>
+            <Link href="/tanitim/iletisim">İletişim</Link>
+          </div>
+
+          <div className="tz-nav-cta">
+            {user ? (
+              <Link href={panelUrl} className="tz-userpill">
+                <span className="tz-avatar">{user.email?.[0]?.toUpperCase()}</span>
+                <span>Panele Dön</span>
               </Link>
-              <Link href="/login" style={{
-                padding: '8px 18px', borderRadius: 10, fontSize: 14, fontWeight: 600,
-                background: '#2d5a3d', color: 'white', textDecoration: 'none',
-              }}>
-                Giriş Yap
-              </Link>
-            </>
-          )}
+            ) : (
+              <>
+                <Link href="/login" className="tz-nav-login">Giriş Yap</Link>
+                <Link href="/signup" className="tz-btn tz-btn-primary">Ücretsiz Başla <ArrowRight size={16} /></Link>
+              </>
+            )}
+          </div>
         </div>
       </nav>
 
-      {/* HERO SECTION - 2026 EDITION */}
-      <section style={{
-        position: 'relative',
-        padding: '140px 40px 100px',
-        overflow: 'hidden',
-        textAlign: 'center',
-        background: 'radial-gradient(ellipse at top, #eafaf1 0%, transparent 70%)',
-      }}>
-        {/* Ambient glow behind text */}
-        <div style={{
-          position: 'absolute', top: -50, left: '50%', transform: 'translateX(-50%)',
-          width: 800, height: 400, background: 'var(--accent)', opacity: 0.15,
-          filter: 'blur(120px)', zIndex: 0, borderRadius: '50%'
-        }} />
+      {/* ---------------------------------------------------------- HERO */}
+      <header className="tz-hero">
+        <div className="tz-hero-glow" aria-hidden />
+        <div className="tz-container tz-hero-inner">
+          <span className="tz-badge">
+            <span className="tz-badge-dot" />
+            MEB Çocuk Kulüpleri Yönergesi'ne %100 uyumlu
+          </span>
 
-        <div style={{ maxWidth: 1100, margin: '0 auto', position: 'relative', zIndex: 10 }}>
-
-          {/* Top Pill */}
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 10,
-            background: 'white', border: '1px solid rgba(45,90,61,0.15)',
-            boxShadow: '0 4px 16px rgba(45,90,61,0.06)',
-            borderRadius: 999, padding: '8px 24px', fontSize: 13, fontWeight: 700,
-            color: 'var(--accent)', marginBottom: 40, letterSpacing: '0.02em', textTransform: 'uppercase'
-          }}>
-            <span style={{ display: 'flex', width: 20, height: 20, background: '#eafaf1', borderRadius: '50%', alignItems: 'center', justifyContent: 'center' }}>
-              <Star size={12} fill="var(--accent)" />
-            </span>
-            MEB Mevzuatına %100 Uyumlu Yönetim Altyapısı
-          </div>
-
-          {/* Epic Headline */}
-          <h1 style={{
-            fontFamily: 'Playfair Display, serif',
-            fontSize: 'clamp(48px, 6vw, 84px)',
-            fontWeight: 800, lineHeight: 1.1,
-            color: '#1a1a14', marginBottom: 30,
-            letterSpacing: '-0.02em'
-          }}>
-            Kulübünüzün Kontrolü <br />
-            <span style={{
-              background: 'linear-gradient(135deg, var(--accent) 0%, #45b673 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-              display: 'inline-block', filter: 'drop-shadow(0 4px 20px rgba(45,90,61,0.15))'
-            }}>
-              Dijital Asistanınızda
-            </span>
+          <h1 className="tz-h1">
+            Çocuk kulübünüzün tüm yönetimi,<br />
+            <span className="tz-grad">tek akıllı platformda.</span>
           </h1>
 
-          <p style={{
-            fontSize: 20, color: '#5a5748', lineHeight: 1.7,
-            maxWidth: 680, margin: '0 auto 50px', fontWeight: 400
-          }}>
-            Excel dosyalarına ve kağıt yığınlarına veda edin. Bordro, tahsilat, ders programı ve yoklama
-            süreçlerinizi <b>saniyeler içinde</b> hatasız yönetin.
+          <p className="tz-hero-lead">
+            Excel dosyalarına ve kağıt yığınlarına veda edin. Bordro, tahsilat, ders programı
+            ve yoklama süreçlerinizi <strong>saniyeler içinde</strong> ve hatasız yönetin.
           </p>
 
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="/signup" style={{
-              display: 'inline-flex', alignItems: 'center', gap: 10,
-              padding: '18px 40px', borderRadius: 999, fontSize: 17, fontWeight: 700,
-              background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%)',
-              color: 'white', textDecoration: 'none',
-              boxShadow: '0 12px 30px rgba(45,90,61,0.25)',
-              transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            }}
-              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05) translateY(-2px)'}
-              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1) translateY(0)'}
-            >
-              Ücretsiz Başlayın <ArrowRight size={20} />
+          <div className="tz-hero-actions">
+            <Link href="/signup" className="tz-btn tz-btn-primary tz-btn-lg">
+              Ücretsiz Başlayın <ArrowRight size={18} />
             </Link>
-            <Link href="/fiyatlandirma" style={{
-              display: 'inline-flex', alignItems: 'center', gap: 10,
-              padding: '18px 40px', borderRadius: 999, fontSize: 17, fontWeight: 600,
-              background: 'white', border: '2px solid #e0dbd0',
-              color: '#1a1a14', textDecoration: 'none',
-              transition: 'all 0.3s',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
-            }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#f9f7f0'; e.currentTarget.style.borderColor = '#d8d0be' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#e0dbd0' }}
-            >
-              Sistemi Keşfedin
+            <Link href="/fiyatlandirma" className="tz-btn tz-btn-ghost tz-btn-lg">
+              Fiyatları İnceleyin
             </Link>
           </div>
 
-          {/* ADVANCED DASHBOARD SHOWCASE */}
-          <div style={{
-            marginTop: 100,
-            perspective: '1400px',
-            position: 'relative'
-          }}>
+          <div className="tz-hero-note">
+            <CheckCircle size={15} /> Kredi kartı gerekmez · Kurulum dakikalar sürer
+          </div>
 
-            {/* Floating Card Left - Success Popup */}
-            <div style={{
-              position: 'absolute', top: -30, left: -20, zIndex: 20,
-              background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(20px)',
-              padding: '20px 24px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.5)',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-              display: 'flex', alignItems: 'center', gap: 16,
-              animation: 'floatLeft 6s ease-in-out infinite'
-            }}>
-              <div style={{ width: 48, height: 48, background: '#eafaf1', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CheckCircle size={24} color="var(--accent)" />
+          {/* Product preview */}
+          <div className="tz-preview">
+            <div className="tz-chip tz-chip-a">
+              <span className="tz-chip-ic tz-chip-ic-green"><CheckCircle size={18} /></span>
+              <div>
+                <div className="tz-chip-t">Bordro hesaplandı</div>
+                <div className="tz-chip-s">Tüm personel eksiksiz</div>
               </div>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#1a1a14' }}>Bordro Hesaplandı</div>
-                <div style={{ fontSize: 13, color: '#5a5748' }}>Tüm personeller eksiksiz.</div>
+            </div>
+            <div className="tz-chip tz-chip-b">
+              <span className="tz-chip-ic tz-chip-ic-gold"><TrendingUp size={18} /></span>
+              <div>
+                <div className="tz-chip-t">+₺45.250</div>
+                <div className="tz-chip-s">Bu haftaki tahsilat</div>
               </div>
             </div>
 
-            {/* Floating Card Right - Revenue Popup */}
-            <div style={{
-              position: 'absolute', top: 120, right: -40, zIndex: 20,
-              background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(20px)',
-              padding: '24px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.5)',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-              display: 'flex', alignItems: 'center', gap: 16,
-              animation: 'floatRight 8s ease-in-out infinite'
-            }}>
-              <div style={{ width: 48, height: 48, background: '#fef9e7', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <TrendingUp size={24} color="#e67e22" />
+            <div className="tz-window">
+              <div className="tz-window-bar">
+                <span className="tz-dot" style={{ background: '#ff5f56' }} />
+                <span className="tz-dot" style={{ background: '#ffbd2e' }} />
+                <span className="tz-dot" style={{ background: '#27c93f' }} />
+                <div className="tz-window-url">app.klup360.com / kontrol-paneli</div>
               </div>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#1a1a14' }}>+₺45.250</div>
-                <div style={{ fontSize: 13, color: '#5a5748' }}>Bu haftaki tahsilat</div>
-              </div>
-            </div>
-
-            <div style={{
-              maxWidth: 1040,
-              margin: '0 auto',
-              background: 'var(--surface)',
-              borderRadius: '24px 24px 0 0',
-              border: '1px solid #d8d0be',
-              borderBottom: 'none',
-              boxShadow: '0 30px 60px rgba(0,0,0,0.12), 0 0 0 10px rgba(255,255,255,0.4)',
-              overflow: 'hidden',
-              transform: 'rotateX(8deg) translateY(0) scale(1)',
-              transition: 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            }}
-              onMouseEnter={e => e.currentTarget.style.transform = 'rotateX(2deg) translateY(-10px) scale(1.02)'}
-              onMouseLeave={e => e.currentTarget.style.transform = 'rotateX(8deg) translateY(0) scale(1)'}
-            >
-              {/* Mockup Topbar */}
-              <div style={{ height: 60, background: '#fffef9', borderBottom: '1px solid #e0dbd0', display: 'flex', alignItems: 'center', padding: '0 24px', gap: 12 }}>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff5f56' }} />
-                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ffbd2e' }} />
-                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#27c93f' }} />
-                </div>
-                <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-                  <div style={{ width: 300, height: 32, background: '#f5f2ec', borderRadius: 8 }} />
-                </div>
-              </div>
-
-              {/* Mockup Layout */}
-              <div style={{ display: 'flex', height: 480 }}>
-                {/* Mockup Sidebar */}
-                <div style={{ width: 220, background: '#1e4229', padding: 20 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 30 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.2)' }} />
-                    <div style={{ width: 100, height: 14, background: 'rgba(255,255,255,0.8)', borderRadius: 4 }} />
+              <div className="tz-mock">
+                <aside className="tz-mock-side">
+                  <div className="tz-mock-brand">
+                    <img src="/logo.png" alt="" />
+                    <span>Klüp360</span>
                   </div>
-                  {[75, 82, 55, 90, 68, 60].map((w, i) => (
-                    <div key={i} style={{
-                      width: '100%', height: 40,
-                      background: i === 1 ? 'rgba(255,255,255,0.15)' : 'transparent',
-                      marginBottom: 8, borderRadius: 8,
-                      display: 'flex', alignItems: 'center', padding: '0 12px', gap: 12
-                    }}>
-                      <div style={{ width: 16, height: 16, borderRadius: 4, background: i === 1 ? '#fff' : 'rgba(255,255,255,0.3)' }} />
-                      <div style={{ width: w, height: 10, borderRadius: 4, background: i === 1 ? '#fff' : 'rgba(255,255,255,0.3)' }} />
+                  {['Kontrol Paneli', 'Öğrenciler', 'Bordro', 'Tahsilat', 'Ders Programı', 'Raporlar'].map((m, i) => (
+                    <div key={m} className={`tz-mock-nav ${i === 0 ? 'is-active' : ''}`}>
+                      <span className="tz-mock-nav-ic" />
+                      <span className="tz-mock-nav-tx">{m}</span>
                     </div>
                   ))}
-                </div>
-
-                {/* Mockup Content Area */}
-                <div style={{ flex: 1, padding: 32, background: '#f5f2ec' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
-                    <div style={{ width: 200, height: 24, background: '#d8d0be', borderRadius: 6 }} />
-                    <div style={{ width: 120, height: 36, background: 'var(--accent)', borderRadius: 8 }} />
+                </aside>
+                <div className="tz-mock-main">
+                  <div className="tz-mock-head">
+                    <div>
+                      <div className="tz-mock-title">Kontrol Paneli</div>
+                      <div className="tz-mock-sub">Ağustos 2026 dönemi</div>
+                    </div>
+                    <div className="tz-mock-btn">+ Yeni Kayıt</div>
                   </div>
-
-                  {/* Mockup Stat Cards */}
-                  <div style={{ display: 'flex', gap: 20, marginBottom: 32 }}>
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} style={{ flex: 1, height: 110, background: 'white', borderRadius: 16, border: '1px solid #e0dbd0', padding: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 10, background: i === 0 ? '#eafaf1' : i === 1 ? '#fef9e7' : '#e8f4fd', marginBottom: 12 }} />
-                        <div style={{ width: 80, height: 10, background: '#d8d0be', borderRadius: 4, marginBottom: 8 }} />
-                        <div style={{ width: 120, height: 20, background: '#1a1a14', borderRadius: 4 }} />
+                  <div className="tz-mock-stats">
+                    {[
+                      { l: 'Aktif Öğrenci', v: '248', c: 'green' },
+                      { l: 'Aylık Tahsilat', v: '₺186K', c: 'gold' },
+                      { l: 'Personel', v: '19', c: 'blue' },
+                    ].map(s => (
+                      <div key={s.l} className="tz-mock-stat">
+                        <span className={`tz-mock-stat-ic ${s.c}`} />
+                        <div className="tz-mock-stat-l">{s.l}</div>
+                        <div className="tz-mock-stat-v">{s.v}</div>
                       </div>
                     ))}
                   </div>
-
-                  {/* Mockup Table */}
-                  <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e0dbd0', padding: 20, height: 200, boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
-                    <div style={{ display: 'flex', gap: 16, borderBottom: '1px solid #f0ede4', paddingBottom: 16, marginBottom: 16 }}>
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} style={{ flex: i === 0 ? 2 : 1, height: 12, background: '#d8d0be', borderRadius: 4 }} />
+                  <div className="tz-mock-panel">
+                    <div className="tz-mock-panel-head">
+                      <span className="tz-mock-panel-title">Aylık Tahsilat Akışı</span>
+                      <span className="tz-mock-legend"><i /> 2026</span>
+                    </div>
+                    <div className="tz-mock-chart">
+                      {[48, 62, 40, 74, 58, 88, 70, 95, 66, 82].map((h, i) => (
+                        <span key={i} className="tz-bar" style={{ height: `${h}%` }} />
                       ))}
                     </div>
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-                        {Array.from({ length: 5 }).map((_, j) => (
-                          <div key={j} style={{ flex: j === 0 ? 2 : 1, height: 10, background: '#f0ede4', borderRadius: 4 }} />
-                        ))}
-                      </div>
-                    ))}
                   </div>
                 </div>
               </div>
             </div>
-
-            {/* Fade out bottom of mockup to blend into page */}
-            <div style={{
-              position: 'absolute', bottom: -5, left: 0, right: 0, height: 150,
-              background: 'linear-gradient(to bottom, transparent, #f5f2ec)',
-              pointerEvents: 'none'
-            }} />
-
-            <style>
-              {`
-                @keyframes floatLeft {
-                  0% { transform: translateY(0px) rotate(-2deg); }
-                  50% { transform: translateY(-15px) rotate(2deg); }
-                  100% { transform: translateY(0px) rotate(-2deg); }
-                }
-                @keyframes floatRight {
-                  0% { transform: translateY(0px) rotate(2deg); }
-                  50% { transform: translateY(-10px) rotate(-1deg); }
-                  100% { transform: translateY(0px) rotate(2deg); }
-                }
-              `}
-            </style>
+            <div className="tz-preview-fade" aria-hidden />
           </div>
+        </div>
+      </header>
+
+      {/* ---------------------------------------------------------- STATS */}
+      <section className="tz-statsband">
+        <div className="tz-container tz-stats">
+          {stats.map(s => (
+            <div key={s.label} className="tz-stat">
+              <div className="tz-stat-v">{s.value}</div>
+              <div className="tz-stat-l">{s.label}</div>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* CONTRAST - BEFORE / AFTER */}
-      <section style={{ padding: '100px 40px', maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 60, alignItems: 'center' }}>
-          <div>
-            <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 'clamp(32px, 4vw, 44px)', fontWeight: 800, color: '#1a1a14', marginBottom: 24, lineHeight: 1.2 }}>
-              Eski Yöntemleri <br />Geride Bırakın
-            </h2>
-            <p style={{ fontSize: 18, color: '#5a5748', lineHeight: 1.6, marginBottom: 40 }}>
+      {/* ---------------------------------------------------------- CONTRAST */}
+      <section className="tz-section">
+        <div className="tz-container tz-split">
+          <div className="tz-reveal">
+            <span className="tz-eyebrow">Neden Klüp360</span>
+            <h2 className="tz-h2">Eski yöntemleri geride bırakın</h2>
+            <p className="tz-lead">
               Excel dosyaları, kayıp kağıtlar ve manuel bordro hesaplama yüküyle kurumunuzu yormayın.
               Modern dijital yönetimle hatasız ve hızlı bir düzene geçin.
             </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {[
-                { bad: 'Karışık Excel Tabloları', good: 'Tek Merkezi Sistem', badDesc: 'Kaosa neden olan veri yığınları', goodDesc: 'Her şeyin birbirine bağlı olduğu akıllı mimari' },
-                { bad: 'Manuel Maaş Hesapları', good: 'Saniyeler İçinde Bordro', badDesc: 'Katsayı hesaplamalarıyla uğraşmak', goodDesc: 'Güncel MEB parametreleriyle sıfır hata' },
-                { bad: 'Geciken Aidat Tespiti', good: 'Zamanında Tahsilat', badDesc: 'Kim ödedi, kim gecikti akılda tutmak', goodDesc: 'Vadesi geçen ödemeler için otomatik uyarılar' }
-              ].map((item, i) => (
-                <div key={i} style={{
-                  display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) minmax(240px, 1.4fr)', gap: 16, alignItems: 'center',
-                  transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)', cursor: 'default'
-                }}
-                  onMouseEnter={e => e.currentTarget.style.transform = 'translateX(8px)'}
-                  onMouseLeave={e => e.currentTarget.style.transform = 'translateX(0)'}
-                >
-                  {/* BAD */}
-                  <div style={{
-                    padding: '16px 20px', borderRadius: 16, background: '#f5f2ec', border: '1px dashed #d8d0be',
-                    opacity: 0.7, position: 'relative'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(192, 57, 43, 0.1)', color: '#c0392b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <span style={{ fontSize: 10, fontWeight: 800 }}>✕</span>
-                      </div>
-                      <span style={{ fontSize: 14, color: '#8a8070', textDecoration: 'line-through', fontWeight: 600 }}>{item.bad}</span>
-                    </div>
-                    <div style={{ fontSize: 13, color: '#b5ac9d', paddingLeft: 30 }}>{item.badDesc}</div>
-
-                    {/* Connector Arrow */}
-                    <div style={{ position: 'absolute', right: -24, top: '50%', transform: 'translateY(-50%)', zIndex: 10, color: '#d8d0be' }}>
-                      <ArrowRight size={18} />
-                    </div>
+            <ul className="tz-contrast">
+              {contrast.map(c => (
+                <li key={c.good} className="tz-contrast-row">
+                  <span className="tz-contrast-bad">{c.bad}</span>
+                  <ArrowRight size={16} className="tz-contrast-arrow" />
+                  <div className="tz-contrast-good">
+                    <div className="tz-contrast-good-t"><CheckCircle size={16} /> {c.good}</div>
+                    <div className="tz-contrast-good-d">{c.goodDesc}</div>
                   </div>
-
-                  {/* GOOD */}
-                  <div style={{
-                    padding: '18px 24px', borderRadius: 16, background: 'white', border: '1px solid rgba(45,90,61,0.2)',
-                    boxShadow: '0 8px 24px rgba(45,90,61,0.06)', position: 'relative', overflow: 'hidden'
-                  }}>
-                    <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 4, background: 'var(--accent)' }} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-                      <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#eafaf1', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <CheckCircle size={14} />
-                      </div>
-                      <span style={{ fontSize: 16, color: '#1a1a14', fontWeight: 800 }}>{item.good}</span>
-                    </div>
-                    <div style={{ fontSize: 14, color: '#5a5748', paddingLeft: 36 }}>{item.goodDesc}</div>
-                  </div>
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
 
-          <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-            {/* Decorative Background */}
-            <div style={{
-              width: '85%', height: '85%',
-              background: 'linear-gradient(135deg, #eafaf1 0%, #fef9e7 100%)',
-              borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%', position: 'absolute', zIndex: -1,
-              animation: 'morph 8s ease-in-out infinite alternate'
-            }} />
-
-            {/* Modern Comparison Graphic (Excel vs Klup360) */}
-            <div style={{ position: 'relative', width: '100%', maxWidth: 440, height: 420 }}>
-              {/* BACK LAYER: Ugly Excel (Before) */}
-              <div style={{
-                position: 'absolute', top: 20, right: 0, width: 320,
-                background: 'white', borderRadius: 16, border: '1px solid #d0d0d0',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.05)', overflow: 'hidden',
-                transform: 'rotate(6deg) translate(20px, -20px)', opacity: 0.85,
-                filter: 'grayscale(0.3)'
-              }}>
-                <div style={{ background: '#217346', height: 28, display: 'flex', alignItems: 'center', padding: '0 12px' }}>
-                  <div style={{ fontSize: 11, color: 'white', fontWeight: 600 }}>Bordro_Hesapları_Son.xlsx</div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '40px 1.5fr 1fr 1.2fr', borderBottom: '1px solid #ccc' }}>
-                  <div style={{ background: '#f3f2f1', borderRight: '1px solid #ccc', height: 24 }} />
-                  <div style={{ background: '#f3f2f1', borderRight: '1px solid #ccc', fontSize: 11, textAlign: 'center', color: '#666', lineHeight: '24px' }}>A</div>
-                  <div style={{ background: '#f3f2f1', borderRight: '1px solid #ccc', fontSize: 11, textAlign: 'center', color: '#666', lineHeight: '24px' }}>B</div>
-                  <div style={{ background: '#f3f2f1', fontSize: 11, textAlign: 'center', color: '#666', lineHeight: '24px' }}>C</div>
-                </div>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '40px 1.5fr 1fr 1.2fr', borderBottom: '1px solid #eee' }}>
-                    <div style={{ background: '#f3f2f1', borderRight: '1px solid #ccc', fontSize: 11, textAlign: 'center', color: '#666', lineHeight: '28px' }}>{i + 1}</div>
-                    <div style={{ borderRight: '1px solid #eee', padding: '6px', fontSize: 11, color: '#333' }}>{i === 1 ? 'Ahmet Yılmaz' : i === 3 ? 'Ayşe K.' : 'Personel ' + i}</div>
-                    <div style={{ borderRight: '1px solid #eee', padding: '6px', fontSize: 11, color: i === 1 ? '#c0392b' : '#333', fontWeight: i === 1 ? 600 : 400 }}>{i === 1 ? 'EKSİK' : 'TAMAM'}</div>
-                    <div style={{ padding: '6px', fontSize: 11, color: i === 3 ? '#c0392b' : '#333', background: i === 3 ? '#ffecec' : 'transparent', fontWeight: i === 3 ? 600 : 400 }}>{i === 3 ? '#DEĞER!' : '₺24,500'}</div>
+          <div className="tz-reveal tz-contrast-visual">
+            <div className="tz-xls">
+              <div className="tz-xls-bar">Bordro_Hesaplari_Son.xlsx</div>
+              <div className="tz-xls-grid">
+                {['Ahmet Yılmaz', 'Zeynep A.', 'Ayşe K.', 'Murat T.', 'Elif S.'].map((n, i) => (
+                  <div key={n} className="tz-xls-row">
+                    <span className="tz-xls-c muted">{i + 1}</span>
+                    <span className="tz-xls-c">{n}</span>
+                    <span className={`tz-xls-c ${i === 0 ? 'err' : ''}`}>{i === 0 ? 'EKSİK' : 'Tamam'}</span>
+                    <span className={`tz-xls-c ${i === 2 ? 'err' : ''}`}>{i === 2 ? '#DEĞER!' : '₺24.500'}</span>
                   </div>
                 ))}
-
-                {/* Floating Excel Error Warning */}
-                <div style={{
-                  position: 'absolute', bottom: 30, right: -10, background: '#c0392b', color: 'white',
-                  padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700,
-                  boxShadow: '0 8px 24px rgba(192,57,43,0.4)', display: 'flex', alignItems: 'center', gap: 6
-                }}>
-                  <span style={{ fontSize: 14 }}>✕</span> Formül Hatası
-                </div>
               </div>
-
-              {/* FRONT LAYER: 2026 UI (After) */}
-              <div style={{
-                position: 'absolute', bottom: 0, left: 0, width: 340,
-                background: '#163620', borderRadius: 24, border: '1px solid rgba(255,255,255,0.1)',
-                boxShadow: '0 30px 60px rgba(0,0,0,0.25), 0 0 0 10px rgba(255,255,255,0.4)',
-                padding: 28, transform: 'translateY(10px)', zIndex: 10
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <div style={{ width: 44, height: 44, background: 'rgba(255,255,255,0.1)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <CheckCircle size={22} color="#45b673" />
-                    </div>
-                    <div>
-                      <div style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 2 }}>Maaş Bordrosu</div>
-                      <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>Tüm kayıtlar doğrulandı</div>
-                    </div>
-                  </div>
-                  <div style={{ padding: '6px 10px', background: 'rgba(69, 182, 115, 0.2)', border: '1px solid rgba(69, 182, 115, 0.5)', borderRadius: 8, color: '#45b673', fontSize: 11, fontWeight: 800, letterSpacing: '0.05em' }}>
-                    HATASIZ
-                  </div>
-                </div>
-
-                <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 16, padding: 20, border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' }}>
-                    <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>Toplam Ödenecek</span>
-                    <span style={{ color: 'white', fontSize: 18, fontWeight: 800 }}>₺145,500.00</span>
-                  </div>
-                  <div style={{ height: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{ width: '100%', height: '100%', background: 'linear-gradient(90deg, #2d5a3d, #45b673)' }} />
-                  </div>
-                </div>
-
-                {/* Floating System Speed Badge */}
-                <div style={{
-                  position: 'absolute', top: -20, left: -20, background: 'white',
-                  padding: '12px 20px', borderRadius: 16, boxShadow: '0 12px 30px rgba(0,0,0,0.15)',
-                  display: 'flex', alignItems: 'center', gap: 10, border: '1px solid #e0dbd0',
-                  animation: 'float 4s ease-in-out infinite'
-                }}>
-                  <Zap size={22} fill="#e67e22" color="#e67e22" />
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: '#1a1a14', lineHeight: 1, marginBottom: 2 }}>0.3sn</div>
-                    <div style={{ fontSize: 12, color: '#8a8070', fontWeight: 500 }}>Hesaplama Süresi</div>
-                  </div>
-                </div>
-              </div>
+              <span className="tz-xls-flag">✕ Formül hatası</span>
             </div>
 
-            <style>
-              {`
-                @keyframes morph {
-                  0% { border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; }
-                  100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-                }
-              `}
-            </style>
+            <div className="tz-clean">
+              <div className="tz-clean-head">
+                <span className="tz-clean-ic"><CheckCircle size={20} /></span>
+                <div>
+                  <div className="tz-clean-t">Maaş Bordrosu</div>
+                  <div className="tz-clean-s">Tüm kayıtlar doğrulandı</div>
+                </div>
+                <span className="tz-clean-badge">HATASIZ</span>
+              </div>
+              <div className="tz-clean-row">
+                <span>Toplam ödenecek</span>
+                <strong>₺145.500,00</strong>
+              </div>
+              <div className="tz-clean-track"><span /></div>
+              <div className="tz-clean-speed"><Zap size={16} /> 0,3 sn hesaplama süresi</div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* STATS */}
-      <section style={{
-        background: 'linear-gradient(135deg,#2d5a3d,#1e4229)',
-        padding: '48px 40px',
-      }}>
-        <div style={{
-          maxWidth: 900, margin: '0 auto',
-          display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 32,
-        }}>
-          {stats.map(s => (
-            <div key={s.value} style={{ textAlign: 'center' }}>
-              <div style={{
-                fontFamily: 'Playfair Display, serif',
-                fontSize: 36, fontWeight: 700, color: 'white', lineHeight: 1,
-              }}>{s.value}</div>
-              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 6 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* FEATURES - PREMIUM 2026 */}
-      <section style={{ padding: '120px 40px', maxWidth: 1200, margin: '0 auto', position: 'relative' }}>
-        {/* Decorative background blurs for depth */}
-        <div style={{ position: 'absolute', top: 100, left: -100, width: 400, height: 400, background: 'var(--accent)', opacity: 0.05, filter: 'blur(100px)', zIndex: -1, borderRadius: '50%' }} />
-        <div style={{ position: 'absolute', bottom: 100, right: -100, width: 400, height: 400, background: '#c8832a', opacity: 0.03, filter: 'blur(100px)', zIndex: -1, borderRadius: '50%' }} />
-
-        <div style={{ textAlign: 'center', marginBottom: 70 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--accent)', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16 }}>
-            <Star size={16} fill="var(--accent)" /> Hepsi Bir Arada Yekpare Sistem
-          </div>
-          <h2 style={{
-            fontFamily: 'Playfair Display, serif', fontSize: 'clamp(36px, 4vw, 48px)', fontWeight: 800,
-            color: '#1a1a14', marginBottom: 16, lineHeight: 1.2
-          }}>
-            İhtiyacınız Olan Her Şey
-          </h2>
-          <p style={{ fontSize: 18, color: '#5a5748', maxWidth: 580, margin: '0 auto', lineHeight: 1.6 }}>
-            12 modül, tek platform. Başka hiçbir yazılıma veya Excel dosyasına ihtiyaç duymadan kulübünüzü yönetmek için gereken tüm akıllı araçlar eksiksiz burada.
-          </p>
-        </div>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: 24,
-        }}>
-          {features.map(f => (
-            <div key={f.title} style={{
-              position: 'relative',
-              background: '#fffef9', borderRadius: 24,
-              border: '1px solid rgba(216, 208, 190, 0.6)',
-              padding: '32px 28px',
-              overflow: 'hidden',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
-              transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-              cursor: 'default'
-            }}
-              onMouseEnter={e => {
-                const target = e.currentTarget as HTMLElement;
-                target.style.transform = 'translateY(-6px)';
-                target.style.boxShadow = '0 20px 40px rgba(45,90,61,0.08), 0 0 0 1px var(--accent)';
-                target.style.background = 'linear-gradient(180deg, #ffffff 0%, #f9fdfa 100%)';
-                const bgIcon = target.querySelector('.bg-icon') as HTMLElement;
-                if (bgIcon) { bgIcon.style.transform = 'scale(1.2) rotate(-10deg)'; bgIcon.style.opacity = '0.08'; }
-              }}
-              onMouseLeave={e => {
-                const target = e.currentTarget as HTMLElement;
-                target.style.transform = 'translateY(0)';
-                target.style.boxShadow = '0 4px 15px rgba(0,0,0,0.02)';
-                target.style.background = '#fffef9';
-                target.style.border = '1px solid rgba(216, 208, 190, 0.6)';
-                const bgIcon = target.querySelector('.bg-icon') as HTMLElement;
-                if (bgIcon) { bgIcon.style.transform = 'scale(1) rotate(0deg)'; bgIcon.style.opacity = '0.03'; }
-              }}
-            >
-              <div style={{
-                width: 48, height: 48, borderRadius: 14,
-                background: 'linear-gradient(135deg, #eafaf1 0%, #d4f2df 100%)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                marginBottom: 20, boxShadow: '0 4px 12px rgba(45,90,61,0.1)',
-                position: 'relative', zIndex: 2
-              }}>
-                <f.icon size={22} color="var(--accent)" />
-              </div>
-              <h3 style={{ fontSize: 17, fontWeight: 700, color: '#1a1a14', marginBottom: 10, position: 'relative', zIndex: 2 }}>
-                {f.title}
-              </h3>
-              <p style={{ fontSize: 14, color: '#5a5748', lineHeight: 1.65, margin: 0, position: 'relative', zIndex: 2 }}>
-                {f.desc}
-              </p>
-
-              {/* Giant abstract faded icon in background */}
-              <div className="bg-icon" style={{
-                position: 'absolute', right: -20, bottom: -20,
-                opacity: 0.03, transition: 'all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                zIndex: 1
-              }}>
-                <f.icon size={120} color="var(--accent)" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* DENETİM YETKİLİSİ - PREMIUM 2026 */}
-      <section style={{
-        background: 'linear-gradient(135deg, #163620 0%, #20412a 100%)',
-        padding: '120px 40px', position: 'relative', overflow: 'hidden'
-      }}>
-        {/* Glow Effects */}
-        <div style={{ position: 'absolute', top: '10%', left: '20%', width: 500, height: 500, background: 'rgba(255,255,255,0.03)', filter: 'blur(100px)', borderRadius: '50%', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '-10%', right: '10%', width: 600, height: 600, background: 'var(--accent)', filter: 'blur(150px)', opacity: 0.1, borderRadius: '50%', pointerEvents: 'none' }} />
-
-        <div style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', zIndex: 10 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: 80 }}>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: 999, padding: '8px 20px', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
-              color: 'rgba(255,255,255,0.95)', marginBottom: 24, backdropFilter: 'blur(10px)'
-            }}>
-              <Eye size={16} /> Resmi Kurumlar / MEB İçin
-            </div>
-
-            <h2 style={{
-              fontFamily: 'Playfair Display, serif', fontSize: 'clamp(36px, 4vw, 56px)', fontWeight: 800,
-              color: 'white', marginBottom: 20, lineHeight: 1.15
-            }}>
-              Şeffaf ve Anlık<br />Denetim Paneli
-            </h2>
-
-            <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.7)', maxWidth: 600, margin: '0 auto 40px', lineHeight: 1.6 }}>
-              İl ve İlçe Milli Eğitim Müdürlüklerine özel olarak tahsis edilen salt-okunur panel ile bölgenizdeki tüm bağlı kurumları saniyeler içinde denetleyin.
+      {/* ---------------------------------------------------------- FEATURES */}
+      <section className="tz-section tz-section-alt">
+        <div className="tz-container">
+          <div className="tz-head tz-reveal">
+            <span className="tz-eyebrow">Hepsi bir arada</span>
+            <h2 className="tz-h2">İhtiyacınız olan her şey</h2>
+            <p className="tz-lead tz-lead-center">
+              12 modül, tek platform. Başka hiçbir yazılıma ya da Excel dosyasına ihtiyaç
+              duymadan kulübünüzü yönetmek için gereken tüm akıllı araçlar burada.
             </p>
-
-            <Link href="/login?type=denetim" style={{
-              display: 'inline-flex', alignItems: 'center', gap: 12,
-              padding: '16px 40px', borderRadius: 16, fontSize: 17, fontWeight: 700,
-              background: 'white', color: '#163620', textDecoration: 'none',
-              boxShadow: '0 0 0 4px rgba(255,255,255,0.1), 0 10px 30px rgba(0,0,0,0.2)',
-              transition: 'all 0.3s ease'
-            }}
-              onMouseEnter={e => {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = '0 0 0 6px rgba(255,255,255,0.15), 0 20px 40px rgba(0,0,0,0.3)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 0 0 4px rgba(255,255,255,0.1), 0 10px 30px rgba(0,0,0,0.2)';
-              }}
-            >
-              Denetçi Girişi Yapın <ArrowRight size={20} />
-            </Link>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 24 }}>
-            {[
-              {
-                icon: MapPin,
-                title: 'İl / İlçe Geneli Özet',
-                desc: 'Bölgedeki toplam öğrenci, personel ve ruhsatlı/ruhsatsız operasyon verilerini kuşbakışı haritada tek bakışta görün.',
-              },
-              {
-                icon: Building2,
-                title: 'Okul Bazlı Kesin İzleme',
-                desc: 'Bağlı her kulübün dosyasına dijital olarak inin. Mevcut öğrenci sayısı ve kapasite aşımı kontrolleri anlık hesaplanır.',
-              },
-              {
-                icon: FileText,
-                title: 'Resmi Bordro Görüntüleme',
-                desc: 'Kulüplerin beyan ettiği aylık bordroları, MEB katsayı doğrulamalarını ve kesintileri salt-okunur olarak inceleyin.',
-              },
-              {
-                icon: BarChart2,
-                title: 'Finansal Şeffaflık Raporları',
-                desc: 'Gelir-gider tabloları, vergi dilimleri ve aidat tahsilat oranları yasal denetim formatında sistemde her an hazırdır.',
-              },
-              {
-                icon: Calendar,
-                title: 'Sınıf Defteri & Yoklama',
-                desc: 'Kurumda o an hangi öğretmenin, hangi sınıfta derste olduğunu fiili devam defterinden yerinde olmadan inceleyin.',
-              },
-              {
-                icon: UserCheck,
-                title: 'Mutlak Salt Okunur Erişim',
-                desc: 'Denetim yetkilisi veriyi değiştiremez, silemez. Kurumun sisteme girdiği veri %100 şeffaflıkla ekrana yansır.',
-              },
-            ].map(item => (
-              <div key={item.title} style={{
-                background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 24, padding: '32px', position: 'relative', overflow: 'hidden',
-                transition: 'all 0.3s ease', cursor: 'default'
-              }}
-                onMouseEnter={e => {
-                  const target = e.currentTarget as HTMLElement;
-                  target.style.background = 'rgba(255,255,255,0.06)';
-                  target.style.borderColor = 'rgba(255,255,255,0.2)';
-                  target.style.transform = 'translateY(-4px)';
-                }}
-                onMouseLeave={e => {
-                  const target = e.currentTarget as HTMLElement;
-                  target.style.background = 'rgba(255,255,255,0.03)';
-                  target.style.borderColor = 'rgba(255,255,255,0.1)';
-                  target.style.transform = 'translateY(0)';
-                }}
-              >
-                <div style={{
-                  width: 52, height: 52, borderRadius: 16,
-                  background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  marginBottom: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                }}>
-                  <item.icon size={26} color="white" />
-                </div>
-                <h3 style={{ fontSize: 17, fontWeight: 700, color: 'white', marginBottom: 12 }}>
-                  {item.title}
-                </h3>
-                <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: 0 }}>
-                  {item.desc}
-                </p>
-
-                {/* Decorative glowing dot */}
-                <div style={{ position: 'absolute', top: 32, right: 32, width: 6, height: 6, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', boxShadow: '0 0 10px rgba(255,255,255,0.5)' }} />
+          <div className="tz-features">
+            {features.map((f, i) => (
+              <div key={f.title} className="tz-fcard tz-reveal" style={{ transitionDelay: `${(i % 4) * 60}ms` }}>
+                <span className="tz-ficon"><f.icon size={20} /></span>
+                <h3>{f.title}</h3>
+                <p>{f.desc}</p>
+                <f.icon className="tz-fcard-ghost" size={104} aria-hidden />
               </div>
             ))}
           </div>
         </div>
       </section>
 
+      {/* ---------------------------------------------------------- AUDIT (dark) */}
+      <section className="tz-audit">
+        <div className="tz-audit-glow" aria-hidden />
+        <div className="tz-container tz-audit-inner">
+          <div className="tz-head tz-reveal">
+            <span className="tz-eyebrow tz-eyebrow-light"><Eye size={15} /> Resmi kurumlar / MEB için</span>
+            <h2 className="tz-h2 tz-h2-light">Şeffaf ve anlık denetim paneli</h2>
+            <p className="tz-lead tz-lead-center tz-lead-light">
+              İl ve İlçe Milli Eğitim Müdürlüklerine özel tahsis edilen salt-okunur panel ile
+              bölgenizdeki tüm bağlı kurumları saniyeler içinde denetleyin.
+            </p>
+            <Link href="/login?type=denetim" className="tz-btn tz-btn-white tz-btn-lg">
+              Denetçi Girişi Yapın <ArrowRight size={18} />
+            </Link>
+          </div>
 
+          <div className="tz-audit-grid">
+            {audit.map((a, i) => (
+              <div key={a.title} className="tz-acard tz-reveal" style={{ transitionDelay: `${(i % 3) * 60}ms` }}>
+                <span className="tz-acard-ic"><a.icon size={22} /></span>
+                <h3>{a.title}</h3>
+                <p>{a.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-      {/* HOW IT WORKS - PREMIUM TIMELINE */}
-      <section style={{
-        background: 'linear-gradient(180deg, #fffef9 0%, #f5f2ec 100%)',
-        padding: '140px 40px', position: 'relative', overflow: 'hidden'
-      }}>
-        {/* Background Decorative Mesh */}
-        <div style={{ position: 'absolute', top: -200, left: '50%', transform: 'translateX(-50%)', width: 1000, height: 400, background: 'radial-gradient(ellipse, #eafaf1 0%, transparent 70%)', opacity: 0.8, pointerEvents: 'none' }} />
-
-        <div style={{ maxWidth: 1100, margin: '0 auto', position: 'relative', zIndex: 10 }}>
-          <div style={{ textAlign: 'center', marginBottom: 100 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--accent)', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16 }}>
-              <Zap size={16} fill="var(--accent)" /> Işık Hızında Kurulum
-            </div>
-            <h2 style={{
-              fontFamily: 'Playfair Display, serif', fontSize: 'clamp(36px, 4vw, 48px)', fontWeight: 800,
-              color: '#1a1a14', marginBottom: 16, lineHeight: 1.2
-            }}>
-              3 Adımda Sisteme Geçin
-            </h2>
-            <p style={{ fontSize: 18, color: '#5a5748', maxWidth: 500, margin: '0 auto' }}>
+      {/* ---------------------------------------------------------- STEPS */}
+      <section className="tz-section">
+        <div className="tz-container">
+          <div className="tz-head tz-reveal">
+            <span className="tz-eyebrow"><Zap size={15} /> Işık hızında kurulum</span>
+            <h2 className="tz-h2">3 adımda sisteme geçin</h2>
+            <p className="tz-lead tz-lead-center">
               Karmaşık entegrasyonlar yok. Öğle aranızda bile sistemi kurup canlıya alabilirsiniz.
             </p>
           </div>
 
-          <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', gap: 32, flexDirection: 'row' }}>
-            {/* The Continuous Glowing Line Background */}
-            <div style={{
-              position: 'absolute', top: 0, left: 60, right: 60, height: 2,
-              background: 'linear-gradient(90deg, rgba(45,90,61,0) 0%, rgba(45,90,61,0.2) 20%, rgba(45,90,61,0.2) 80%, rgba(45,90,61,0) 100%)',
-              zIndex: 0
-            }} />
-
+          <div className="tz-steps">
             {steps.map((s, i) => (
-              <div key={s.num} style={{
-                flex: 1, position: 'relative', zIndex: 1,
-                background: 'white', borderRadius: 24, padding: '50px 32px 40px',
-                border: '1px solid #e0dbd0', boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
-                transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                textAlign: 'center', marginTop: 0
-              }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.transform = 'translateY(-10px)';
-                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(45,90,61,0.08)';
-                  e.currentTarget.style.borderColor = 'var(--accent-light)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.03)';
-                  e.currentTarget.style.borderColor = '#e0dbd0';
-                }}
-              >
-                <div style={{
-                  width: 80, height: 80, borderRadius: '50%',
-                  background: 'white', border: '1px solid #d8d0be',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  margin: '-90px auto 32px', position: 'relative',
-                  fontFamily: 'Playfair Display, serif', fontSize: 28, fontWeight: 800, color: 'var(--accent)'
-                }}>
-                  {/* Subtle Inner Glow */}
-                  <div style={{ position: 'absolute', inset: 6, borderRadius: '50%', background: 'linear-gradient(135deg, #eafaf1, transparent)', zIndex: -1 }} />
-                  {s.num}
-                </div>
-
-                <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1a1a14', marginBottom: 12 }}>
-                  {s.title}
-                </h3>
-                <p style={{ fontSize: 15, color: '#5a5748', lineHeight: 1.6, margin: 0 }}>
-                  {s.desc}
-                </p>
+              <div key={s.num} className="tz-step tz-reveal" style={{ transitionDelay: `${i * 80}ms` }}>
+                <span className="tz-step-num">{s.num}</span>
+                <h3>{s.title}</h3>
+                <p>{s.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* TRUST - PREMIUM 2026 */}
-      <section style={{ padding: '120px 40px', maxWidth: 1100, margin: '0 auto', position: 'relative' }}>
-        <div style={{ textAlign: 'center', marginBottom: 70 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--accent)', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16 }}>
-            <Shield size={16} fill="var(--accent)" /> Kurumsal Güven
+      {/* ---------------------------------------------------------- TRUST */}
+      <section className="tz-section tz-section-alt">
+        <div className="tz-container">
+          <div className="tz-head tz-reveal">
+            <span className="tz-eyebrow"><Shield size={15} /> Kurumsal güven</span>
+            <h2 className="tz-h2">Güvenli ve uyumlu</h2>
+            <p className="tz-lead tz-lead-center">
+              Verileriniz endüstri standartlarında şifrelenir, altyapımız MEB mevzuatına tam uyumlu çalışır.
+            </p>
           </div>
-          <h2 style={{
-            fontFamily: 'Playfair Display, serif', fontSize: 'clamp(32px, 4vw, 44px)', fontWeight: 800,
-            color: '#1a1a14', marginBottom: 16, lineHeight: 1.2
-          }}>
-            Güvenli ve Uyumlu
-          </h2>
-          <p style={{ fontSize: 18, color: '#5a5748', maxWidth: 520, margin: '0 auto', lineHeight: 1.6 }}>
-            Verileriniz endüstri standartlarında şifrelenir, altyapımız MEB mevzuatına tam uyumlu çalışır.
-          </p>
-        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 24 }}>
-          {[
-            {
-              icon: Shield,
-              title: 'Sıfır Risk, Şifreli Altyapı',
-              desc: 'Tüm verileriniz 256-bit şifrelenmiş olarak Supabase bulutunda saklanır. Kimse izniniz olmadan erişemez.',
-            },
-            {
-              icon: CheckCircle,
-              title: 'MEB & SGK Uyumluluğu',
-              desc: 'Bordro algoritmaları tamamen MEB katsayıları ve SGK güncellemelerine endekslidir. Yasal ceza riski sıfır.',
-            },
-            {
-              icon: Building2,
-              title: 'Çoklu Kurum Mimarisi',
-              desc: 'Birden fazla işletmeniz varsa tek hesapta birleştirin. Her kurum bağımsız ve verileri mutlak şekilde izolelidir.',
-            },
-            {
-              icon: Activity,
-              title: 'Gerçek Zamanlı Senkronizasyon',
-              desc: 'Siz bir öğrenci kaydettiğinizde, muhasebenin ekranına anında düşer. Takımınızla saniye sekmeden aynı anda çalışın.',
-            },
-            {
-              icon: Zap,
-              title: 'Akıllı Proaktif Bildirimler',
-              desc: 'Geciken ödemeler, kritik eksiklikler veya yaklaşan tahsilat günleri size sistem tarafından bildirim olarak gelir.',
-            },
-            {
-              icon: TrendingUp,
-              title: 'Otomatik Raporlama Motoru',
-              desc: 'Aylık, dönemlik veya anlık mali bilançolarınızı Excel stresine girmeden saniyeler içinde çekin.',
-            },
-          ].map((t) => (
-            <div key={t.title} style={{
-              background: '#fffef9', borderRadius: 24, border: '1px solid rgba(216, 208, 190, 0.4)',
-              padding: '32px', position: 'relative', overflow: 'hidden',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.02)', cursor: 'default',
-              transition: 'all 0.3s ease'
-            }}
-              onMouseEnter={e => {
-                const target = e.currentTarget as HTMLElement;
-                target.style.boxShadow = '0 12px 30px rgba(45,90,61,0.06)';
-                target.style.borderColor = 'var(--accent-light)';
-                const iconBg = target.querySelector('.trust-icon-bg') as HTMLElement;
-                if (iconBg) iconBg.style.transform = 'scale(1.1)';
-              }}
-              onMouseLeave={e => {
-                const target = e.currentTarget as HTMLElement;
-                target.style.boxShadow = '0 4px 15px rgba(0,0,0,0.02)';
-                target.style.borderColor = 'rgba(216, 208, 190, 0.4)';
-                const iconBg = target.querySelector('.trust-icon-bg') as HTMLElement;
-                if (iconBg) iconBg.style.transform = 'scale(1)';
-              }}
-            >
-              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                <div className="trust-icon-bg" style={{
-                  width: 48, height: 48, borderRadius: 14, flexShrink: 0,
-                  background: 'linear-gradient(135deg, #f5f2ec 0%, #fffef9 100%)', border: '1px solid #e0dbd0',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.3s ease'
-                }}>
-                  <t.icon size={22} color="var(--accent)" />
-                </div>
+          <div className="tz-trust">
+            {trust.map((t, i) => (
+              <div key={t.title} className="tz-tcard tz-reveal" style={{ transitionDelay: `${(i % 3) * 60}ms` }}>
+                <span className="tz-tcard-ic"><t.icon size={20} /></span>
                 <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1a1a14', marginBottom: 8, marginTop: 4 }}>{t.title}</h3>
-                  <p style={{ fontSize: 14, color: '#5a5748', lineHeight: 1.6, margin: 0 }}>{t.desc}</p>
+                  <h3>{t.title}</h3>
+                  <p>{t.desc}</p>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* CTA - PREMIUM 2026 */}
-      <section style={{
-        padding: '120px 40px',
-        background: '#fffef9',
-        display: 'flex', justifyContent: 'center'
-      }}>
-        <div style={{
-          width: '100%', maxWidth: 1200,
-          background: 'linear-gradient(135deg, #1e4229 0%, #163620 100%)',
-          borderRadius: 40,
-          padding: '80px 40px',
-          textAlign: 'center',
-          position: 'relative',
-          overflow: 'hidden',
-          boxShadow: '0 30px 60px rgba(45,90,61,0.15)'
-        }}>
-          {/* Ambient Glow inside the CTA card */}
-          <div style={{ position: 'absolute', top: '-50%', left: '-10%', width: '60%', height: '200%', background: 'radial-gradient(ellipse, rgba(255,255,255,0.08) 0%, transparent 60%)', transform: 'rotate(-45deg)' }} />
-          <div style={{ position: 'absolute', bottom: '-80%', right: '-10%', width: '60%', height: '200%', background: 'radial-gradient(ellipse, var(--accent) 0%, transparent 60%)', opacity: 0.5 }} />
-
-          <div style={{ position: 'relative', zIndex: 10 }}>
-            <h2 style={{
-              fontFamily: 'Playfair Display, serif',
-              fontSize: 'clamp(32px, 5vw, 56px)',
-              fontWeight: 800, color: 'white',
-              marginBottom: 20, lineHeight: 1.15
-            }}>
-              Kulübünüzü Dijitale Taşıyın
-            </h2>
-            <p style={{
-              fontSize: 18, color: 'rgba(255,255,255,0.8)',
-              maxWidth: 540, margin: '0 auto 48px',
-              lineHeight: 1.6,
-            }}>
-              Kağıt, Excel ve manuel hesaplama dönemine kalıcı olarak son verin.
-              Klüp360 ile sadece dakikalar içinde yeni nesil yönetime geçin.
-            </p>
-            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Link href="/signup" style={{
-                display: 'inline-flex', alignItems: 'center', gap: 10,
-                padding: '18px 48px', borderRadius: 999, fontSize: 17, fontWeight: 700,
-                background: 'white', color: '#163620', textDecoration: 'none',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
-                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
-              }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
-                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.3)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
-                }}
-              >
-                Ücretsiz Başlayın <ArrowRight size={20} />
-              </Link>
-              <Link href="/fiyatlandirma" style={{
-                display: 'inline-flex', alignItems: 'center', gap: 10,
-                padding: '18px 48px', borderRadius: 999, fontSize: 17, fontWeight: 600,
-                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)',
-                color: 'white', textDecoration: 'none', backdropFilter: 'blur(10px)',
-                transition: 'all 0.3s ease'
-              }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
-                }}
-              >
-                Fiyatları İnceleyin
-              </Link>
+      {/* ---------------------------------------------------------- CTA */}
+      <section className="tz-ctawrap">
+        <div className="tz-container">
+          <div className="tz-cta tz-reveal">
+            <div className="tz-cta-glow" aria-hidden />
+            <div className="tz-cta-inner">
+              <h2>Kulübünüzü dijitale taşıyın</h2>
+              <p>
+                Kağıt, Excel ve manuel hesaplama dönemine kalıcı son verin. Klüp360 ile
+                dakikalar içinde yeni nesil yönetime geçin.
+              </p>
+              <div className="tz-hero-actions tz-cta-actions">
+                <Link href="/signup" className="tz-btn tz-btn-white tz-btn-lg">
+                  Ücretsiz Başlayın <ArrowUpRight size={18} />
+                </Link>
+                <Link href="/fiyatlandirma" className="tz-btn tz-btn-outline-light tz-btn-lg">
+                  Fiyatları İnceleyin
+                </Link>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer style={{
-        background: '#1e4229', padding: '40px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexWrap: 'wrap', gap: 16,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 30, height: 30, borderRadius: 8,
-            background: 'rgba(255,255,255,0.15)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <ClipboardList size={16} color="white" />
+      {/* ---------------------------------------------------------- FOOTER */}
+      <footer className="tz-footer">
+        <div className="tz-container tz-footer-inner">
+          <div className="tz-footer-brand">
+            <img src="/logo.png" alt="Klüp360" />
+            <div>
+              <div className="tz-footer-name">Klüp360</div>
+              <div className="tz-footer-tag">MEB Çocuk Kulüpleri Yönetim Sistemi</div>
+            </div>
           </div>
-          <span style={{ fontFamily: 'Playfair Display, serif', fontWeight: 700, fontSize: 16, color: 'white' }}>
-            Klüp360
-          </span>
+          <div className="tz-footer-links">
+            <Link href="/rehber">Rehber & Araçlar</Link>
+            <Link href="/fiyatlandirma">Fiyatlandırma</Link>
+            <Link href="/tanitim/kullanim-kosullari">Kullanım Koşulları</Link>
+            <Link href="/tanitim/gizlilik-politikasi">Gizlilik</Link>
+            <Link href="/tanitim/iade-politikasi">İade</Link>
+            <Link href="/tanitim/iletisim">İletişim</Link>
+            <Link href="/login">Giriş</Link>
+          </div>
         </div>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0 }}>
-          © {new Date().getFullYear()} Klüp360 — MEB Çocuk Kulüpleri Yönetim Sistemi
-        </p>
-        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
-          <Link href="/fiyatlandirma" style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>Fiyatlandırma</Link>
-          <Link href="/tanitim/kullanim-kosullari" style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>Kullanım Koşulları</Link>
-          <Link href="/tanitim/gizlilik-politikasi" style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>Gizlilik</Link>
-          <Link href="/tanitim/iade-politikasi" style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>İade</Link>
-          <Link href="/tanitim/iletisim" style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>İletişim</Link>
-          <Link href="/login" style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>Giriş</Link>
-          <Link href="/signup" style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>Kayıt</Link>
+        <div className="tz-container tz-footer-copy">
+          © {new Date().getFullYear()} Klüp360 — Tüm hakları saklıdır.
         </div>
       </footer>
-
     </div>
   )
 }
+
+/* ----------------------------------------------------------------- styles */
+
+const CSS = `
+.tz {
+  --g: #2d5a3d; --g-d: #1e4229; --g-dd: #163620;
+  --gold: #c8832a; --gold-d: #a06820;
+  --bg: #f5f2ec; --surf: #fffef9; --line: #e6dfd0; --line-2: #d8d0be;
+  --tx: #1a1a14; --tx2: #5a5748; --tx3: #8a8070;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--tx); background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+.tz *, .tz *::before, .tz *::after { box-sizing: border-box; }
+.tz :where(a) { text-decoration: none; color: inherit; }
+.tz img { max-width: 100%; display: block; }
+.tz-container { width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 clamp(20px, 5vw, 48px); }
+
+/* reveal (only active once JS confirmed) */
+.tz-js .tz-reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s cubic-bezier(.16,1,.3,1); }
+.tz-js .tz-reveal.tz-in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .tz-js .tz-reveal { opacity: 1 !important; transform: none !important; transition: none; }
+  .tz * { animation: none !important; }
+}
+
+/* buttons */
+.tz-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: inherit; font-weight: 600; font-size: 14px; border-radius: 12px;
+  padding: 10px 18px; cursor: pointer; border: 1px solid transparent; white-space: nowrap;
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease; }
+.tz-btn-lg { font-size: 16px; padding: 15px 30px; border-radius: 14px; }
+.tz-btn-primary { background: var(--g); color: #fff; box-shadow: 0 8px 22px rgba(45,90,61,.22); }
+.tz-btn-primary:hover { background: var(--g-d); transform: translateY(-2px); box-shadow: 0 14px 30px rgba(45,90,61,.28); }
+.tz-btn-ghost { background: var(--surf); color: var(--tx); border-color: var(--line-2); }
+.tz-btn-ghost:hover { border-color: var(--g); color: var(--g); transform: translateY(-2px); }
+.tz-btn-white { background: #fff; color: var(--g-dd); box-shadow: 0 10px 26px rgba(0,0,0,.14); }
+.tz-btn-white:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(0,0,0,.2); }
+.tz-btn-outline-light { background: rgba(255,255,255,.06); color: #fff; border-color: rgba(255,255,255,.28); backdrop-filter: blur(6px); }
+.tz-btn-outline-light:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.5); transform: translateY(-2px); }
+
+/* nav */
+.tz-nav { position: sticky; top: 0; z-index: 100; background: rgba(245,242,236,.82);
+  backdrop-filter: saturate(160%) blur(14px); border-bottom: 1px solid var(--line); }
+.tz-nav-inner { max-width: 1180px; margin: 0 auto; height: 68px; padding: 0 clamp(20px,5vw,48px);
+  display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.tz-brand { display: flex; align-items: center; gap: 10px; }
+.tz-brand-mark { width: 38px; height: 38px; }
+.tz-brand-name { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 22px; color: var(--g-d); letter-spacing: -.01em; }
+.tz-brand-360 { color: var(--gold); }
+.tz-nav-links { display: flex; align-items: center; gap: 28px; }
+.tz-nav-links a { font-size: 14.5px; font-weight: 500; color: var(--tx2); transition: color .15s; }
+.tz-nav-links a:hover { color: var(--g); }
+.tz-nav-tool { display: inline-flex; align-items: center; gap: 6px; font-weight: 600 !important; color: var(--g-d) !important; }
+.tz-nav-tool::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+.tz-nav-tool:hover { color: var(--gold) !important; }
+.tz-nav-cta { display: flex; align-items: center; gap: 14px; }
+.tz-nav-login { font-size: 14.5px; font-weight: 600; color: var(--tx); }
+.tz-nav-login:hover { color: var(--g); }
+.tz-userpill { display: flex; align-items: center; gap: 10px; padding: 6px 16px 6px 6px; border-radius: 999px;
+  background: var(--surf); border: 1px solid var(--line-2); box-shadow: 0 2px 8px rgba(0,0,0,.05);
+  font-size: 14px; font-weight: 600; transition: transform .2s, border-color .2s; }
+.tz-userpill:hover { border-color: var(--g); transform: translateY(-1px); }
+.tz-avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,var(--g),var(--g-d));
+  color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
+
+/* hero */
+.tz-hero { position: relative; overflow: hidden; padding: clamp(64px,9vw,120px) 0 0;
+  background: radial-gradient(120% 70% at 50% -10%, #ecf7f0 0%, var(--bg) 60%); text-align: center; }
+.tz-hero-glow { position: absolute; top: -140px; left: 50%; transform: translateX(-50%);
+  width: min(760px,90vw); height: 460px; background: radial-gradient(closest-side, rgba(45,90,61,.16), transparent);
+  filter: blur(30px); pointer-events: none; }
+.tz-hero-inner { position: relative; z-index: 2; }
+.tz-badge { display: inline-flex; align-items: center; gap: 9px; background: var(--surf);
+  border: 1px solid var(--line-2); border-radius: 999px; padding: 8px 18px; font-size: 13px; font-weight: 600;
+  color: var(--g-d); box-shadow: 0 4px 16px rgba(45,90,61,.06); }
+.tz-badge-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold);
+  box-shadow: 0 0 0 4px rgba(200,131,42,.18); }
+.tz-h1 { font-family: 'Playfair Display', serif; font-weight: 800; letter-spacing: -.02em;
+  font-size: clamp(36px, 6.2vw, 74px); line-height: 1.08; margin: 28px auto 22px; max-width: 15ch; }
+.tz-grad { background: linear-gradient(100deg, var(--g) 0%, var(--gold) 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.tz-hero-lead { font-size: clamp(16px,2vw,20px); color: var(--tx2); line-height: 1.65; max-width: 620px; margin: 0 auto 36px; }
+.tz-hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.tz-hero-note { display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; font-size: 13.5px; color: var(--tx3); font-weight: 500; }
+.tz-hero-note svg { color: var(--g); }
+
+/* product preview */
+.tz-preview { position: relative; max-width: 1000px; margin: clamp(56px,8vw,88px) auto 0; }
+.tz-window { position: relative; z-index: 3; border-radius: 18px 18px 0 0; overflow: hidden;
+  border: 1px solid var(--line-2); border-bottom: none; background: var(--surf);
+  box-shadow: 0 40px 80px -30px rgba(30,66,41,.35), 0 0 0 8px rgba(255,255,255,.5); }
+.tz-window-bar { height: 46px; display: flex; align-items: center; gap: 8px; padding: 0 18px;
+  background: #fbf9f3; border-bottom: 1px solid var(--line); }
+.tz-dot { width: 11px; height: 11px; border-radius: 50%; }
+.tz-window-url { flex: 1; margin: 0 12px; max-width: 320px; height: 26px; border-radius: 8px;
+  background: var(--bg); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center;
+  font-size: 11.5px; color: var(--tx3); }
+.tz-mock { display: flex; min-height: 440px; text-align: left; }
+.tz-mock-side { width: 210px; flex-shrink: 0; background: linear-gradient(180deg,var(--g-d),var(--g-dd)); padding: 18px 14px; }
+.tz-mock-brand { display: flex; align-items: center; gap: 9px; padding: 4px 6px 20px; }
+.tz-mock-brand img { width: 26px; height: 26px; }
+.tz-mock-brand span { color: #fff; font-family: 'Playfair Display', serif; font-weight: 700; font-size: 16px; }
+.tz-mock-nav { display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 9px; margin-bottom: 3px; }
+.tz-mock-nav.is-active { background: rgba(255,255,255,.14); }
+.tz-mock-nav-ic { width: 16px; height: 16px; border-radius: 5px; background: rgba(255,255,255,.35); flex-shrink: 0; }
+.tz-mock-nav.is-active .tz-mock-nav-ic { background: var(--gold); }
+.tz-mock-nav-tx { font-size: 12.5px; color: rgba(255,255,255,.62); font-weight: 500; }
+.tz-mock-nav.is-active .tz-mock-nav-tx { color: #fff; font-weight: 600; }
+.tz-mock-main { flex: 1; min-width: 0; padding: 24px; background: var(--bg); }
+.tz-mock-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.tz-mock-title { font-family: 'Playfair Display', serif; font-size: 19px; font-weight: 700; }
+.tz-mock-sub { font-size: 12px; color: var(--tx3); margin-top: 2px; }
+.tz-mock-btn { background: var(--g); color: #fff; font-size: 12px; font-weight: 600; padding: 8px 14px; border-radius: 9px; }
+.tz-mock-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 18px; }
+.tz-mock-stat { background: var(--surf); border: 1px solid var(--line); border-radius: 14px; padding: 15px; }
+.tz-mock-stat-ic { display: block; width: 30px; height: 30px; border-radius: 9px; margin-bottom: 12px; }
+.tz-mock-stat-ic.green { background: #eafaf1; border: 1px solid #cdeed9; }
+.tz-mock-stat-ic.gold { background: #fdf3e2; border: 1px solid #f2ddb8; }
+.tz-mock-stat-ic.blue { background: #e8f2fb; border: 1px solid #cadff2; }
+.tz-mock-stat-l { font-size: 11px; color: var(--tx3); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.tz-mock-stat-v { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; margin-top: 3px; }
+.tz-mock-panel { background: var(--surf); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+.tz-mock-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.tz-mock-panel-title { font-size: 13px; font-weight: 600; }
+.tz-mock-legend { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--tx3); }
+.tz-mock-legend i { width: 9px; height: 9px; border-radius: 3px; background: var(--g); }
+.tz-mock-chart { display: flex; align-items: flex-end; gap: 8px; height: 110px; }
+.tz-bar { flex: 1; border-radius: 5px 5px 2px 2px; background: linear-gradient(180deg,var(--gold) 0%,var(--g) 100%); opacity: .9; }
+.tz-preview-fade { position: absolute; left: -20px; right: -20px; bottom: -1px; height: 150px;
+  background: linear-gradient(180deg, transparent, var(--bg) 92%); z-index: 4; pointer-events: none; }
+
+/* accent chips — statically anchored to the window frame corners */
+.tz-chip { position: absolute; z-index: 5; display: flex; align-items: center; gap: 12px;
+  background: #ffffff; border: 1px solid var(--line);
+  border-radius: 16px; padding: 12px 16px; box-shadow: 0 24px 48px -20px rgba(30,66,41,.4);
+  transition: transform .35s cubic-bezier(.16,1,.3,1), box-shadow .35s; }
+.tz-chip:hover { transform: translateY(-3px); box-shadow: 0 30px 56px -20px rgba(30,66,41,.5); }
+.tz-chip-a { top: -26px; left: -26px; }
+.tz-chip-b { bottom: 132px; right: -30px; }
+.tz-chip-ic { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.tz-chip-ic-green { background: #eafaf1; color: var(--g); }
+.tz-chip-ic-gold { background: #fdf3e2; color: var(--gold); }
+.tz-chip-t { font-size: 15px; font-weight: 800; color: var(--tx); line-height: 1.1; }
+.tz-chip-s { font-size: 12px; color: var(--tx2); margin-top: 2px; }
+
+/* stats band */
+.tz-statsband { background: linear-gradient(135deg,var(--g),var(--g-d)); }
+.tz-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 24px; padding-top: 44px; padding-bottom: 44px; }
+.tz-stat { text-align: center; }
+.tz-stat-v { font-family: 'Playfair Display', serif; font-size: clamp(28px,4vw,40px); font-weight: 800; color: #fff; line-height: 1; }
+.tz-stat-l { font-size: 13px; color: rgba(255,255,255,.72); margin-top: 8px; }
+
+/* generic section */
+.tz-section { padding: clamp(72px,10vw,120px) 0; }
+.tz-section-alt { background: linear-gradient(180deg,var(--surf),var(--bg)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.tz-head { text-align: center; max-width: 660px; margin: 0 auto clamp(48px,6vw,72px); }
+.tz-eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--g); margin-bottom: 16px; }
+.tz-eyebrow svg { color: var(--gold); }
+.tz-eyebrow-light { color: rgba(255,255,255,.9); }
+.tz-eyebrow-light svg { color: var(--gold); }
+.tz-h2 { font-family: 'Playfair Display', serif; font-weight: 800; letter-spacing: -.015em;
+  font-size: clamp(28px,4vw,46px); line-height: 1.15; margin: 0 0 18px; }
+.tz-h2-light { color: #fff; }
+.tz-lead { font-size: clamp(15px,1.6vw,18px); color: var(--tx2); line-height: 1.65; margin: 0; }
+.tz-lead-center { margin-left: auto; margin-right: auto; }
+.tz-lead-light { color: rgba(255,255,255,.72); }
+
+/* contrast split */
+.tz-split { display: grid; grid-template-columns: 1.05fr .95fr; gap: clamp(40px,6vw,80px); align-items: center; }
+.tz-split .tz-eyebrow { margin-top: 0; }
+.tz-split .tz-h2, .tz-split .tz-lead { text-align: left; }
+.tz-split .tz-lead { margin-bottom: 32px; }
+.tz-contrast { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.tz-contrast-row { display: grid; grid-template-columns: minmax(120px,1fr) auto 1.5fr; align-items: center; gap: 14px; }
+.tz-contrast-bad { font-size: 14px; font-weight: 600; color: var(--tx3); text-decoration: line-through; text-decoration-color: var(--line-2); }
+.tz-contrast-arrow { color: var(--line-2); flex-shrink: 0; }
+.tz-contrast-good { position: relative; background: var(--surf); border: 1px solid var(--line);
+  border-left: 3px solid var(--g); border-radius: 12px; padding: 12px 16px; }
+.tz-contrast-good-t { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; }
+.tz-contrast-good-t svg { color: var(--g); flex-shrink: 0; }
+.tz-contrast-good-d { font-size: 13px; color: var(--tx2); margin-top: 3px; padding-left: 24px; }
+
+/* contrast visual */
+.tz-contrast-visual { position: relative; min-height: 400px; }
+.tz-xls { position: absolute; top: 0; right: 0; width: min(320px,80%); background: #fff; border: 1px solid #d9d9d9;
+  border-radius: 12px; overflow: hidden; box-shadow: 0 16px 40px -18px rgba(0,0,0,.25);
+  transform: rotate(4deg); filter: grayscale(.25); }
+.tz-xls-bar { background: #217346; color: #fff; font-size: 11px; font-weight: 600; padding: 8px 12px; }
+.tz-xls-grid { padding: 4px 0; }
+.tz-xls-row { display: grid; grid-template-columns: 28px 1.4fr 1fr 1fr; border-bottom: 1px solid #f0f0f0; }
+.tz-xls-c { font-size: 11px; color: #444; padding: 7px 8px; border-right: 1px solid #f0f0f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tz-xls-c.muted { background: #f3f2f1; color: #999; text-align: center; }
+.tz-xls-c.err { color: #c0392b; font-weight: 700; background: #fdecea; }
+.tz-xls-flag { position: absolute; bottom: 24px; right: -8px; background: #c0392b; color: #fff;
+  font-size: 11.5px; font-weight: 700; padding: 7px 13px; border-radius: 8px; box-shadow: 0 10px 24px -8px rgba(192,57,43,.6); }
+.tz-clean { position: relative; z-index: 2; width: min(330px,88%); margin-top: 130px;
+  background: var(--g-dd); border-radius: 20px; padding: 22px;
+  box-shadow: 0 40px 70px -28px rgba(22,54,32,.7), 0 0 0 8px rgba(255,255,255,.4); }
+.tz-clean-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.tz-clean-ic { width: 42px; height: 42px; border-radius: 12px; background: rgba(255,255,255,.1); color: #58c98a;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.tz-clean-t { color: #fff; font-size: 15px; font-weight: 700; }
+.tz-clean-s { color: rgba(255,255,255,.6); font-size: 12px; margin-top: 1px; }
+.tz-clean-badge { margin-left: auto; align-self: flex-start; background: rgba(88,201,138,.16); color: #58c98a;
+  border: 1px solid rgba(88,201,138,.4); font-size: 10.5px; font-weight: 800; letter-spacing: .05em; padding: 4px 9px; border-radius: 7px; }
+.tz-clean-row { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 0 12px; }
+.tz-clean-row span { color: rgba(255,255,255,.7); font-size: 13px; }
+.tz-clean-row strong { color: #fff; font-size: 18px; font-weight: 800; }
+.tz-clean-track { height: 8px; border-radius: 5px; background: rgba(255,255,255,.12); overflow: hidden; }
+.tz-clean-track span { display: block; width: 100%; height: 100%; background: linear-gradient(90deg,var(--g),var(--gold)); }
+.tz-clean-speed { display: flex; align-items: center; gap: 7px; margin-top: 14px; color: rgba(255,255,255,.82); font-size: 12.5px; font-weight: 600; }
+.tz-clean-speed svg { color: var(--gold); }
+
+/* features */
+.tz-features { display: grid; grid-template-columns: repeat(4,1fr); gap: 18px; }
+.tz-fcard { position: relative; overflow: hidden; background: var(--surf); border: 1px solid var(--line);
+  border-radius: 18px; padding: 26px 24px; transition: transform .3s cubic-bezier(.16,1,.3,1), box-shadow .3s, border-color .3s; }
+.tz-fcard:hover { transform: translateY(-5px); border-color: #cdeed9; box-shadow: 0 22px 40px -22px rgba(45,90,61,.4); }
+.tz-ficon { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 13px;
+  background: linear-gradient(135deg,#eafaf1,#d6f0e0); color: var(--g); margin-bottom: 18px;
+  box-shadow: 0 4px 12px rgba(45,90,61,.1); transition: transform .3s; }
+.tz-fcard:hover .tz-ficon { transform: scale(1.06) rotate(-4deg); }
+.tz-fcard h3 { font-size: 16px; font-weight: 700; margin: 0 0 8px; }
+.tz-fcard p { font-size: 13.5px; color: var(--tx2); line-height: 1.6; margin: 0; }
+.tz-fcard-ghost { position: absolute; right: -22px; bottom: -22px; color: var(--g); opacity: .04; transition: transform .4s, opacity .4s; }
+.tz-fcard:hover .tz-fcard-ghost { transform: scale(1.15) rotate(-8deg); opacity: .07; }
+
+/* audit (dark) */
+.tz-audit { position: relative; overflow: hidden; padding: clamp(72px,10vw,120px) 0;
+  background: linear-gradient(160deg,var(--g-dd) 0%,#1a3c26 100%); }
+.tz-audit-glow { position: absolute; bottom: -20%; right: -5%; width: 620px; height: 620px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(200,131,42,.16), transparent); filter: blur(20px); pointer-events: none; }
+.tz-audit-inner { position: relative; z-index: 2; }
+.tz-audit .tz-head .tz-btn { margin-top: 30px; }
+.tz-audit-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
+.tz-acard { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); border-radius: 18px;
+  padding: 28px; transition: transform .3s, background .3s, border-color .3s; }
+.tz-acard:hover { transform: translateY(-4px); background: rgba(255,255,255,.07); border-color: rgba(200,131,42,.5); }
+.tz-acard-ic { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 14px;
+  background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.14); color: #fff; margin-bottom: 18px; }
+.tz-acard:hover .tz-acard-ic { color: var(--gold); border-color: rgba(200,131,42,.45); }
+.tz-acard h3 { font-size: 16px; font-weight: 700; color: #fff; margin: 0 0 10px; }
+.tz-acard p { font-size: 14px; color: rgba(255,255,255,.62); line-height: 1.6; margin: 0; }
+
+/* steps */
+.tz-steps { display: grid; grid-template-columns: repeat(3,1fr); gap: 22px; position: relative; }
+.tz-steps::before { content: ''; position: absolute; top: 46px; left: 12%; right: 12%; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--line-2) 15%, var(--line-2) 85%, transparent); }
+.tz-step { position: relative; text-align: center; background: var(--surf); border: 1px solid var(--line);
+  border-radius: 20px; padding: 40px 28px 32px; transition: transform .3s cubic-bezier(.16,1,.3,1), box-shadow .3s, border-color .3s; }
+.tz-step:hover { transform: translateY(-6px); border-color: #cdeed9; box-shadow: 0 24px 44px -24px rgba(45,90,61,.4); }
+.tz-step-num { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%;
+  background: var(--surf); border: 1px solid var(--line-2); box-shadow: 0 6px 18px rgba(45,90,61,.1);
+  font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 800; color: var(--g);
+  margin: -72px auto 20px; position: relative; }
+.tz-step h3 { font-size: 17px; font-weight: 700; margin: 0 0 10px; }
+.tz-step p { font-size: 14px; color: var(--tx2); line-height: 1.6; margin: 0; }
+
+/* trust */
+.tz-trust { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
+.tz-tcard { display: flex; gap: 16px; background: var(--surf); border: 1px solid var(--line); border-radius: 18px;
+  padding: 26px 24px; transition: transform .3s, box-shadow .3s, border-color .3s; }
+.tz-tcard:hover { transform: translateY(-4px); border-color: #cdeed9; box-shadow: 0 20px 38px -22px rgba(45,90,61,.35); }
+.tz-tcard-ic { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 13px; flex-shrink: 0;
+  background: linear-gradient(135deg,var(--bg),var(--surf)); border: 1px solid var(--line-2); color: var(--g); }
+.tz-tcard h3 { font-size: 15.5px; font-weight: 700; margin: 2px 0 7px; }
+.tz-tcard p { font-size: 13.5px; color: var(--tx2); line-height: 1.6; margin: 0; }
+
+/* CTA */
+.tz-ctawrap { padding: clamp(56px,8vw,96px) 0; background: var(--surf); border-top: 1px solid var(--line); }
+.tz-cta { position: relative; overflow: hidden; border-radius: clamp(24px,4vw,36px);
+  background: linear-gradient(135deg,var(--g-d) 0%,var(--g-dd) 100%); padding: clamp(48px,7vw,84px) clamp(24px,5vw,48px); text-align: center; }
+.tz-cta-glow { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(60% 120% at 85% -10%, rgba(200,131,42,.28), transparent 60%),
+              radial-gradient(50% 120% at 10% 120%, rgba(45,90,61,.5), transparent 60%); }
+.tz-cta-inner { position: relative; z-index: 2; }
+.tz-cta h2 { font-family: 'Playfair Display', serif; font-weight: 800; letter-spacing: -.015em;
+  font-size: clamp(28px,4.5vw,52px); line-height: 1.15; color: #fff; margin: 0 0 18px; }
+.tz-cta p { font-size: clamp(15px,1.8vw,18px); color: rgba(255,255,255,.78); line-height: 1.6; max-width: 540px; margin: 0 auto 36px; }
+.tz-cta-actions { margin-top: 0; }
+
+/* footer */
+.tz-footer { background: var(--g-dd); color: #fff; padding: 48px 0 28px; }
+.tz-footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; padding-bottom: 26px;
+  border-bottom: 1px solid rgba(255,255,255,.1); }
+.tz-footer-brand { display: flex; align-items: center; gap: 12px; }
+.tz-footer-brand img { width: 40px; height: 40px; }
+.tz-footer-name { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 18px; }
+.tz-footer-tag { font-size: 12.5px; color: rgba(255,255,255,.5); margin-top: 2px; }
+.tz-footer-links { display: flex; gap: 22px; flex-wrap: wrap; }
+.tz-footer-links a { font-size: 13.5px; color: rgba(255,255,255,.65); transition: color .15s; }
+.tz-footer-links a:hover { color: #fff; }
+.tz-footer-copy { font-size: 12.5px; color: rgba(255,255,255,.42); padding-top: 22px; }
+
+/* ---------------- responsive ---------------- */
+@media (max-width: 980px) {
+  .tz-split { grid-template-columns: 1fr; }
+  .tz-contrast-visual { min-height: 380px; max-width: 420px; margin: 0 auto; }
+  .tz-features { grid-template-columns: repeat(2,1fr); }
+  .tz-audit-grid, .tz-trust { grid-template-columns: repeat(2,1fr); }
+}
+@media (max-width: 860px) {
+  .tz-nav-links { display: none; }
+  .tz-steps { grid-template-columns: 1fr; gap: 44px; }
+  .tz-steps::before { display: none; }
+  .tz-step-num { margin-top: 0; }
+  .tz-chip { display: none; }
+  .tz-mock-side { display: none; }
+}
+@media (max-width: 620px) {
+  .tz-stats { grid-template-columns: repeat(2,1fr); gap: 28px; }
+  .tz-features, .tz-audit-grid, .tz-trust { grid-template-columns: 1fr; }
+  .tz-nav-login { display: none; }
+  .tz-contrast-row { grid-template-columns: 1fr; gap: 6px; }
+  .tz-contrast-arrow { display: none; }
+  .tz-contrast-bad { padding-bottom: 2px; }
+  .tz-window-url { display: none; }
+  .tz-mock-main { padding: 18px; }
+  .tz-mock-stats { gap: 10px; }
+  .tz-tcard { padding: 20px; }
+}
+`

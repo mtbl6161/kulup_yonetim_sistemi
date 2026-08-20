@@ -5,7 +5,7 @@ import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
 import { SinifDefteri, Personel, Tatil, Sinif, Ayarlar } from '@/lib/types'
 import { GUNLER, AYLAR, gunSayisi, tatilMi, ayLabel, haftaIciMi } from '@/lib/hesaplama'
-import { Download } from 'lucide-react'
+import { Download, RefreshCw, Calendar, Grid } from 'lucide-react'
 import React from 'react'
 import ConfirmModal from '@/components/ConfirmModal'
 
@@ -99,7 +99,10 @@ const RenderTable = ({
                           ders ? (
                             <div className="cell-content">
                               {type === 'koord' && <button className="fast-del-mini no-print" onClick={(e) => fastSil(e, ders.id)}>×</button>}
-                                <div style={{ fontWeight: 700, fontSize: 10, color: '#343a40', textDecoration: ders.durum === 'gelmedi' ? 'line-through' : 'none' }}>{ogr?.ad}</div>
+                                <div style={{ fontWeight: 700, fontSize: 10, color: '#343a40', textDecoration: ders.durum === 'gelmedi' ? 'line-through' : 'none' }}>
+                                  {ogr?.ad}
+                                  {ogr?.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 9 }}> (Ayrıldı)</span>}
+                                </div>
                                 <div className={`status-badge ${ders.durum}`}>
                                   {ders.durum === 'geldi' ? '✓ GELDİ' : '✕ GELMEDİ'}
                                 </div>
@@ -191,7 +194,10 @@ const RenderWeeklyTable = ({
                         ders ? (
                           <div className="cell-content">
                             {currentTab === 'koord' && <button className="fast-del-mini no-print" onClick={(e) => fastSil(e, ders.id)}>×</button>}
-                            <div style={{ fontWeight: 700, fontSize: 10, color: '#333', textDecoration: ders.durum === 'gelmedi' ? 'line-through' : 'none' }}>{ogr?.ad}</div>
+                            <div style={{ fontWeight: 700, fontSize: 10, color: '#333', textDecoration: ders.durum === 'gelmedi' ? 'line-through' : 'none' }}>
+                              {ogr?.ad}
+                              {ogr?.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 9 }}> (Ayrıldı)</span>}
+                            </div>
                             <div className={`status-badge ${ders.durum}`}>
                               {ders.durum === 'geldi' ? '✓ GELDİ' : '✕ GELMEDİ'}
                             </div>
@@ -228,7 +234,7 @@ export default function SinifDefteriPage() {
   const [picker, setPicker] = useState<{ day: number, month: number, year: number, sinifId: number, dersNo: number, rect: DOMRect, gunAdi: string } | null>(null)
   const [conf, setConf] = useState<{ 
     open: boolean, 
-    type: 'sil' | 'kopyala' | 'tatil', 
+    type: 'sil' | 'kopyala' | 'tatil' | 'programdan-aktar', 
     id?: number, 
     payload?: any,
     title: string,
@@ -273,7 +279,7 @@ export default function SinifDefteriPage() {
 
       const [{ data: sd, error: sdErr }, { data: per }, { data: tat }, { data: sin }, { data: ayr }] = await Promise.all([
         supabase.from('sinif_defteri')
-          .select('*, ogretmen:personel(id,ad,gorev)')
+          .select('*, ogretmen:personel(id,ad,gorev,aktif)')
           .eq('ay', ay)
           .eq('yil', yil)
           .order('gun'),
@@ -344,7 +350,16 @@ export default function SinifDefteriPage() {
 
   useEffect(() => { load() }, [load])
 
-  async function programdanAktar() {
+  function programdanAktar() {
+    setConf({
+      open: true,
+      type: 'programdan-aktar',
+      title: 'Ders Programı ile Eşitle',
+      message: `${ayLabel(ay, yil)} dönemine ait mevcut tüm sınıf defteri ve koordinatör kayıtları silinecek ve ders programı şablonundan yeniden oluşturulacaktır. Bu işlem geri alınamaz. Emin misiniz?`
+    })
+  }
+
+  async function programdanAktarGercek() {
     try {
       setPickerSaving(true)
       setMsg('⌛ Aktarım başlıyor...')
@@ -364,6 +379,7 @@ export default function SinifDefteriPage() {
       if (prErr) throw prErr
       if (!pr || pr.length === 0) {
         setMsg('ℹ️ Ders programında bu ay için veri bulunamadı. Lütfen önce ders programını doldurun.')
+        setPickerSaving(false)
         return
       }
 
@@ -413,6 +429,9 @@ export default function SinifDefteriPage() {
       const { error: insErr } = await supabase.from('sinif_defteri').insert(finalPayload)
       if (insErr) throw insErr
       
+      // Puantajı senkronize et
+      await syncPuantajForMonth(ay, yil, currentOkulId)
+
       setMsg('✅ Program başarıyla aktarıldı.')
       load()
     } catch (err: any) {
@@ -444,6 +463,85 @@ export default function SinifDefteriPage() {
       await supabase.from('puantaj').upsert({ personel_id: personelId, tarih, saat: totalHours, okul_id: ayarlar?.okul_id }, { onConflict: 'personel_id,tarih' })
     } else {
       await supabase.from('puantaj').delete().match({ personel_id: personelId, tarih })
+    }
+  }
+
+  async function syncPuantajForMonth(m: number, y: number, okulId: number) {
+    try {
+      const { data: defterEntries, error: defterErr } = await supabase
+        .from('sinif_defteri')
+        .select('ogretmen_id, gun, etkinlik_saati, durum')
+        .eq('ay', m)
+        .eq('yil', y)
+        .eq('okul_id', okulId)
+      if (defterErr) throw defterErr
+
+      const startDate = `${y}-${String(m).padStart(2, '0')}-01`
+      const endDate = `${y}-${String(m).padStart(2, '0')}-31`
+      const { data: existingPuantaj, error: puantajErr } = await supabase
+        .from('puantaj')
+        .select('id, personel_id, tarih, saat')
+        .eq('okul_id', okulId)
+        .gte('tarih', startDate)
+        .lte('tarih', endDate)
+      if (puantajErr) throw puantajErr
+
+      const expectedHours: Record<string, number> = {}
+      const affectedPersonelIds = new Set<number>()
+
+      defterEntries?.forEach(entry => {
+        if (entry.ogretmen_id && entry.durum === 'geldi') {
+          const key = `${entry.ogretmen_id}_${entry.gun}`
+          expectedHours[key] = (expectedHours[key] || 0) + (Number(entry.etkinlik_saati) || 1)
+          affectedPersonelIds.add(entry.ogretmen_id)
+        }
+      })
+
+      existingPuantaj?.forEach(p => {
+        if (p.personel_id) {
+          affectedPersonelIds.add(p.personel_id)
+        }
+      })
+
+      const daysInMonth = gunSayisi(y, m)
+      const upserts: any[] = []
+      const deletes: number[] = []
+
+      affectedPersonelIds.forEach(pid => {
+        for (let day = 1; day <= daysInMonth; day++) {
+          const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+          const key = `${pid}_${day}`
+          const totalHours = expectedHours[key] || 0
+          const existing = existingPuantaj?.find(p => p.personel_id === pid && p.tarih === dateStr)
+
+          if (totalHours > 0) {
+            if (!existing || existing.saat !== totalHours) {
+              upserts.push({
+                personel_id: pid,
+                tarih: dateStr,
+                saat: totalHours,
+                okul_id: okulId
+              })
+            }
+          } else {
+            if (existing) {
+              deletes.push(existing.id)
+            }
+          }
+        }
+      })
+
+      const promises: any[] = []
+      if (upserts.length > 0) {
+        promises.push(supabase.from('puantaj').upsert(upserts, { onConflict: 'personel_id,tarih' }))
+      }
+      if (deletes.length > 0) {
+        promises.push(supabase.from('puantaj').delete().in('id', deletes))
+      }
+
+      await Promise.all(promises)
+    } catch (err) {
+      console.error('Error syncing puantaj for month:', err)
     }
   }
 
@@ -508,6 +606,12 @@ export default function SinifDefteriPage() {
     const sinif = siniflar.find(s => s.id === pInfo.sinifId)
     if (!sinif) return
 
+    // Eski kaydı ve öğretmenini bul
+    const oldEntry = defter.find(d => d.gun === pInfo.day && d.ay === pInfo.month && d.yil === pInfo.year && d.kulup_adi === sinif.ad && (d.ders_no || 1) === pInfo.dersNo)
+    const oldTeacherId = oldEntry?.ogretmen_id
+    const oldTeacher = oldTeacherId ? personel.find(p => p.id === oldTeacherId) : null
+    const oldKoordinatorId = oldTeacher?.koordinator_id
+
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profil } = await supabase.from('profiller').select('okul_id').eq('id', user?.id).single()
@@ -526,24 +630,41 @@ export default function SinifDefteriPage() {
         okul_id: okulId
       }
 
-      const { error } = await supabase.from('sinif_defteri').upsert(payload, { onConflict: 'gun,ay,yil,kulup_adi,ders_no,seans' })
+      const { error } = await supabase.from('sinif_defteri').upsert(payload, { onConflict: 'gun,ay,yil,kulup_adi,ders_no,okul_id' })
       if (error) throw error
-
-      // Puantajı senkronize et
-      await syncPuantajForPersonDay(personelId, pInfo.day, pInfo.month, pInfo.year)
 
       // ÖĞRETMEN İÇİN KOORDİNATÖR OTOMASYONU
       const secilenOgr = personel.find(p => p.id === personelId)
+      const koordDersNo = pInfo.dersNo + 10
+
       if (secilenOgr?.koordinator_id && pInfo.dersNo < 11) {
-        const koordDersNo = pInfo.dersNo + 10
         const koordPayload = {
           ...payload,
           ogretmen_id: secilenOgr.koordinator_id,
           ders_no: koordDersNo
         }
-        await supabase.from('sinif_defteri').upsert(koordPayload, { onConflict: 'gun,ay,yil,kulup_adi,ders_no,seans' })
-        await syncPuantajForPersonDay(secilenOgr.koordinator_id, pInfo.day, pInfo.month, pInfo.year)
+        await supabase.from('sinif_defteri').upsert(koordPayload, { onConflict: 'gun,ay,yil,kulup_adi,ders_no,okul_id' })
+      } else if (pInfo.dersNo < 11) {
+        // Yeni öğretmenin koordinatörü yoksa, eski koordinatör kaydını siliyoruz
+        await supabase.from('sinif_defteri').delete().match({
+          gun: pInfo.day,
+          ay: pInfo.month,
+          yil: pInfo.year,
+          kulup_adi: sinif.ad,
+          ders_no: koordDersNo,
+          seans: 'sabah',
+          okul_id: okulId
+        })
       }
+
+      // Etkilenen tüm öğretmen/koordinatörlerin puantajlarını güncelle
+      const uniquePersonelIds = new Set<number>()
+      uniquePersonelIds.add(personelId)
+      if (secilenOgr?.koordinator_id) uniquePersonelIds.add(secilenOgr.koordinator_id)
+      if (oldTeacherId) uniquePersonelIds.add(oldTeacherId)
+      if (oldKoordinatorId) uniquePersonelIds.add(oldKoordinatorId)
+
+      await Promise.all(Array.from(uniquePersonelIds).map(pid => syncPuantajForPersonDay(pid, pInfo.day, pInfo.month, pInfo.year)))
 
       load()
     } catch (err: any) {
@@ -553,77 +674,6 @@ export default function SinifDefteriPage() {
     }
   }
 
-  async function koordHaftayiKopyala() {
-    setConf({
-      open: true,
-      type: 'kopyala',
-      title: 'Koordinatör Planını Kopyala',
-      message: '1. haftadaki (1-7. günler) koordinatör atamaları ayın geri kalanındaki tüm haftalara kopyalanacak. Mevcut koordinatör kayıtları (8-31 arası) silinecek. Emin misiniz?'
-    })
-  }
-
-  async function koordHaftayiKopyalaGercek() {
-    setConf(null)
-    setPickerSaving(true)
-    setMsg('⌛ Koordinatör planlaması kopyalanıyor...')
-    
-    try {
-      // 1. Haftadaki (1-7. günler) koordinatör kayıtlarını al (ders_no >= 11)
-      const ilkHaftaKoord = defter.filter(p => p.gun >= 1 && p.gun <= 7 && (p.ders_no || 0) >= 11)
-      
-      if (ilkHaftaKoord.length === 0) {
-        setMsg('⚠️ 1. haftada kopyalanacak koordinatör kaydı bulunamadı. Lütfen önce 1. haftayı doldurun.')
-        setPickerSaving(false)
-        return
-      }
-
-      // --- ADIM 1: MEVCUT KOORDİNATÖRLERİ TEMİZLE (8-31 arası) ---
-      const { error: delErr } = await supabase.from('sinif_defteri').delete().gte('gun', 8).eq('ay', ay).eq('yil', yil).gte('ders_no', 11)
-      if (delErr) throw delErr
-
-      // --- ADIM 2: YENİ KAYITLARI HAZIRLA ---
-      const payload: any[] = []
-      const ayinGunleri = gunSayisi(yil, ay)
-
-      // 8. günden ay sonuna kadar döngü
-      for (let d = 8; d <= ayinGunleri; d++) {
-        // TATİL KONTROLÜ
-        if (tatilMi(ay, d, yil, tatiller)) continue
-
-        // Bu günün hangi haftalık güne (1-7) denk geldiğini bul
-        const kaynakGun = ((d - 1) % 7) + 1
-        const kaynakKayitlar = ilkHaftaKoord.filter(p => p.gun === kaynakGun)
-        
-        kaynakKayitlar.forEach(k => {
-          payload.push({
-            gun: d,
-            ay,
-            yil,
-            kulup_adi: k.kulup_adi,
-            ogretmen_id: k.ogretmen_id,
-            ders_no: k.ders_no,
-            seans: k.seans || 'sabah',
-            etkinlik_saati: k.etkinlik_saati || 1,
-            durum: 'geldi'
-          })
-        })
-      }
-
-      if (payload.length > 0) {
-        const { error: insErr } = await supabase.from('sinif_defteri').insert(payload)
-        if (insErr) throw insErr
-        
-        setMsg('✅ Koordinatör planı tüm aya başarıyla kopyalandı.')
-        load()
-      } else {
-        setMsg('ℹ️ Kopyalanacak veri oluşmadı.')
-      }
-    } catch (err: any) {
-      setMsg('❌ Kopyalama hatası: ' + err.message)
-    } finally {
-      setPickerSaving(false)
-    }
-  }
 
   function fastSil(e: React.MouseEvent, id: number) {
     e.stopPropagation()
@@ -655,7 +705,7 @@ export default function SinifDefteriPage() {
         const { data: koordItem } = await supabase.from('sinif_defteri')
           .select('*')
           .match({ gun: item.gun, ay: item.ay, yil: item.yil, kulup_adi: item.kulup_adi, ders_no: koordDersNo })
-          .single()
+          .maybeSingle()
         
         if (koordItem) {
           await supabase.from('sinif_defteri').delete().eq('id', koordItem.id)
@@ -758,7 +808,8 @@ export default function SinifDefteriPage() {
                 if (!ders) return ''
                 const ogr = ders.ogretmen as any
                 const status = ders.durum === 'geldi' ? 'GELDİ' : 'GELMEDİ'
-                return `${ogr?.ad || ''}\n(${status})`
+                const ayrildiText = ogr?.aktif === false ? ' (Ayrıldı)' : ''
+                return `${ogr?.ad || ''}${ayrildiText}\n(${status})`
               })
             ]
           })
@@ -805,7 +856,8 @@ export default function SinifDefteriPage() {
                   if (!ders) return ''
                   const ogr = ders.ogretmen as any
                   const status = ders.durum === 'geldi' ? 'GELDİ' : 'GELMEDİ'
-                  return `${ogr?.ad || ''}\n(${status})`
+                  const ayrildiText = ogr?.aktif === false ? ' (Ayrıldı)' : ''
+                  return `${ogr?.ad || ''}${ayrildiText}\n(${status})`
                 })
               ]
             })
@@ -882,8 +934,29 @@ export default function SinifDefteriPage() {
         sub={`${ayLabel(ay, yil)} — Öğretmen Devam Takibi`}
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn no-print" disabled={pickerSaving} style={{ background: '#0284c7', color: '#fff', border: 'none', fontWeight: 600, padding: '6px 12px', fontSize: 13, borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }} onClick={koordHaftayiKopyala}>
-              {pickerSaving ? '⌛ İşleniyor...' : '💠 Koordinatörleri Tüm Aya Uygula'}
+            <button 
+              className="btn no-print" 
+              disabled={pickerSaving} 
+              style={{ 
+                background: 'var(--accent)', 
+                color: '#fff', 
+                border: 'none', 
+                fontWeight: 600, 
+                padding: '6px 12px', 
+                fontSize: 13, 
+                borderRadius: 6, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 6,
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }} 
+              onClick={programdanAktar}
+              onMouseOver={e => e.currentTarget.style.background = 'var(--accent-hover)'}
+              onMouseOut={e => e.currentTarget.style.background = 'var(--accent)'}
+            >
+              <RefreshCw size={14} className={pickerSaving ? "animate-spin" : ""} />
+              {pickerSaving ? 'Eşitleniyor...' : 'Ders Programı ile Eşitle'}
             </button>
             <div style={{ display: 'flex', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
               {(['aylik', 'haftalik'] as const).map(g => (
@@ -893,15 +966,41 @@ export default function SinifDefteriPage() {
                     borderRadius: 0, border: 'none',
                     background: gorunum === g ? 'var(--accent)' : 'transparent',
                     color: gorunum === g ? '#fff' : 'var(--text2)',
-                    padding: '6px 12px'
+                    padding: '6px 12px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
                   }}
                   onClick={() => setGorunum(g)}
                 >
-                  {g === 'aylik' ? '📅 Aylık' : '📆 Haftalık'}
+                  {g === 'aylik' ? <Calendar size={14} /> : <Grid size={14} />}
+                  {g === 'aylik' ? 'Aylık' : 'Haftalık'}
                 </button>
               ))}
             </div>
-            <button className="btn btn-sm" onClick={handlePdfDownload} style={{ background: '#ef4444', color: '#fff', border: 'none', fontWeight: 600, padding: '6px 12px', fontSize: 13, borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button 
+              className="btn btn-sm" 
+              onClick={handlePdfDownload} 
+              style={{ 
+                background: 'var(--danger)', 
+                color: '#fff', 
+                border: 'none', 
+                fontWeight: 600, 
+                padding: '6px 12px', 
+                fontSize: 13, 
+                borderRadius: 6, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 6,
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={e => e.currentTarget.style.background = 'var(--danger-hover)'}
+              onMouseOut={e => e.currentTarget.style.background = 'var(--danger)'}
+            >
               <Download size={14} /> PDF İndir
             </button>
           </div>
@@ -1010,13 +1109,13 @@ export default function SinifDefteriPage() {
       <div className="no-print" style={{ marginTop: 60, padding: '30px 0', borderTop: '1px dashed var(--border)', textAlign: 'center' }}>
           <p style={{ color: 'var(--text3)', fontSize: 13, marginBottom: 15 }}>⚠️ Eksik veya hatalı veriler mi görüyorsunuz?</p>
           <button 
-            className="btn btn-sm" 
+            className="btn no-print" 
             onClick={programdanAktar} 
             disabled={pickerSaving}
             style={{ 
-              background: '#f8f9fa', 
-              color: 'var(--text2)', 
-              border: '1px solid var(--border)',
+              background: 'var(--accent)', 
+              color: '#fff', 
+              border: 'none',
               padding: '10px 24px',
               borderRadius: 8,
               fontSize: 14,
@@ -1027,10 +1126,11 @@ export default function SinifDefteriPage() {
               alignItems: 'center',
               gap: 8
             }}
-            onMouseOver={e => e.currentTarget.style.background = '#eee'}
-            onMouseOut={e => e.currentTarget.style.background = '#f8f9fa'}
+            onMouseOver={e => e.currentTarget.style.background = 'var(--accent-hover)'}
+            onMouseOut={e => e.currentTarget.style.background = 'var(--accent)'}
           >
-            {pickerSaving ? '⌛ Eşitleniyor...' : '🔄 Ders Programı ile Eşitle'}
+            <RefreshCw size={14} className={pickerSaving ? "animate-spin" : ""} />
+            {pickerSaving ? 'Eşitleniyor...' : 'Ders Programı ile Eşitle'}
           </button>
           <div style={{ fontSize: 11, color: '#999', marginTop: 10 }}>Bu işlem, ders programındaki tüm kayıtları mevcut aya kopyalar.</div>
         </div>
@@ -1069,6 +1169,7 @@ export default function SinifDefteriPage() {
             <div className="picker-list" style={{ overflowY: 'auto', flex: 1 }}>
               {(() => {
                 const filtered = personel.filter(p => {
+                  if (p.aktif === false) return false;
                   const g = (p.gorev || '').toLowerCase()
                   if (picker.dersNo >= 11) {
                     return g.includes('koordinatör') || g.includes('koord') || g.includes('başkan')
@@ -1097,11 +1198,11 @@ export default function SinifDefteriPage() {
         <ConfirmModal
           baslik={conf.title}
           mesaj={conf.message}
-          onayMetni={conf.type === 'sil' ? 'Evet, Sil' : conf.type === 'kopyala' ? 'Evet, Kopyala' : 'Evet, Devam Et'}
-          tehlikeli={conf.type === 'sil' || conf.type === 'kopyala'}
+          onayMetni={conf.type === 'sil' ? 'Evet, Sil' : conf.type === 'programdan-aktar' ? 'Evet, Eşitle' : 'Evet, Devam Et'}
+          tehlikeli={conf.type === 'sil' || conf.type === 'programdan-aktar'}
           onOnayla={() => {
             if (conf.type === 'sil') finishSil(conf.id!)
-            else if (conf.type === 'kopyala') koordHaftayiKopyalaGercek()
+            else if (conf.type === 'programdan-aktar') programdanAktarGercek()
             else if (conf.type === 'tatil') directKaydetGercek(conf.payload.personelId, conf.payload.pInfo)
           }}
           onIptal={() => setConf(null)}
@@ -1109,6 +1210,14 @@ export default function SinifDefteriPage() {
       )}
 
       <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+
         :global(.scroll-container) { scrollbar-width: thick; scrollbar-color: var(--accent) #e0e0e0; overflow: auto; }
         :global(.scroll-container::-webkit-scrollbar) { height: 12px !important; display: block !important; }
         :global(.scroll-container::-webkit-scrollbar-track) { background: var(--bg) !important; }

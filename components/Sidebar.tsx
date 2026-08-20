@@ -61,6 +61,7 @@ const NAV = [
     adminOnly: true,
     items: [
       { href: '/ayarlar', label: 'Okul Ayarları', sub: 'Kurum bilgileri ve vergi ayarları', tags: 'bilgi, katsayı, imza', icon: <Settings size={18} /> },
+      { href: '/egitim', label: 'Eğitim Kılavuzu', sub: 'İnteraktif kullanım ve ayar rehberi', tags: 'eğitim, kılavuz, yardım, simülatör', icon: <BookOpen size={18} /> },
     ],
   },
   {
@@ -134,7 +135,7 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
       }}>
         {collapsed ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, width: '100%' }}>
-            <span style={{ fontSize: 24 }}>🏫</span>
+            <School size={24} />
             <button
               onClick={() => setCollapsed(!collapsed)}
               style={{

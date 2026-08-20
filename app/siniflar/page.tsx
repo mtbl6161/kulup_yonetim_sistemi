@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { Sinif, Personel, Ayarlar } from '@/lib/types'
 import { fmtTL } from '@/lib/hesaplama'
 import ConfirmModal from '@/components/ConfirmModal'
+import { Pencil, Plus, Save, Loader2, Trash2, School } from 'lucide-react'
 
 const BOŞ: Omit<Sinif, 'id' | 'created_at'> = {
   ad: '', ogretmen: '', kapasite: 15, aylik_ucret: 0,
@@ -122,7 +123,19 @@ export default function SiniflarPage() {
 
         {/* Form */}
         <div className="card">
-          <div className="card-title">{duzenle ? '✏️ Sınıf Düzenle' : '➕ Yeni Sınıf Ekle'}</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {duzenle ? (
+              <>
+                <Pencil size={18} style={{ color: 'var(--accent)' }} />
+                <span>Sınıf Düzenle</span>
+              </>
+            ) : (
+              <>
+                <Plus size={18} style={{ color: 'var(--accent)' }} />
+                <span>Yeni Sınıf Ekle</span>
+              </>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ flex: 2, minWidth: 180 }}>
               <label htmlFor="sinif-ad" className="form-label">Sınıf / Kulüp Adı *</label>
@@ -165,8 +178,28 @@ export default function SiniflarPage() {
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
             {duzenle && <button className="btn btn-secondary" onClick={iptal}>İptal</button>}
-            <button className="btn btn-primary" onClick={kaydet} disabled={saving}>
-              {saving ? '⏳...' : duzenle ? '💾 Güncelle' : '➕ Ekle'}
+            <button 
+              className="btn btn-primary" 
+              onClick={kaydet} 
+              disabled={saving}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              {saving ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>İşlem Yapılıyor...</span>
+                </>
+              ) : duzenle ? (
+                <>
+                  <Save size={16} />
+                  <span>Güncelle</span>
+                </>
+              ) : (
+                <>
+                  <Plus size={16} />
+                  <span>Ekle</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -194,7 +227,12 @@ export default function SiniflarPage() {
               <tbody>
                 {siniflar.length === 0 ? (
                   <tr><td colSpan={8}>
-                    <div className="empty-state"><div className="empty-icon">🏫</div><p>Henüz sınıf eklenmedi</p></div>
+                    <div className="empty-state">
+                      <div className="empty-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}>
+                        <School size={48} />
+                      </div>
+                      <p>Henüz sınıf eklenmedi</p>
+                    </div>
                   </td></tr>
                 ) : siniflar.map(s => (
                   <tr key={s.id} style={{ opacity: s.aktif ? 1 : 0.55 }}>
@@ -215,8 +253,22 @@ export default function SiniflarPage() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="btn btn-secondary btn-sm" onClick={() => formuDoldur(s)}>✏️</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => sil(s.id)}>🗑️</button>
+                        <button 
+                          className="btn btn-secondary btn-sm" 
+                          onClick={() => formuDoldur(s)}
+                          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, padding: 0 }}
+                          title="Düzenle"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button 
+                          className="btn btn-danger btn-sm" 
+                          onClick={() => sil(s.id)}
+                          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, padding: 0 }}
+                          title="Sil"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </td>
                   </tr>

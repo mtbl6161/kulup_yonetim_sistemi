@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 import { logIslem } from '@/lib/audit'
 import { Ogrenci, Personel } from '@/lib/types'
-import { Upload, Download, X, CheckCircle, AlertTriangle, FileSpreadsheet } from 'lucide-react'
+import { Upload, Download, X, CheckCircle, AlertTriangle, FileSpreadsheet, Copy } from 'lucide-react'
 
 type Tip = 'ogrenci' | 'personel'
 type Adim = 'yukle' | 'onizleme' | 'sonuc'
@@ -29,25 +29,26 @@ interface Props {
 // ── Şablon tanımları ────────────────────────────────────────────
 const OGR_KOLONLAR = [
   'Ad', 'Soyad', 'TC Kimlik No', 'Sınıf', 'Öğretmen',
-  'Anne Adı', 'Anne Telefonu', 'Kardeş İndirimi (Evet/Hayır)',
-  'Ücretsiz Mi (Evet/Hayır)', 'Ücretsiz Nedeni',
+  'Anne Adı', 'Anne Telefonu', 'Veli Adı', 'Kardeş İndirimi (Evet/Hayır)',
+  'Ücretsiz Mi (Evet/Hayır)', 'Ücretsiz Nedeni', 'Günlük Ders Saati Limiti'
 ]
 const OGR_ORNEK = [
-  ['Ali', 'YILMAZ', '12345678901', '1-A', 'Ayşe Öğretmen', 'Fatma', '0532 111 2233', 'Hayır', 'Hayır', ''],
-  ['Zeynep', 'KAYA', '', '2-B', '', 'Emine', '0543 222 3344', 'Evet', 'Evet', 'Şehit çocuğu'],
+  ['Ali', 'YILMAZ', '12345678901', '1-A', 'Ayşe Öğretmen', 'Fatma', '0532 111 2233', 'Ahmet YILMAZ', 'Hayır', 'Hayır', '', ''],
+  ['Zeynep', 'KAYA', '', '2-B', '', 'Emine', '0543 222 3344', 'Hasan KAYA', 'Evet', 'Evet', 'Şehit çocuğu', '2'],
 ]
 
 const PER_KOLONLAR = [
-  'Ad Soyad', 'TC Kimlik No', 'Meslek Kodu', 'Görevi', 'SGK\'lı mı (Evet/Hayır)',
-  'Vergi İstisnası (Evet/Hayır)', 'IBAN', 'Yıllık Matrah (₺)',
+  'Ad Soyad', 'TC Kimlik No', 'SGK No', 'Görevi', 'Kadro Durumu', 
+  'SGK\'lı mı (Evet/Hayır)', 'Vergi İstisnası (Evet/Hayır)', 'IBAN', 
+  'Yıllık Matrah (₺)', 'Meslek Kodu', 'Personel Türü', 'Emekli mi (Evet/Hayır)', 'E-posta'
 ]
 const PER_GOREVLER = [
   'Öğretmen', 'Usta Öğretici', 'Koordinatör Öğretmen',
   'Muhasebe Personeli', 'Temizlik Personeli', 'Başkan', 'Başkan Yrd.', 'Denetim Yetkilisi',
 ]
 const PER_ORNEK = [
-  ['Ayşe ÖZTÜRK', '98765432109', '2311.01', 'Öğretmen', 'Evet', 'Hayır', 'TR330006100519786457841326', '150000'],
-  ['Mehmet DEMİR', '', '1112.01', 'Başkan', 'Hayır', 'Evet', '', '0'],
+  ['Ayşe ÖZTÜRK', '98765432109', '12345678901', 'Öğretmen', 'Kadrolu', 'Evet', 'Hayır', 'TR330006100519786457841326', '150000', '2311.01', 'Kadrolu MEB Personeli', 'Hayır', 'ayse@okul.k12.tr'],
+  ['Mehmet DEMİR', '', '', 'Başkan', 'Dışarıdan', 'Hayır', 'Evet', '', '0', '1112.01', 'Yönetici', 'Evet', 'mehmet@domain.com'],
 ]
 
 function evet(s: string): boolean {
@@ -56,6 +57,19 @@ function evet(s: string): boolean {
 
 function normalizeAd(s: string): string {
   return s.trim().toUpperCase().replace(/\s+/g, ' ')
+}
+
+function isKolonZorunlu(tip: Tip, k: string): boolean {
+  if (tip === 'ogrenci') {
+    return [
+      'Ad', 'Soyad', 'Sınıf', 'Kardeş İndirimi (Evet/Hayır)'
+    ].includes(k)
+  }
+  return [
+    'Ad Soyad', 'Görevi', 'TC Kimlik No', 'Meslek Kodu', 
+    'E-posta', 'IBAN', 'Personel Türü', 
+    'SGK\'lı mı (Evet/Hayır)', 'Emekli mi (Evet/Hayır)', 'Vergi İstisnası (Evet/Hayır)'
+  ].includes(k)
 }
 
 // ── Ana bileşen ─────────────────────────────────────────────────
@@ -93,6 +107,16 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
     if (!soyad) hatalar.push('Soyad boş')
     if (tc && (!/^\d{11}$/.test(tc))) hatalar.push('TC 11 haneli rakam olmalı')
 
+    const sinif = (ham['Sınıf'] || '').trim()
+    if (!sinif) hatalar.push('Sınıf boş')
+
+    const kardesStr = (ham['Kardeş İndirimi (Evet/Hayır)'] || '').trim().toLowerCase()
+    if (!kardesStr) {
+      hatalar.push('Kardeş İndirimi boş')
+    } else if (kardesStr !== 'evet' && kardesStr !== 'hayır') {
+      hatalar.push('Kardeş İndirimi "Evet" veya "Hayır" olmalı')
+    }
+
     if (hatalar.length > 0) {
       return { index: idx, durum: 'hatali', hatalar, data: {}, ham }
     }
@@ -110,13 +134,15 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
       ad,
       soyad,
       tc: tc || undefined,
-      sinif: (ham['Sınıf'] || '').trim() || undefined,
+      sinif: sinif,
       ogretmen: (ham['Öğretmen'] || '').trim() || undefined,
       anne_adi: (ham['Anne Adı'] || '').trim() || undefined,
       anne_tel: (ham['Anne Telefonu'] || '').trim() || undefined,
-      kardes_indirimi: evet(ham['Kardeş İndirimi (Evet/Hayır)'] || ''),
+      veli_ad: (ham['Veli Adı'] || '').trim() || undefined,
+      kardes_indirimi: evet(kardesStr),
       ucretsiz_mi: evet(ham['Ücretsiz Mi (Evet/Hayır)'] || ''),
       ucretsiz_nedeni: (ham['Ücretsiz Nedeni'] || '').trim() || undefined,
+      gunluk_saat: ham['Günlük Ders Saati Limiti'] ? (parseInt(ham['Günlük Ders Saati Limiti']) || undefined) : undefined,
     }
 
     return { index: idx, durum: 'gecerli', hatalar: [], data, ham }
@@ -131,8 +157,59 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
     const matrah = parseFloat((ham['Yıllık Matrah (₺)'] || '0').replace(',', '.')) || 0
 
     if (!ad) hatalar.push('Ad Soyad boş')
-    if (tc && !/^\d{11}$/.test(tc)) hatalar.push('TC 11 haneli rakam olmalı')
-    if (gorev && !PER_GOREVLER.includes(gorev)) hatalar.push(`Geçersiz görev: "${gorev}". Geçerli: ${PER_GOREVLER.join(', ')}`)
+    
+    if (!tc) {
+      hatalar.push('TC Kimlik No boş')
+    } else if (!/^\d{11}$/.test(tc)) {
+      hatalar.push('TC 11 haneli rakam olmalı')
+    }
+    
+    if (!gorev) {
+      hatalar.push('Görevi boş')
+    } else if (!PER_GOREVLER.includes(gorev)) {
+      hatalar.push(`Geçersiz görev: "${gorev}". Geçerli: ${PER_GOREVLER.join(', ')}`)
+    }
+
+    const meslekKodu = (ham['Meslek Kodu'] || '').trim()
+    if (!meslekKodu) hatalar.push('Meslek Kodu boş')
+
+    const email = (ham['E-posta'] || '').trim()
+    if (!email) hatalar.push('E-posta boş')
+
+    const iban = (ham['IBAN'] || '').replace(/\s/g, '').toUpperCase()
+    if (!iban) {
+      hatalar.push('IBAN boş')
+    } else if (!iban.startsWith('TR')) {
+      hatalar.push('IBAN TR ile başlamalı')
+    }
+
+    const personelTuru = (ham['Personel Türü'] || '').trim().toLowerCase()
+    if (!personelTuru) {
+      hatalar.push('Personel Türü boş')
+    } else if (personelTuru !== 'kadrolu' && personelTuru !== 'sgk') {
+      hatalar.push('Personel Türü "kadrolu" veya "sgk" olmalı')
+    }
+
+    const sgkLiStr = (ham['SGK\'lı mı (Evet/Hayır)'] || '').trim().toLowerCase()
+    if (!sgkLiStr) {
+      hatalar.push('SGK\'lı mı boş')
+    } else if (sgkLiStr !== 'evet' && sgkLiStr !== 'hayır') {
+      hatalar.push('SGK\'lı mı "Evet" veya "Hayır" olmalı')
+    }
+
+    const emekliStr = (ham['Emekli mi (Evet/Hayır)'] || '').trim().toLowerCase()
+    if (!emekliStr) {
+      hatalar.push('Emekli mi boş')
+    } else if (emekliStr !== 'evet' && emekliStr !== 'hayır') {
+      hatalar.push('Emekli mi "Evet" veya "Hayır" olmalı')
+    }
+
+    const vergiStr = (ham['Vergi İstisnası (Evet/Hayır)'] || '').trim().toLowerCase()
+    if (!vergiStr) {
+      hatalar.push('Vergi İstisnası boş')
+    } else if (vergiStr !== 'evet' && vergiStr !== 'hayır') {
+      hatalar.push('Vergi İstisnası "Evet" veya "Hayır" olmalı')
+    }
 
     if (hatalar.length > 0) {
       return { index: idx, durum: 'hatali', hatalar, data: {}, ham }
@@ -148,13 +225,18 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
 
     const data: Partial<Personel> = {
       ad,
-      tc: tc || undefined,
-      meslek_kodu: (ham['Meslek Kodu'] || '').trim() || undefined,
-      gorev: gorev || 'Öğretmen',
-      sgk_li: evet(ham['SGK\'lı mı (Evet/Hayır)'] || ''),
-      vergi_istisnasi: evet(ham['Vergi İstisnası (Evet/Hayır)'] || ''),
-      iban: (ham['IBAN'] || '').replace(/\s/g, '') || undefined,
+      tc: tc,
+      sgk_no: (ham['SGK No'] || '').trim() || undefined,
+      gorev: gorev,
+      kadro_durumu: (ham['Kadro Durumu'] || '').trim() || undefined,
+      sgk_li: evet(sgkLiStr),
+      vergi_istisnasi: evet(vergiStr),
+      iban: iban,
       yillik_matrah: matrah,
+      meslek_kodu: meslekKodu,
+      personel_turu: personelTuru,
+      is_retired: evet(emekliStr),
+      email: email,
     }
 
     return { index: idx, durum: 'gecerli', hatalar: [], data, ham }
@@ -340,21 +422,53 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
               </div>
 
               {/* Sütun rehberi */}
-              <div style={{ marginTop: 20, background: '#f8fafc', borderRadius: 10, padding: 14 }}>
-                <p style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>Beklenen sütunlar:</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {kolonlar.map(k => (
-                    <span key={k} style={{
-                      fontSize: 11, padding: '2px 8px', borderRadius: 6,
-                      background: k.includes('Ad') && !k.includes('Anne') ? '#dbeafe' : '#f3f4f6',
-                      color: k.includes('Ad') && !k.includes('Anne') ? '#1d4ed8' : '#6b7280',
-                      fontWeight: k.includes('Ad') && !k.includes('Anne') ? 600 : 400,
-                    }}>
-                      {k}
-                    </span>
-                  ))}
+              <div style={{ marginTop: 20, background: '#f8fafc', borderRadius: 10, padding: 14, userSelect: 'text' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: '#374151', margin: 0 }}>Beklenen sütunlar:</p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const text = kolonlar.join('\t');
+                      navigator.clipboard.writeText(text)
+                        .then(() => alert('Sütun başlıkları Excel\'e yapıştırılmak üzere panoya kopyalandı!'))
+                        .catch(() => alert('Kopyalama başarısız oldu.'));
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--accent)',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Copy size={12} />
+                    Başlıkları Kopyala
+                  </button>
                 </div>
-                <p style={{ fontSize: 11, color: '#6b7280', marginTop: 8 }}>Mavi olanlar zorunlu alanlardır.</p>
+                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, userSelect: 'text' }}>
+                  {kolonlar.map(k => {
+                    const zorunlu = isKolonZorunlu(tip, k);
+                    return (
+                      <span key={k} style={{
+                        fontSize: 11, padding: '2px 8px', borderRadius: 6,
+                        background: zorunlu ? '#dbeafe' : '#f3f4f6',
+                        color: zorunlu ? '#1d4ed8' : '#6b7280',
+                        fontWeight: zorunlu ? 600 : 400,
+                        userSelect: 'text'
+                      }}>
+                        {k}
+                      </span>
+                    );
+                  })}
+                </div>
+                <p style={{ fontSize: 11, color: '#6b7280', marginTop: 8 }}>Mavi olanlar zorunlu alanlardır. Başlıkları kopyalayıp Excel sayfanızın ilk satırına yapıştırabilirsiniz.</p>
               </div>
             </div>
           )}

@@ -3,6 +3,7 @@ import './globals.css'
 import ClientLayout from './ClientLayout'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://www.klup360.com'),
   title: 'Klüp360 | MEB Çocuk Kulüpleri Yönetim Sistemi',
   description: "MEB Çocuk Kulüpleri Yönergesi'ne %100 uyumlu, dijital yoklama, otomatik puantaj, bordro ve aidat takibi sunan profesyonel okul yönetim platformu.",
   keywords: [
@@ -20,15 +21,17 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Klüp360 | Dijital Okul Yönetim Platformu',
     description: 'MEB uyumlu en gelişmiş çocuk kulübü yönetim yazılımı. İş yükünüzü azaltın, verimliliği artırın.',
-    url: 'https://klup360.com',
+    url: 'https://www.klup360.com/tanitim',
     siteName: 'Klüp360',
     locale: 'tr_TR',
     type: 'website',
+    images: [{ url: '/logo.png', width: 512, height: 512, alt: 'Klüp360' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Klüp360 | Çocuk Kulübü Yönetimi',
     description: 'Puantaj, Bordro, Yoklama ve Aidat takibi tek platformda.',
+    images: ['/logo.png'],
   },
   verification: {
     google: 'ab4aWvn31CkvUn_uzV1H5_rNf9CaFdBflT3l7-ecEN4',

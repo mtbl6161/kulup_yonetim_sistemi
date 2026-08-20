@@ -1,4 +1,5 @@
 'use client'
+import { CheckCircle2, Trash2, AlertTriangle } from 'lucide-react'
 
 interface Props {
   baslik?: string
@@ -50,9 +51,10 @@ export default function ConfirmModal({
           borderRadius: 14,
           background: basari ? '#f0fdf4' : tehlikeli ? '#fff1f2' : '#fff9e6',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 24, marginBottom: 16,
+          color: basari ? 'var(--success)' : tehlikeli ? 'var(--danger)' : 'var(--warn)',
+          marginBottom: 16,
         }}>
-          {basari ? '✅' : tehlikeli ? '🗑️' : '⚠️'}
+          {basari ? <CheckCircle2 size={24} /> : tehlikeli ? <Trash2 size={24} /> : <AlertTriangle size={24} />}
         </div>
 
         {/* Başlık */}

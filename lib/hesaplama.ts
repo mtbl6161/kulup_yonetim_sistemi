@@ -298,6 +298,75 @@ export function bordroHesapla(
 // ============================================================
 // Tahakkuk dağılımı
 // ============================================================
+export function isOgretmen(gorev: string | null | undefined): boolean {
+  const g = (gorev || '').toLowerCase()
+  return g.includes('öğretmen') || g.includes('ogretmen') || g.includes('usta')
+}
+export function isBaskan(gorev: string | null | undefined): boolean {
+  const g = (gorev || '').toLowerCase()
+  return (g.includes('başkan') || g.includes('baskan') || g.includes('müdür')) &&
+    !g.includes('yardımcı') && !g.includes('yardimci') && !g.includes('yrd')
+}
+export function isBaskanYrd(gorev: string | null | undefined): boolean {
+  const g = (gorev || '').toLowerCase()
+  return g.includes('yardımcı') || g.includes('yardimci') || g.includes('yrd')
+}
+export function isMuhasebe(gorev: string | null | undefined): boolean {
+  const g = (gorev || '').toLowerCase()
+  return g.includes('muhasebe') || g.includes('memur') || g.includes('yazışma')
+}
+export function isTemizlik(gorev: string | null | undefined): boolean {
+  const g = (gorev || '').toLowerCase()
+  return g.includes('temizlik') || g.includes('hizmet') || g.includes('bakım')
+}
+export function isDenetim(gorev: string | null | undefined): boolean {
+  return (gorev || '').toLowerCase().includes('denetim')
+}
+
+export interface ActiveCategories {
+  baskan: boolean
+  baskan_yrd: boolean
+  muhasebe: boolean
+  temizlik: boolean
+  denetim: boolean
+}
+
+export function detectActiveCategories(
+  personelList: any[],
+  puantajList: any[],
+  bordroList: any[]
+): ActiveCategories {
+  const hasWorked = (p: any) => {
+    // If they have a saved bordro, they worked.
+    const hasSavedBordro = bordroList.some(b => b.personel_id === p.id)
+    if (hasSavedBordro) return true
+
+    // If they are active:
+    if (p.aktif !== false) {
+      if (isBaskan(p.gorev) || isBaskanYrd(p.gorev) || isMuhasebe(p.gorev) || isTemizlik(p.gorev) || isDenetim(p.gorev)) {
+        return true
+      }
+      // Teachers must have puantaj hours > 0
+      const hasPuantaj = puantajList.some(pu => pu.personel_id === p.id && Number(pu.saat) > 0)
+      return hasPuantaj
+    }
+
+    // If they are inactive but have puantaj:
+    const hasPuantaj = puantajList.some(pu => pu.personel_id === p.id && Number(pu.saat) > 0)
+    if (hasPuantaj) return true
+
+    return false
+  }
+
+  return {
+    baskan: personelList.some(p => isBaskan(p.gorev) && hasWorked(p)),
+    baskan_yrd: personelList.some(p => isBaskanYrd(p.gorev) && hasWorked(p)),
+    muhasebe: personelList.some(p => isMuhasebe(p.gorev) && hasWorked(p)),
+    temizlik: personelList.some(p => isTemizlik(p.gorev) && hasWorked(p)),
+    denetim: personelList.some(p => isDenetim(p.gorev) && hasWorked(p)),
+  }
+}
+
 export interface TahakkukHesap {
   toplam: number
   temel_gider: number
@@ -307,24 +376,70 @@ export interface TahakkukHesap {
   muhasebe: number
   temizlik: number
   denetim: number
+  pct_temel_gider: number
+  pct_ogretmen: number
+  pct_baskan: number
+  pct_baskan_yrd: number
+  pct_muhasebe: number
+  pct_temizlik: number
+  pct_denetim: number
 }
 
 export function tahakkukDagitimHesapla(
   toplamGelir: number,
-  ayarlar: Ayarlar
+  ayarlar: Ayarlar,
+  activeCategories?: ActiveCategories
 ): TahakkukHesap {
-  const pct = (oran: number | undefined) =>
-    Math.round((toplamGelir * (oran ?? 0)) / 100 * 100) / 100
+  const isBaskanActive = activeCategories ? activeCategories.baskan : true
+  const isBaskanYrdActive = activeCategories ? activeCategories.baskan_yrd : true
+  const isMuhasebeActive = activeCategories ? activeCategories.muhasebe : true
+  const isTemizlikActive = activeCategories ? activeCategories.temizlik : true
+  const isDenetimActive = activeCategories ? activeCategories.denetim : true
+
+  const rawBaskan = isBaskanActive ? (ayarlar.dagitim_baskan ?? 7) : 0
+  const rawBaskanYrd = isBaskanYrdActive ? (ayarlar.dagitim_baskan_yrd ?? 5) : 0
+  const rawMuhasebe = isMuhasebeActive ? (ayarlar.dagitim_muhasebe ?? 2) : 0
+  const rawTemizlik = isTemizlikActive ? (ayarlar.dagitim_temizlik ?? 4) : 0
+  const rawDenetim = isDenetimActive ? (ayarlar.dagitim_denetim ?? 1) : 0
+
+  const sumUnused = 
+    (!isBaskanActive ? (ayarlar.dagitim_baskan ?? 7) : 0) +
+    (!isBaskanYrdActive ? (ayarlar.dagitim_baskan_yrd ?? 5) : 0) +
+    (!isMuhasebeActive ? (ayarlar.dagitim_muhasebe ?? 2) : 0) +
+    (!isTemizlikActive ? (ayarlar.dagitim_temizlik ?? 4) : 0) +
+    (!isDenetimActive ? (ayarlar.dagitim_denetim ?? 1) : 0)
+
+  const rawTemelGider = (ayarlar.dagitim_temel_gider ?? 26) + sumUnused
+  const rawOgretmen = ayarlar.dagitim_ogretmen ?? 55
+
+  const pct = (oran: number) =>
+    Math.round((toplamGelir * oran) / 100 * 100) / 100
+
+  const baskan = pct(rawBaskan)
+  const baskan_yrd = pct(rawBaskanYrd)
+  const muhasebe = pct(rawMuhasebe)
+  const temizlik = pct(rawTemizlik)
+  const denetim = pct(rawDenetim)
+  const ogretmen_havuzu = pct(rawOgretmen)
+
+  const temel_gider = Math.round((toplamGelir - (baskan + baskan_yrd + muhasebe + temizlik + denetim + ogretmen_havuzu)) * 100) / 100
 
   return {
     toplam: toplamGelir,
-    temel_gider: pct(ayarlar.dagitim_temel_gider),
-    ogretmen_havuzu: pct(ayarlar.dagitim_ogretmen),
-    baskan: pct(ayarlar.dagitim_baskan),
-    baskan_yrd: pct(ayarlar.dagitim_baskan_yrd),
-    muhasebe: pct(ayarlar.dagitim_muhasebe),
-    temizlik: pct(ayarlar.dagitim_temizlik),
-    denetim: pct(ayarlar.dagitim_denetim),
+    temel_gider,
+    ogretmen_havuzu,
+    baskan,
+    baskan_yrd,
+    muhasebe,
+    temizlik,
+    denetim,
+    pct_temel_gider: rawTemelGider,
+    pct_ogretmen: rawOgretmen,
+    pct_baskan: rawBaskan,
+    pct_baskan_yrd: rawBaskanYrd,
+    pct_muhasebe: rawMuhasebe,
+    pct_temizlik: rawTemizlik,
+    pct_denetim: rawDenetim,
   }
 }
 

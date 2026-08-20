@@ -107,20 +107,22 @@ export async function POST(request: NextRequest) {
       gosterge:             0,
       katsayi:              0,
       yemek:                false,
+      // NOT: Oranlar ONDALIK olarak saklanır (hesaplama.ts ve ayarlar sayfası ile uyumlu).
+      // Örn: %14 → 0.14, binde 7,59 damga → 0.00759, %15 vergi dilimi → 0.15
       asgari_ucret:         26005.50,
-      sgk_kisi_pay:         14,
-      sgk_issizlik_kisi:    1,
-      sgk_kisa_vadeli:      2,
-      sgk_malulluk:         2,
-      sgk_saglik:           7.5,
-      sgk_issizlik_isveren: 2,
-      damga_vergi_orani:    0.759,
+      sgk_kisi_pay:         0.14,
+      sgk_issizlik_kisi:    0.01,
+      sgk_kisa_vadeli:      0.02,
+      sgk_malulluk:         0.02,
+      sgk_saglik:           0.075,
+      sgk_issizlik_isveren: 0.02,
+      damga_vergi_orani:    0.00759,
       vergi_dilimleri:    [
-        { "ust": 220000, "oran": 15 },
-        { "ust": 480000, "oran": 20 },
-        { "ust": 1800000, "oran": 27 },
-        { "ust": 6000000, "oran": 35 },
-        { "ust": 99999999, "oran": 40 }
+        { "ust": 220000,  "oran": 0.15 },
+        { "ust": 480000,  "oran": 0.20 },
+        { "ust": 1800000, "oran": 0.27 },
+        { "ust": 6000000, "oran": 0.35 },
+        { "ust": 99999999, "oran": 0.40 }
       ],
     })
   }

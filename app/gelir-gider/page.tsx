@@ -2,15 +2,20 @@
 import { useEffect, useState } from 'react'
 import Topbar from '@/components/Topbar'
 import { supabase } from '@/lib/supabase'
-import { fmtTL, AYLAR, tarihFmt, tahakkukDagitimHesapla } from '@/lib/hesaplama'
+import {
+  fmtTL, AYLAR, tarihFmt, tahakkukDagitimHesapla,
+  isBaskan, isBaskanYrd, isMuhasebe, isTemizlik, isDenetim
+} from '@/lib/hesaplama'
 import { HesapHareketi, Ayarlar } from '@/lib/types'
 import StatCard from '@/components/StatCard'
+import { Printer, Calendar, ArrowUpRight, ArrowDownRight, Percent } from 'lucide-react'
 
 interface AylikOzet { ay: number; yil: number; gelir: number; gider: number; net: number }
 
 export default function GelirGiderPage() {
   const [hareketler, setHareketler] = useState<HesapHareketi[]>([])
   const [ayarlar, setAyarlar] = useState<Ayarlar | null>(null)
+  const [personel, setPersonel] = useState<any[]>([])
   const [aktifTab, setAktifTab] = useState<'aylik' | 'gelirler' | 'giderler' | 'tahakkuk'>('aylik')
   const [loading, setLoading] = useState(true)
 
@@ -18,9 +23,11 @@ export default function GelirGiderPage() {
     Promise.all([
       supabase.from('hesap_hareketleri').select('*').order('tarih', { ascending: false }),
       supabase.from('ayarlar').select('*').single(),
-    ]).then(([{ data: hh }, { data: ayr }]) => {
+      supabase.from('personel').select('*'),
+    ]).then(([{ data: hh }, { data: ayr }, { data: per }]) => {
       setHareketler(hh || [])
       setAyarlar(ayr)
+      setPersonel(per || [])
       setLoading(false)
     })
   }, [])
@@ -48,7 +55,14 @@ export default function GelirGiderPage() {
   const giderler = hareketler.filter(h => h.tur === 'gider')
 
   // Tahakkuk dağılımı (toplam gelir üzerinden)
-  const tahakkuk = ayarlar ? tahakkukDagitimHesapla(toplamGelir, ayarlar) : null
+  const activeCategories = {
+    baskan: (personel || []).some(p => isBaskan(p.gorev) && p.aktif !== false),
+    baskan_yrd: (personel || []).some(p => isBaskanYrd(p.gorev) && p.aktif !== false),
+    muhasebe: (personel || []).some(p => isMuhasebe(p.gorev) && p.aktif !== false),
+    temizlik: (personel || []).some(p => isTemizlik(p.gorev) && p.aktif !== false),
+    denetim: (personel || []).some(p => isDenetim(p.gorev) && p.aktif !== false),
+  }
+  const tahakkuk = ayarlar ? tahakkukDagitimHesapla(toplamGelir, ayarlar, activeCategories) : null
 
   return (
     <div>
@@ -56,7 +70,14 @@ export default function GelirGiderPage() {
         title="Gelir / Gider Özet"
         sub="Mali özet ve tahakkuk dağılımı"
         actions={
-          <button className="btn btn-secondary btn-sm no-print" onClick={() => window.print()}>🖨️ Yazdır</button>
+          <button 
+            className="btn btn-secondary btn-sm no-print" 
+            onClick={() => window.print()}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <Printer size={16} />
+            <span>Yazdır</span>
+          </button>
         }
       />
       <div style={{ padding: 28 }}>
@@ -71,17 +92,19 @@ export default function GelirGiderPage() {
           {/* Tabs */}
           <div className="tab-bar">
             {[
-              { key: 'aylik', label: '📅 Aylık Özet' },
-              { key: 'gelirler', label: '↑ Gelirler' },
-              { key: 'giderler', label: '↓ Giderler' },
-              { key: 'tahakkuk', label: '📊 Tahakkuk Dağılımı' },
+              { key: 'aylik', label: 'Aylık Özet', icon: <Calendar size={15} /> },
+              { key: 'gelirler', label: 'Gelirler', icon: <ArrowUpRight size={15} /> },
+              { key: 'giderler', label: 'Giderler', icon: <ArrowDownRight size={15} /> },
+              { key: 'tahakkuk', label: 'Tahakkuk Dağılımı', icon: <Percent size={15} /> },
             ].map(t => (
               <div
                 key={t.key}
                 className={`tab-item ${aktifTab === t.key ? 'active' : ''}`}
                 onClick={() => setAktifTab(t.key as typeof aktifTab)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               >
-                {t.label}
+                {t.icon}
+                <span>{t.label}</span>
               </div>
             ))}
           </div>
@@ -104,7 +127,7 @@ export default function GelirGiderPage() {
                     </thead>
                     <tbody>
                       {aylikOzetler.length === 0 ? (
-                        <tr><td colSpan={4}><div className="empty-state"><div className="empty-icon">📊</div><p>Veri yok</p></div></td></tr>
+                        <tr><td colSpan={4}><div className="empty-state"><div className="empty-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}><Percent size={48} /></div><p>Veri yok</p></div></td></tr>
                       ) : aylikOzetler.map(o => (
                         <tr key={`${o.yil}-${o.ay}`}>
                           <td><strong>{AYLAR[o.ay]} {o.yil}</strong></td>
@@ -135,7 +158,7 @@ export default function GelirGiderPage() {
                     </thead>
                     <tbody>
                       {gelirler.length === 0 ? (
-                        <tr><td colSpan={4}><div className="empty-state"><div className="empty-icon">↑</div><p>Gelir kaydı yok</p></div></td></tr>
+                        <tr><td colSpan={4}><div className="empty-state"><div className="empty-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}><ArrowUpRight size={48} /></div><p>Gelir kaydı yok</p></div></td></tr>
                       ) : gelirler.map(h => (
                         <tr key={h.id}>
                           <td>{tarihFmt(h.tarih)}</td>
@@ -162,7 +185,7 @@ export default function GelirGiderPage() {
                     </thead>
                     <tbody>
                       {giderler.length === 0 ? (
-                        <tr><td colSpan={4}><div className="empty-state"><div className="empty-icon">↓</div><p>Gider kaydı yok</p></div></td></tr>
+                        <tr><td colSpan={4}><div className="empty-state"><div className="empty-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}><ArrowDownRight size={48} /></div><p>Gider kaydı yok</p></div></td></tr>
                       ) : giderler.map(h => (
                         <tr key={h.id}>
                           <td>{tarihFmt(h.tarih)}</td>
@@ -188,13 +211,13 @@ export default function GelirGiderPage() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
                     {[
-                      { label: 'Temel Gider (%26)', val: tahakkuk.temel_gider },
-                      { label: 'Öğretmen Havuzu (%55)', val: tahakkuk.ogretmen_havuzu },
-                      { label: 'Başkan (%7)', val: tahakkuk.baskan },
-                      { label: 'Başkan Yrd. (%5)', val: tahakkuk.baskan_yrd },
-                      { label: 'Muhasebe (%2)', val: tahakkuk.muhasebe },
-                      { label: 'Temizlik (%4)', val: tahakkuk.temizlik },
-                      { label: 'Denetim (%1)', val: tahakkuk.denetim },
+                      { label: `Temel Gider (%${tahakkuk.pct_temel_gider})`, val: tahakkuk.temel_gider },
+                      { label: `Öğretmen Havuzu (%${tahakkuk.pct_ogretmen})`, val: tahakkuk.ogretmen_havuzu },
+                      { label: `Başkan (%${tahakkuk.pct_baskan})`, val: tahakkuk.baskan },
+                      { label: `Başkan Yrd. (%${tahakkuk.pct_baskan_yrd})`, val: tahakkuk.baskan_yrd },
+                      { label: `Muhasebe (%${tahakkuk.pct_muhasebe})`, val: tahakkuk.muhasebe },
+                      { label: `Temizlik (%${tahakkuk.pct_temizlik})`, val: tahakkuk.temizlik },
+                      { label: `Denetim (%${tahakkuk.pct_denetim})`, val: tahakkuk.denetim },
                     ].map(({ label, val }) => (
                       <div key={label} className="stat-card" style={{ padding: '14px 16px' }}>
                         <div className="stat-label" style={{ fontSize: 10 }}>{label}</div>
@@ -209,13 +232,13 @@ export default function GelirGiderPage() {
                       </thead>
                       <tbody>
                         {[
-                          { k: 'Temel Gider', o: '%26', v: tahakkuk.temel_gider },
-                          { k: 'Öğretmen Havuzu', o: '%55', v: tahakkuk.ogretmen_havuzu },
-                          { k: 'Başkan', o: '%7', v: tahakkuk.baskan },
-                          { k: 'Başkan Yrd.', o: '%5', v: tahakkuk.baskan_yrd },
-                          { k: 'Muhasebe', o: '%2', v: tahakkuk.muhasebe },
-                          { k: 'Temizlik', o: '%4', v: tahakkuk.temizlik },
-                          { k: 'Denetim', o: '%1', v: tahakkuk.denetim },
+                          { k: 'Temel Gider', o: `%${tahakkuk.pct_temel_gider}`, v: tahakkuk.temel_gider },
+                          { k: 'Öğretmen Havuzu', o: `%${tahakkuk.pct_ogretmen}`, v: tahakkuk.ogretmen_havuzu },
+                          { k: 'Başkan', o: `%${tahakkuk.pct_baskan}`, v: tahakkuk.baskan },
+                          { k: 'Başkan Yrd.', o: `%${tahakkuk.pct_baskan_yrd}`, v: tahakkuk.baskan_yrd },
+                          { k: 'Muhasebe', o: `%${tahakkuk.pct_muhasebe}`, v: tahakkuk.muhasebe },
+                          { k: 'Temizlik', o: `%${tahakkuk.pct_temizlik}`, v: tahakkuk.temizlik },
+                          { k: 'Denetim', o: `%${tahakkuk.pct_denetim}`, v: tahakkuk.denetim },
                         ].map(({ k, o, v }) => (
                           <tr key={k}>
                             <td><strong>{k}</strong></td>

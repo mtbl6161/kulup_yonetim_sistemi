@@ -7,22 +7,22 @@ import { supabase } from '@/lib/supabase'
 import {
   AYLAR, fmtTL, fmt, isGunuSayisi, saatUcretiHesapla,
   tavanHesapla, gorevTavanYuzdesi, gunSayisi,
-  tahakkukDagitimHesapla
+  tahakkukDagitimHesapla, detectActiveCategories, bordroHesapla
 } from '@/lib/hesaplama'
 import { Ayarlar } from '@/lib/types'
+import { Printer } from 'lucide-react'
 
-// Tavan hesabı yapılacak görev kategorileri
 const TAVAN_KATEGORILER = [
-  { label: 'Başkan',                    gorev: 'Başkan',              sgkLi: true  },
-  { label: 'Başkan Yardımcısı',         gorev: 'Başkan Yardımcısı',   sgkLi: true  },
-  { label: 'Öğretmen',                  gorev: 'Öğretmen',            sgkLi: true  },
-  { label: 'Koordinatör Öğretmen',      gorev: 'Koordinatör Öğretmen',sgkLi: true  },
+  { label: 'Başkan',                    gorev: 'Başkan',              sgkLi: false },
+  { label: 'Başkan Yardımcısı',         gorev: 'Başkan Yardımcısı',   sgkLi: false },
+  { label: 'Öğretmen',                  gorev: 'Öğretmen',            sgkLi: false },
+  { label: 'Koordinatör Öğretmen',      gorev: 'Koordinatör Öğretmen',sgkLi: false },
   { label: 'Usta Öğretici',             gorev: 'Usta Öğretici',       sgkLi: true  },
-  { label: 'Usta Öğretici (Emekli)',    gorev: 'Usta Öğretici',       sgkLi: false },
+  { label: 'Usta Öğretici (Emekli)',    gorev: 'Usta Öğretici',       sgkLi: true, isRetired: true },
   { label: 'Muhasebe Memuru',           gorev: 'Muhasebe Personeli',  sgkLi: true  },
-  { label: 'Muhasebe Memuru (Emekli)',  gorev: 'Muhasebe Personeli',  sgkLi: false },
+  { label: 'Muhasebe Memuru (Emekli)',  gorev: 'Muhasebe Personeli',  sgkLi: true, isRetired: true },
   { label: 'Temizlik Personeli',        gorev: 'Temizlik Personeli',  sgkLi: true  },
-  { label: 'Temizlik Personeli (Emekli)', gorev: 'Temizlik Personeli',sgkLi: false },
+  { label: 'Temizlik Personeli (Emekli)', gorev: 'Temizlik Personeli',sgkLi: true, isRetired: true },
 ]
 
 export default function BilancoPage() {
@@ -34,22 +34,33 @@ export default function BilancoPage() {
   const [subeSayisi, setSubeSayisi] = useState(0)
   const [toplamDersSaati, setToplamDersSaati] = useState(0)
   const [tatiller, setTatiller] = useState<any[]>([])
+  const [personel, setPersonel] = useState<any[]>([])
+  const [puantaj, setPuantaj] = useState<any[]>([])
+  const [bordro, setBordro] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
+    const startDate = `${yil}-${String(ay).padStart(2, '0')}-01`
+    const lastDay = gunSayisi(yil, ay)
+    const endDate = `${yil}-${String(ay).padStart(2, '0')}-${lastDay}T23:59:59`
+
     const [
       { data: ayr },
       { data: tahs },
       { data: brd },
       { data: sinif },
       { data: tat },
+      { data: per },
+      { data: puan },
     ] = await Promise.all([
-      supabase.from('ayarlar').select('*').single(),
-      supabase.from('tahsilat').select('tutar, ogrenci_id').eq('ay', Number(ay)).eq('yil', Number(yil)),
-      supabase.from('bordro').select('toplam_saat').eq('ay', Number(ay)).eq('yil', Number(yil)),
-      supabase.from('siniflar').select('id').eq('aktif', true),
+      supabase.from('ayarlar').select('*').eq('okul_id', okul?.id).single(),
+      supabase.from('tahsilat').select('tutar, ogrenci_id').eq('okul_id', okul?.id).eq('ay', Number(ay)).eq('yil', Number(yil)),
+      supabase.from('bordro').select('*').eq('okul_id', okul?.id).eq('ay', Number(ay)).eq('yil', Number(yil)),
+      supabase.from('siniflar').select('id').eq('okul_id', okul?.id).eq('aktif', true),
       supabase.from('tatiller').select('*').or(`okul_id.eq.${okul?.id ?? 0},okul_id.is.null`),
+      supabase.from('personel').select('*').eq('okul_id', okul?.id),
+      supabase.from('puantaj').select('*').eq('okul_id', okul?.id).gte('tarih', startDate).lte('tarih', endDate),
     ])
 
     setAyarlar(ayr)
@@ -58,12 +69,15 @@ export default function BilancoPage() {
     setOgrenciSayisi(uniqueStudents)
     setSubeSayisi(sinif?.length || 0)
     setTatiller(tat || [])
+    setPersonel(per || [])
+    setPuantaj(puan || [])
+    setBordro(brd || [])
 
     const totalBrdHours = (brd || []).reduce((s, b) => s + Number(b.toplam_saat), 0)
     setToplamDersSaati(totalBrdHours)
 
     setLoading(false)
-  }, [ay, yil])
+  }, [ay, yil, okul?.id])
 
   useEffect(() => { load() }, [load])
 
@@ -126,26 +140,44 @@ export default function BilancoPage() {
     dagitim_temizlik:     ayarlar.dagitim_temizlik      ?? 4,
     dagitim_denetim:      ayarlar.dagitim_denetim       ?? 1,
   }
-  const dagitim      = toplamGelir > 0 ? tahakkukDagitimHesapla(toplamGelir, effectiveAyarlar) : null
+  const activeCategories = detectActiveCategories(personel, puantaj, bordro)
+  const dagitim      = toplamGelir > 0 ? tahakkukDagitimHesapla(toplamGelir, effectiveAyarlar, activeCategories) : null
   const tavanKatsayi = effectiveAyarlar.tavan_katsayi!
 
-  // Tahakkuk dağılım tablosu — yüzdeler effectiveAyarlar'dan (fallback dahil)
-  const ea = effectiveAyarlar
+  // Tahakkuk dağılım tablosu — yüzdeler dagitim'dan (dynamic)
   const tahakkukSatirlari = [
-    { label: 'Temel Giderler (Materyal, Beslenme, SGK Primi, Diğer Giderler)',  yuzde: ea.dagitim_temel_gider!, tutar: dagitim?.temel_gider || 0 },
-    { label: 'Kulüp Yönetim Kurulu Başkanı - Müdür',                            yuzde: ea.dagitim_baskan!,       tutar: dagitim?.baskan || 0 },
-    { label: 'Kulüp Yönetim Kurulu Üyesi - Müdür Yardımcısı',                  yuzde: ea.dagitim_baskan_yrd!,   tutar: dagitim?.baskan_yrd || 0 },
-    { label: 'Öğretmen, Usta Öğretici, Koordinatör Öğretmen',                   yuzde: ea.dagitim_ogretmen!,     tutar: dagitim?.ogretmen_havuzu || 0 },
-    { label: 'Yazışma-Muhasebe İşlerini Yürüten Personel',                      yuzde: ea.dagitim_muhasebe!,     tutar: dagitim?.muhasebe || 0 },
-    { label: 'Temizlik Bakım ve Beslenme İşlerini Yürüten Personel',            yuzde: ea.dagitim_temizlik!,     tutar: dagitim?.temizlik || 0 },
-    { label: 'Denetim Yetkilisi',                                                yuzde: ea.dagitim_denetim!,      tutar: dagitim?.denetim || 0 },
+    { label: 'Temel Giderler (Materyal, Beslenme, SGK Primi, Diğer Giderler)',  yuzde: dagitim?.pct_temel_gider ?? effectiveAyarlar.dagitim_temel_gider!, tutar: dagitim?.temel_gider || 0 },
+    { label: 'Kulüp Yönetim Kurulu Başkanı - Müdür',                            yuzde: dagitim?.pct_baskan ?? effectiveAyarlar.dagitim_baskan!,       tutar: dagitim?.baskan || 0 },
+    { label: 'Kulüp Yönetim Kurulu Üyesi - Müdür Yardımcısı',                  yuzde: dagitim?.pct_baskan_yrd ?? effectiveAyarlar.dagitim_baskan_yrd!,   tutar: dagitim?.baskan_yrd || 0 },
+    { label: 'Öğretmen, Usta Öğretici, Koordinatör Öğretmen',                   yuzde: dagitim?.pct_ogretmen ?? effectiveAyarlar.dagitim_ogretmen!,     tutar: dagitim?.ogretmen_havuzu || 0 },
+    { label: 'Yazışma-Muhasebe İşlerini Yürüten Personel',                      yuzde: dagitim?.pct_muhasebe ?? effectiveAyarlar.dagitim_muhasebe!,     tutar: dagitim?.muhasebe || 0 },
+    { label: 'Temizlik Bakım ve Beslenme İşlerini Yürüten Personel',            yuzde: dagitim?.pct_temizlik ?? effectiveAyarlar.dagitim_temizlik!,     tutar: dagitim?.temizlik || 0 },
+    { label: 'Denetim Yetkilisi',                                                yuzde: dagitim?.pct_denetim ?? effectiveAyarlar.dagitim_denetim!,      tutar: dagitim?.denetim || 0 },
   ]
 
-  // Tavan hesapları — her iki tabloda da brüt tavan gösterilir (Excel uyumlu)
+  // Tavan hesapları — net ve brüt tavanlar hesaplanır
   const tavanHesaplari = TAVAN_KATEGORILER.map(kat => {
     const brut = tavanHesapla(kat.gorev, tavanKatsayi)
     const yuzde = gorevTavanYuzdesi(kat.gorev)
-    return { ...kat, yuzde, brut }
+    
+    let net = brut
+    if (kat.gorev.toLowerCase().includes('denetim')) {
+      net = brut
+    } else {
+      const sonuc = bordroHesapla(
+        effectiveAyarlar,
+        0, // hours
+        0, // cumulative matrah
+        !!kat.sgkLi,
+        !!(kat as any).isRetired,
+        kat.gorev,
+        brut,
+        true // vergiIstisnasi
+      )
+      net = sonuc.net
+    }
+    
+    return { ...kat, yuzde, brut, net }
   })
 
   // Stiller
@@ -162,8 +194,13 @@ export default function BilancoPage() {
       <Topbar
         title="Bilanço"
         actions={
-          <button className="btn btn-secondary btn-sm no-print" onClick={handlePrint}>
-            🖨️ Yazdır
+          <button 
+            className="btn btn-secondary btn-sm no-print" 
+            onClick={handlePrint}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <Printer size={16} />
+            <span>Yazdır</span>
           </button>
         }
       />
@@ -280,7 +317,7 @@ export default function BilancoPage() {
                     <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f4f9fc' }}>
                       <td style={{ ...tdS, fontSize: 10 }}>{kat.label}</td>
                       <td style={{ ...tdC, color: '#1a6b8a', fontWeight: 700, fontSize: 10 }}>%{kat.yuzde}</td>
-                      <td style={{ ...tdR, fontWeight: 700, fontSize: 10 }}>{fmtTL(kat.brut)}</td>
+                      <td style={{ ...tdR, fontWeight: 700, fontSize: 10 }}>{fmtTL(kat.net)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -45,6 +45,12 @@ export async function proxy(request: NextRequest) {
                         || pathname === '/bakim'
                         || pathname.startsWith('/tanitim')
                         || pathname === '/fiyatlandirma'
+                        || pathname === '/ek-ders-hesaplama'
+                        || pathname === '/cocuk-kulubu-bordro-hesaplama'
+                        || pathname === '/cocuk-kulubu-aidat-hesaplama'
+                        || pathname === '/cocuk-kulubu-butce-tablosu'
+                        || pathname === '/gelir-vergisi-dilimleri-2026'
+                        || pathname.startsWith('/rehber')
                         || isPaymentPage
 
     // 1. BAKIM MODU KONTROLÜ

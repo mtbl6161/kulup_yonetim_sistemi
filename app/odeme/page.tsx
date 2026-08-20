@@ -9,6 +9,7 @@ import { Ogrenci, Tahsilat, Ayarlar } from '@/lib/types'
 import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
 import ConfirmModal from '@/components/ConfirmModal'
+import { Printer, Wallet, History, Save, Loader2, CreditCard, Trash2, CheckCircle2 } from 'lucide-react'
 
 export default function OdemePage() {
   const { ay, yil } = useAy()
@@ -45,7 +46,12 @@ export default function OdemePage() {
       supabase.from('siniflar').select('*'),
       supabase.from('tatiller').select('*').or(`okul_id.eq.${okul?.id ?? 0},okul_id.is.null`)
     ])
-    setOgrenciler(ogr || [])
+    const filteredOgr = (ogr || []).filter(o => {
+      if (o.aktif !== false) return true;
+      const hasTahsilat = (tah || []).some(t => t.ogrenci_id === o.id);
+      return hasTahsilat;
+    })
+    setOgrenciler(filteredOgr)
     setTahsilatlar(tah || [])
     setAyarlar(ayr)
     setSiniflar(sin || [])
@@ -311,6 +317,7 @@ export default function OdemePage() {
 
       const ads = `${tahs.ogrenciler.ad} ${tahs.ogrenciler.soyad}`
       const tag = `Kurum Havuzu Dağıtımı (${ads})`
+      const tagToplu = `Kurum Havuzu Dağıtımı (Toplu: ${ads})`
 
       // 2. Tahsilat kaydını sil
       const { error: e1 } = await supabase.from('tahsilat').delete().eq('id', id)
@@ -323,7 +330,7 @@ export default function OdemePage() {
       // Önce giderler tablosundan bul ve sil (aciklama ve tutar eşleşmesiyle)
       const { data: gid, error: gFindErr } = await supabase.from('giderler')
         .select('id')
-        .eq('aciklama', tag)
+        .in('aciklama', [tag, tagToplu])
         .eq('tutar', tahs.tutar)
         .eq('tarih', tahs.tarih)
         .maybeSingle()
@@ -333,7 +340,7 @@ export default function OdemePage() {
         await supabase.from('hesap_hareketleri').delete().eq('kaynak', 'giderler').eq('kaynak_id', gid.id)
       } else {
         // Giderler tablosunda yoksa bile hesap_hareketleri'nden açıklamaya göre temizle (fallback)
-        await supabase.from('hesap_hareketleri').delete().eq('aciklama', tag).eq('tur', 'gider')
+        await supabase.from('hesap_hareketleri').delete().in('aciklama', [tag, tagToplu]).eq('tur', 'gider')
       }
       
       setMsg('✅ Ödeme ve tüm dağıtım kayıtları başarıyla silindi.')
@@ -380,7 +387,14 @@ export default function OdemePage() {
         title="Ödeme Takibi"
         sub={`${ayLabel(ay, yil)} — Aylık tahsilat`}
         actions={
-          <button className="btn btn-secondary btn-sm no-print" onClick={() => window.print()}>🖨️ Yazdır</button>
+          <button 
+            className="btn btn-secondary btn-sm no-print" 
+            onClick={() => window.print()}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <Printer size={16} />
+            <span>Yazdır</span>
+          </button>
         }
       />
       <div style={{ padding: 28 }}>
@@ -405,7 +419,10 @@ export default function OdemePage() {
 
         {/* Ödeme kayıt formu */}
         <div ref={formRef} className="card">
-          <div className="card-title">💰 Ödeme Kaydet</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Wallet size={20} style={{ color: 'var(--accent)' }} />
+            <span>Ödeme Kaydet</span>
+          </div>
           {msg && !progress && <div className={`alert ${msg.startsWith('✅') ? 'alert-success' : 'alert-danger'}`}>{msg}</div>}
           {progress && (
             <div className="alert alert-info" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 20px', alignItems: 'stretch' }}>
@@ -446,9 +463,9 @@ export default function OdemePage() {
                 }
               }}>
                 <option value="">-- Seçin --</option>
-                {ogrenciler.map(o => (
+                {ogrenciler.filter(o => o.aktif !== false).map(o => (
                   <option key={o.id} value={o.id}>
-                    {o.ad} {o.soyad} ({o.sinif || '?'}) — Gereken: {fmtTL(gereken(o))}
+                    {o.ad} {o.soyad} {o.aktif === false ? '(Ayrıldı) ' : ''}({o.sinif || '?'}) — Gereken: {fmtTL(gereken(o))}
                   </option>
                 ))}
               </select>
@@ -471,8 +488,23 @@ export default function OdemePage() {
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <button className="btn btn-primary" onClick={odemeKaydet} disabled={saving}>
-              {saving ? '⏳...' : '💾 Ödemeyi Kaydet'}
+            <button 
+              className="btn btn-primary" 
+              onClick={odemeKaydet} 
+              disabled={saving}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              {saving ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>İşlem Yapılıyor...</span>
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  <span>Ödemeyi Kaydet</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -487,7 +519,10 @@ export default function OdemePage() {
                 onClick={() => setShowHistory(true)}
                 style={{ backgroundColor: 'var(--bg2)', border: '1px solid var(--border)' }}
               >
-                📋 Ödeme Geçmişi
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <History size={14} />
+                  <span>Ödeme Geçmişi</span>
+                </div>
               </button>
               <select className="form-select" style={{ width: 140 }} value={sinifFiltre} onChange={e => setSinifFiltre(e.target.value)}>
                 <option value="">Tüm Sınıflar</option>
@@ -507,7 +542,8 @@ export default function OdemePage() {
                   onClick={topluOdemeKaydet}
                   disabled={saving}
                 >
-                  ✅ Seçilenleri Öde ({secilenler.length})
+                  <CheckCircle2 size={14} />
+                  <span>Seçilenleri Öde ({secilenler.length})</span>
                 </button>
               )}
             </div>
@@ -549,6 +585,7 @@ export default function OdemePage() {
                     </td>
                     <td>
                       <strong>{r.ogrenci.ad} {r.ogrenci.soyad}</strong>
+                      {r.ogrenci.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 10, marginLeft: 6 }}> (Ayrıldı)</span>}
                       {r.ogrenci.gunluk_saat && (
                         <span style={{ fontSize: 9, marginLeft: 8, padding: '1px 4px', background: '#e9ecef', borderRadius: 4, color: '#495057', border: '1px solid #dee2e6' }}>
                           {r.ogrenci.gunluk_saat} Saat
@@ -580,9 +617,10 @@ export default function OdemePage() {
                           className="btn btn-outline-danger btn-sm" 
                           title="Ödemeyi İptal Et"
                           onClick={() => tahsilatSil(r.tahsilatId!)}
-                          style={{ minWidth: 80 }}
+                          style={{ minWidth: 80, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
                         >
-                          ✖️ İptal Et
+                          <Trash2 size={12} />
+                          <span>İptal Et</span>
                         </button>
                       ) : (
                         <button 
@@ -590,9 +628,10 @@ export default function OdemePage() {
                           title="Ödeme Formunu Doldur"
                           onClick={() => hizliOdemeDoldur(r.ogrenci)}
                           disabled={r.kalan <= 0}
-                          style={{ minWidth: 80 }}
+                          style={{ minWidth: 80, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
                         >
-                          💰 Öde
+                          <Wallet size={12} />
+                          <span>Öde</span>
                         </button>
                       )}
                     </td>
@@ -630,9 +669,17 @@ export default function OdemePage() {
             >
               ✕
             </button>
-            <div className="card-title">📋 {ayLabel(ay, yil)} Ödeme Geçmişi</div>
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <History size={20} style={{ color: 'var(--accent)' }} />
+              <span>{ayLabel(ay, yil)} Ödeme Geçmişi</span>
+            </div>
             {loading ? <div className="alert alert-info">⏳ Yükleniyor...</div> : tahsilatlar.length === 0 ? (
-              <div className="empty-state"><div className="empty-icon">💳</div><p>Bu ay henüz ödeme kaydı yok</p></div>
+              <div className="empty-state">
+                <div className="empty-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}>
+                  <CreditCard size={48} />
+                </div>
+                <p>Bu ay henüz ödeme kaydı yok</p>
+              </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table className="data-table">
@@ -645,12 +692,22 @@ export default function OdemePage() {
                       return (
                         <tr key={t.id}>
                           <td>{tarihFmt(t.tarih)}</td>
-                          <td>{o ? o.ad + ' ' + o.soyad : '?'}</td>
+                          <td>
+                            {o ? o.ad + ' ' + o.soyad : '?'}
+                            {o?.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 10, marginLeft: 6 }}> (Ayrıldı)</span>}
+                          </td>
                           <td>{t.aciklama || '-'}</td>
                           <td style={{ fontSize: 12 }}>{t.dekont_no || '-'}</td>
                           <td className="td-num fw-600" style={{ color: 'var(--success)' }}>{fmtTL(Number(t.tutar))}</td>
                           <td>
-                            <button className="btn btn-danger btn-sm" onClick={() => tahsilatSil(t.id)}>🗑️ Sil</button>
+                            <button 
+                              className="btn btn-danger btn-sm" 
+                              onClick={() => tahsilatSil(t.id)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                            >
+                              <Trash2 size={14} />
+                              <span>Sil</span>
+                            </button>
                           </td>
                         </tr>
                       )

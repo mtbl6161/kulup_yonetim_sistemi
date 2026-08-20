@@ -10,6 +10,7 @@ import {
 import {
   isGunuSayisi, gunSayisi, tahakkukDagitimHesapla,
   tavanHesapla, gorevTavanYuzdesi, AYLAR, tatilMi,
+  detectActiveCategories, bordroHesapla
 } from '@/lib/hesaplama'
 import { Ayarlar } from '@/lib/types'
 
@@ -44,20 +45,23 @@ interface BilancoVerisi {
   subeSayisi: number
   toplamDersSaati: number
   tatiller: any[]
+  personel?: any[]
+  puantaj?: any[]
+  bordro?: any[]
 }
 
 const TAVAN_KATEGORILER = [
-  { label: 'Başkan',                      gorev: 'Başkan',               sgkLi: true  },
-  { label: 'Başkan Yardımcısı',           gorev: 'Başkan Yardımcısı',    sgkLi: true  },
-  { label: 'Koordinatör Öğretmen',        gorev: 'Koordinatör Öğretmen', sgkLi: true  },
-  { label: 'Öğretmen',                    gorev: 'Öğretmen',             sgkLi: true  },
+  { label: 'Başkan',                      gorev: 'Başkan',               sgkLi: false },
+  { label: 'Başkan Yardımcısı',           gorev: 'Başkan Yardımcısı',    sgkLi: false },
+  { label: 'Koordinatör Öğretmen',        gorev: 'Koordinatör Öğretmen', sgkLi: false },
+  { label: 'Öğretmen',                    gorev: 'Öğretmen',             sgkLi: false },
   { label: 'Usta Öğretici',               gorev: 'Usta Öğretici',        sgkLi: true  },
-  { label: 'Usta Öğretici (Emekli)',      gorev: 'Usta Öğretici',        sgkLi: false },
+  { label: 'Usta Öğretici (Emekli)',      gorev: 'Usta Öğretici',        sgkLi: true, isRetired: true },
   { label: 'Muhasebe Memuru',             gorev: 'Muhasebe Personeli',   sgkLi: true  },
-  { label: 'Muhasebe Memuru (Emekli)',    gorev: 'Muhasebe Personeli',   sgkLi: false },
+  { label: 'Muhasebe Memuru (Emekli)',    gorev: 'Muhasebe Personeli',   sgkLi: true, isRetired: true },
   { label: 'Temizlik Personeli',          gorev: 'Temizlik Personeli',   sgkLi: true  },
-  { label: 'Temizlik Personeli (Emekli)', gorev: 'Temizlik Personeli',   sgkLi: false },
-  { label: 'Denetim Yetkilisi',           gorev: 'Denetim Yetkilisi',    sgkLi: true  },
+  { label: 'Temizlik Personeli (Emekli)', gorev: 'Temizlik Personeli',   sgkLi: true, isRetired: true },
+  { label: 'Denetim Yetkilisi',           gorev: 'Denetim Yetkilisi',    sgkLi: false },
 ]
 
 const AY_ADI = ['','Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
@@ -373,18 +377,26 @@ export default function DenetimPage() {
 
         setSatirlar(siraliData)
       } else if (sekme === 'bilanco') {
+        const startDate = `${yil}-${String(ay).padStart(2, '0')}-01`
+        const lastDay = gunSayisi(yil, ay)
+        const endDate = `${yil}-${String(ay).padStart(2, '0')}-${lastDay}T23:59:59`
+
         const [
           { data: ayr },
           { data: tahs },
           { data: brd },
           { data: sinif },
           { data: tat },
+          { data: per },
+          { data: puan },
         ] = await Promise.all([
           supabase.from('ayarlar').select('*').eq('okul_id', secilenOkulId).single(),
           supabase.from('tahsilat').select('tutar, ogrenci_id').eq('okul_id', secilenOkulId).eq('ay', ay).eq('yil', yil),
-          supabase.from('bordro').select('toplam_saat').eq('okul_id', secilenOkulId).eq('ay', ay).eq('yil', yil),
+          supabase.from('bordro').select('*').eq('okul_id', secilenOkulId).eq('ay', ay).eq('yil', yil),
           supabase.from('siniflar').select('id').eq('okul_id', secilenOkulId).eq('aktif', true),
           supabase.from('tatiller').select('*'),
+          supabase.from('personel').select('*').eq('okul_id', secilenOkulId),
+          supabase.from('puantaj').select('*').eq('okul_id', secilenOkulId).gte('tarih', startDate).lte('tarih', endDate),
         ])
         
         if (ayr) {
@@ -395,6 +407,9 @@ export default function DenetimPage() {
             subeSayisi: sinif?.length || 0,
             toplamDersSaati: (brd || []).reduce((s, b) => s + Number(b.toplam_saat), 0),
             tatiller: tat || [],
+            personel: per || [],
+            puantaj: puan || [],
+            bordro: brd || [],
           })
         } else {
           setBilVeri(null)
@@ -1349,25 +1364,43 @@ function BilancoIcerik({ veri, ay, yil, okulAd }: { veri: BilancoVerisi; ay: num
     dagitim_temizlik:    ayarlar.dagitim_temizlik    ?? 4,
     dagitim_denetim:     ayarlar.dagitim_denetim     ?? 1,
   }
-  const dagitim      = toplamGelir > 0 ? tahakkukDagitimHesapla(toplamGelir, effectiveAyarlar) : null
+  const activeCategories = detectActiveCategories(veri.personel || [], veri.puantaj || [], veri.bordro || [])
+  const dagitim      = toplamGelir > 0 ? tahakkukDagitimHesapla(toplamGelir, effectiveAyarlar, activeCategories) : null
   const tavanKatsayi = effectiveAyarlar.tavan_katsayi!
-  const ea           = effectiveAyarlar
 
   const tahakkukSatirlari = [
-    { label: 'Temel Giderler (Materyal, Beslenme, SGK Primi, Diğer Giderler)', yuzde: ea.dagitim_temel_gider!, tutar: dagitim?.temel_gider || 0 },
-    { label: 'Kulüp Yönetim Kurulu Başkanı (Müdür)',                           yuzde: ea.dagitim_baskan!,      tutar: dagitim?.baskan || 0 },
-    { label: 'Kulüp Yönetim Kurulu Üyesi (Müdür Yardımcısı)',                 yuzde: ea.dagitim_baskan_yrd!,  tutar: dagitim?.baskan_yrd || 0 },
-    { label: 'Koordinatör Öğretmen, Öğretmen, Usta Öğretici',                  yuzde: ea.dagitim_ogretmen!,    tutar: dagitim?.ogretmen_havuzu || 0 },
-    { label: 'Yazışma-Muhasebe İşlerini Yürüten Personel',                     yuzde: ea.dagitim_muhasebe!,    tutar: dagitim?.muhasebe || 0 },
-    { label: 'Temizlik Bakım ve Beslenme İşlerini Yürüten Personel',           yuzde: ea.dagitim_temizlik!,    tutar: dagitim?.temizlik || 0 },
-    { label: 'Denetim Yetkilisi',                                               yuzde: ea.dagitim_denetim!,     tutar: dagitim?.denetim || 0 },
+    { label: 'Temel Giderler (Materyal, Beslenme, SGK Primi, Diğer Giderler)', yuzde: dagitim?.pct_temel_gider ?? effectiveAyarlar.dagitim_temel_gider!, tutar: dagitim?.temel_gider || 0 },
+    { label: 'Kulüp Yönetim Kurulu Başkanı (Müdür)',                           yuzde: dagitim?.pct_baskan ?? effectiveAyarlar.dagitim_baskan!,      tutar: dagitim?.baskan || 0 },
+    { label: 'Kulüp Yönetim Kurulu Üyesi (Müdür Yardımcısı)',                 yuzde: dagitim?.pct_baskan_yrd ?? effectiveAyarlar.dagitim_baskan_yrd!,  tutar: dagitim?.baskan_yrd || 0 },
+    { label: 'Koordinatör Öğretmen, Öğretmen, Usta Öğretici',                  yuzde: dagitim?.pct_ogretmen ?? effectiveAyarlar.dagitim_ogretmen!,    tutar: dagitim?.ogretmen_havuzu || 0 },
+    { label: 'Yazışma-Muhasebe İşlerini Yürüten Personel',                     yuzde: dagitim?.pct_muhasebe ?? effectiveAyarlar.dagitim_muhasebe!,    tutar: dagitim?.muhasebe || 0 },
+    { label: 'Temizlik Bakım ve Beslenme İşlerini Yürüten Personel',           yuzde: dagitim?.pct_temizlik ?? effectiveAyarlar.dagitim_temizlik!,    tutar: dagitim?.temizlik || 0 },
+    { label: 'Denetim Yetkilisi',                                               yuzde: dagitim?.pct_denetim ?? effectiveAyarlar.dagitim_denetim!,     tutar: dagitim?.denetim || 0 },
   ]
 
-  const tavanHesaplari = TAVAN_KATEGORILER.map(kat => ({
-    ...kat,
-    yuzde: gorevTavanYuzdesi(kat.gorev),
-    brut:  tavanHesapla(kat.gorev, tavanKatsayi),
-  }))
+  const tavanHesaplari = TAVAN_KATEGORILER.map(kat => {
+    const brut = tavanHesapla(kat.gorev, tavanKatsayi)
+    const yuzde = gorevTavanYuzdesi(kat.gorev)
+    
+    let net = brut
+    if (kat.gorev.toLowerCase().includes('denetim')) {
+      net = brut
+    } else {
+      const sonuc = bordroHesapla(
+        effectiveAyarlar,
+        0, // hours
+        0, // cumulative matrah
+        !!kat.sgkLi,
+        !!(kat as any).isRetired,
+        kat.gorev,
+        brut,
+        true // vergiIstisnasi
+      )
+      net = sonuc.net
+    }
+    
+    return { ...kat, yuzde, brut, net }
+  })
 
   const thS: React.CSSProperties = { fontSize: 10, padding: '12px 16px', background: 'var(--surface2)', border: '1px solid var(--border)', fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase' }
   const tdS: React.CSSProperties = { fontSize: 13, padding: '12px 16px', border: '1px solid var(--border)', color: 'var(--text)', background: 'var(--surface)' }
@@ -1469,7 +1502,7 @@ function BilancoIcerik({ veri, ay, yil, okulAd }: { veri: BilancoVerisi; ay: num
                 <tr key={i} style={{ background: i % 2 === 0 ? 'var(--surface)' : 'var(--bg)' }}>
                   <td style={{ ...tdS, fontSize: 12, padding: '10px 16px' }}>{kat.label}</td>
                   <td style={{ ...tdC, color: 'var(--accent)', fontSize: 12, padding: '10px 16px' }}>%{kat.yuzde}</td>
-                  <td style={{ ...tdR, fontWeight: 700, fontSize: 12, padding: '10px 16px' }}>{fmtTL(kat.brut)}</td>
+                  <td style={{ ...tdR, fontWeight: 700, fontSize: 12, padding: '10px 16px' }}>{fmtTL(kat.net)}</td>
                 </tr>
               ))}
             </tbody>

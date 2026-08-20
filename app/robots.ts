@@ -4,7 +4,7 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: '*',
-      allow: ['/', '/tanitim/', '/fiyatlandirma', '/signup', '/login'],
+      allow: ['/', '/tanitim/', '/rehber', '/ek-ders-hesaplama', '/cocuk-kulubu-bordro-hesaplama', '/cocuk-kulubu-aidat-hesaplama', '/cocuk-kulubu-butce-tablosu', '/gelir-vergisi-dilimleri-2026', '/fiyatlandirma', '/signup', '/login'],
       disallow: [
         '/api/',
         '/yonetim/',

@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { fmtTL, ayLabel, tarihFmt } from '@/lib/hesaplama'
 import { HesapHareketi } from '@/lib/types'
 import ConfirmModal from '@/components/ConfirmModal'
+import { Printer, TrendingUp, Landmark, Trash2 } from 'lucide-react'
 
 export default function HesapHareketleriPage() {
   const { ay, yil } = useAy()
@@ -73,7 +74,14 @@ export default function HesapHareketleriPage() {
         title="Hesap Hareketleri"
         sub="Gelir ve gider işlemleri"
         actions={
-          <button className="btn btn-secondary btn-sm no-print" onClick={() => window.print()}>🖨️ Yazdır</button>
+          <button 
+            className="btn btn-secondary btn-sm no-print" 
+            onClick={() => window.print()}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <Printer size={16} />
+            <span>Yazdır</span>
+          </button>
         }
       />
       <div style={{ padding: 28 }}>
@@ -88,7 +96,10 @@ export default function HesapHareketleriPage() {
         {/* Tablo */}
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div className="card-title" style={{ marginBottom: 0 }}>📊 Hesap Hareketleri</div>
+            <div className="card-title" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <TrendingUp size={20} style={{ color: 'var(--accent)' }} />
+              <span>Hesap Hareketleri</span>
+            </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <input 
                 type="text" 
@@ -118,7 +129,12 @@ export default function HesapHareketleriPage() {
                   <tr><td colSpan={9} style={{ textAlign: 'center', padding: 24, color: 'var(--text3)' }}>Yükleniyor...</td></tr>
                 ) : filtrelenmis.length === 0 ? (
                   <tr><td colSpan={9}>
-                    <div className="empty-state"><div className="empty-icon">🏦</div><p>İşlem bulunamadı</p></div>
+                    <div className="empty-state">
+                      <div className="empty-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}>
+                        <Landmark size={48} />
+                      </div>
+                      <p>İşlem bulunamadı</p>
+                    </div>
                   </td></tr>
                 ) : filtrelenmis.map((h, i) => (
                   <tr key={h.id}>
@@ -144,7 +160,14 @@ export default function HesapHareketleriPage() {
                     </td>
                     <td>
                       {h.kaynak === 'manuel' && (
-                        <button className="btn btn-danger btn-sm" onClick={() => sil(h.id)}>🗑️</button>
+                        <button 
+                          className="btn btn-danger btn-sm" 
+                          onClick={() => sil(h.id)}
+                          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, padding: 0 }}
+                          title="Sil"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       )}
                     </td>
                   </tr>

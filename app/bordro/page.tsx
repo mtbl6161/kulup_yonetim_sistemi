@@ -3,39 +3,19 @@ import { useEffect, useState, useCallback } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
-import { ayLabel, fmtTL, fmt, bordroHesapla, isGunuSayisi, tavanHesapla, gunSayisi, AYLAR, gvDilimiBul, tatilMi, gelirVergisiHesapla } from '@/lib/hesaplama'
+import {
+  ayLabel, fmtTL, fmt, bordroHesapla, isGunuSayisi, tavanHesapla, gunSayisi,
+  AYLAR, gvDilimiBul, tatilMi, gelirVergisiHesapla,
+  tahakkukDagitimHesapla, detectActiveCategories,
+  isOgretmen, isBaskan, isBaskanYrd, isMuhasebe, isTemizlik, isDenetim
+} from '@/lib/hesaplama'
 import { Personel, SinifDefteri, Ayarlar, Bordro, BordroSonuc, Tahakkuk, Puantaj, BordroSatir } from '@/lib/types'
 import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
-import { Users, Layers, Calendar, Clock, TrendingUp, Wallet, CheckCircle2, FileText, Printer, Download, Mail, Info } from 'lucide-react'
+import { Users, Layers, Calendar, Clock, TrendingUp, Wallet, CheckCircle2, FileText, Printer, Download, Mail, Info, RotateCw, AlertTriangle, XCircle } from 'lucide-react'
 import { useRef } from 'react'
 import BordroZarfi from '@/components/BordroZarfi'
 import ConfirmModal from '@/components/ConfirmModal'
-
-function isOgretmen(gorev: string) {
-  const g = gorev.toLowerCase()
-  return g.includes('öğretmen') || g.includes('ogretmen') || g.includes('usta')
-}
-function isBaskan(gorev: string) {
-  const g = gorev.toLowerCase()
-  return (g.includes('başkan') || g.includes('baskan') || g.includes('müdür')) &&
-    !g.includes('yardımcı') && !g.includes('yardimci') && !g.includes('yrd')
-}
-function isBaskanYrd(gorev: string) {
-  const g = gorev.toLowerCase()
-  return g.includes('yardımcı') || g.includes('yardimci') || g.includes('yrd')
-}
-function isMuhasebe(gorev: string) {
-  const g = gorev.toLowerCase()
-  return g.includes('muhasebe') || g.includes('memur') || g.includes('yazışma')
-}
-function isTemizlik(gorev: string) {
-  const g = gorev.toLowerCase()
-  return g.includes('temizlik') || g.includes('hizmet') || g.includes('bakım')
-}
-function isDenetim(gorev: string) {
-  return gorev.toLowerCase().includes('denetim')
-}
 
 export default function BordroPage() {
   const { ay, yil } = useAy()
@@ -92,7 +72,13 @@ export default function BordroPage() {
       supabase.from('siniflar').select('id', { count: 'exact', head: true }).eq('aktif', true),
       supabase.from('tahsilat').select('ogrenci_id, tutar').eq('ay', Number(ay)).eq('yil', Number(yil)),
     ])
-    setPersonel(per || [])
+    const filteredPer = (per || []).filter(p => {
+      if (p.aktif !== false) return true;
+      const hasPuantaj = (puan || []).some(x => x.personel_id === p.id && Number(x.saat) > 0);
+      const hasSavedBordro = (brd || []).some(b => b.personel_id === p.id);
+      return hasPuantaj || hasSavedBordro;
+    })
+    setPersonel(filteredPer)
     setDefter(sd || [])
     setPuantajData(puan || [])
     setAyarlar(ayr)
@@ -112,16 +98,38 @@ export default function BordroPage() {
     if (brd && brd.length > 0) {
       // 1. Gerekli ön hesaplamaları yap (hesapla() ile aynı mantık)
       const gelir = tah?.toplam_gelir || 0
+      const activeCategories = detectActiveCategories(filteredPer, puan || [], brd || [])
+      const dagitim = tahakkukDagitimHesapla(gelir, ayr!, activeCategories)
       const pools = {
-        ogretmen:  gelir * (ayr?.dagitim_ogretmen ?? 55) / 100,
-        baskan:    gelir * (ayr?.dagitim_baskan ?? 7) / 100,
-        muhasebe:  gelir * (ayr?.dagitim_muhasebe ?? 2) / 100,
-        temizlik:  gelir * (ayr?.dagitim_temizlik ?? 4) / 100,
-        denetim:   gelir * (ayr?.dagitim_denetim ?? 1) / 100,
+        ogretmen:  dagitim.ogretmen_havuzu,
+        baskan:    dagitim.baskan,
+        baskanYrd: dagitim.baskan_yrd,
+        muhasebe:  dagitim.muhasebe,
+        temizlik:  dagitim.temizlik,
+        denetim:   dagitim.denetim,
       }
 
-      const temizlikSay = (per || []).filter(p => isTemizlik(p.gorev)).length || 1
-      const ogretmenler = (per || []).filter(p => isOgretmen(p.gorev))
+      const isWorking = (p: Personel) => {
+        const hasSavedBordro = (brd || []).some(b => b.personel_id === p.id)
+        if (hasSavedBordro) return true
+
+        if (p.aktif !== false) {
+          if (isBaskan(p.gorev) || isBaskanYrd(p.gorev) || isMuhasebe(p.gorev) || isTemizlik(p.gorev) || isDenetim(p.gorev)) {
+            return true
+          }
+          const hasPuantaj = (puan || []).some(pu => pu.personel_id === p.id && Number(pu.saat) > 0)
+          return hasPuantaj
+        }
+
+        const hasPuantaj = (puan || []).some(pu => pu.personel_id === p.id && Number(pu.saat) > 0)
+        if (hasPuantaj) return true
+
+        return false
+      }
+
+      const workingPersonel = filteredPer.filter(isWorking)
+      const temizlikSay = workingPersonel.filter(p => isTemizlik(p.gorev)).length || 1
+      const ogretmenler = filteredPer.filter(p => isOgretmen(p.gorev))
       let toplamOgretmenSaat = 0
       if (ogretmenler.length > 0) {
         toplamOgretmenSaat = (brd || []).reduce((s, b) => {
@@ -150,15 +158,15 @@ export default function BordroPage() {
         if (isOgretmen(p.gorev)) {
           sUcretDisplay = fmt(ogretmenBirimSaatUcreti)
         } else if (isBaskan(p.gorev)) {
-          sUcretDisplay = `%${ayr?.dagitim_baskan || 7}`
+          sUcretDisplay = `%${dagitim.pct_baskan}`
         } else if (isBaskanYrd(p.gorev)) {
-          sUcretDisplay = `%${ayr?.dagitim_baskan_yrd || 5}`
+          sUcretDisplay = `%${dagitim.pct_baskan_yrd}`
         } else if (isMuhasebe(p.gorev)) {
-          sUcretDisplay = `%${ayr?.dagitim_muhasebe || 2}`
+          sUcretDisplay = `%${dagitim.pct_muhasebe}`
         } else if (isTemizlik(p.gorev)) {
-          sUcretDisplay = `%${ayr?.dagitim_temizlik || 4} / ${temizlikSay}`
+          sUcretDisplay = `%${dagitim.pct_temizlik} / ${temizlikSay}`
         } else if (isDenetim(p.gorev)) {
-          sUcretDisplay = `%${ayr?.dagitim_denetim || 1}`
+          sUcretDisplay = `%${dagitim.pct_denetim}`
         } else {
           sUcretDisplay = ayr?.saat_ucreti?.toString() || "0"
         }
@@ -329,7 +337,7 @@ export default function BordroPage() {
     const body = sortedSatirlar.map((s, i) => [
       i + 1,
       s.personel.gorev,
-      s.personel.ad,
+      s.personel.ad + (s.personel.aktif === false ? ' (Ayrıldı)' : ''),
       s.personel.tc || '-',
       s.toplamSaat || 0,
       typeof s.saatUcreti === 'string' ? s.saatUcreti : fmt(Number(s.saatUcreti)),
@@ -685,7 +693,13 @@ export default function BordroPage() {
         .select('*')
         .order('ad')
       if (perErr) throw new Error('Personel listesi çekilemedi: ' + perErr.message)
-      const aktifPersonelListesi: Personel[] = freshPer || []
+      const filteredPer = (freshPer || []).filter(p => {
+        if (p.aktif !== false) return true;
+        const hasPuantaj = puantajData.some(x => x.personel_id === p.id && Number(x.saat) > 0);
+        const hasSavedBordro = kaydedilmis.some(b => b.personel_id === p.id);
+        return hasPuantaj || hasSavedBordro;
+      })
+      const aktifPersonelListesi: Personel[] = filteredPer
       setPersonel(aktifPersonelListesi)  // state'i de güncelle
 
       // 1. Gerçekleşen Tahsilat Toplamını bul (Kasanıza giren gerçek para)
@@ -715,17 +729,36 @@ export default function BordroPage() {
         setMsg(prev => prev + ' ⚠️ Uyarı: Havuz "0" olarak hesaplandı. Lütfen tahsilatları kontrol edin.')
       }
 
-      const toplam = finalGelir
-      const pct = (oran: number | undefined) => toplam * (oran ?? 0) / 100
       const effectiveTavan = ayarlar.tavan_katsayi || 13184.78
 
+      const isWorking = (p: Personel) => {
+        const hasSavedBordro = kaydedilmis.some(b => b.personel_id === p.id)
+        if (hasSavedBordro) return true
+
+        if (p.aktif !== false) {
+          if (isBaskan(p.gorev) || isBaskanYrd(p.gorev) || isMuhasebe(p.gorev) || isTemizlik(p.gorev) || isDenetim(p.gorev)) {
+            return true
+          }
+          const hasPuantaj = puantajData.some(pu => pu.personel_id === p.id && Number(pu.saat) > 0)
+          return hasPuantaj
+        }
+
+        const hasPuantaj = puantajData.some(pu => pu.personel_id === p.id && Number(pu.saat) > 0)
+        if (hasPuantaj) return true
+
+        return false
+      }
+
+      const activeCategories = detectActiveCategories(aktifPersonelListesi, puantajData, kaydedilmis)
+      const dagitim = tahakkukDagitimHesapla(finalGelir, ayarlar, activeCategories)
+
       const pools = {
-        ogretmen:  pct(ayarlar.dagitim_ogretmen ?? 55),
-        baskan:    pct(ayarlar.dagitim_baskan ?? 7),
-        baskanYrd: pct(ayarlar.dagitim_baskan_yrd ?? 5),
-        muhasebe:  pct(ayarlar.dagitim_muhasebe ?? 2),
-        temizlik:  pct(ayarlar.dagitim_temizlik ?? 4),
-        denetim:   pct(ayarlar.dagitim_denetim ?? 1),
+        ogretmen:  dagitim.ogretmen_havuzu,
+        baskan:    dagitim.baskan,
+        baskanYrd: dagitim.baskan_yrd,
+        muhasebe:  dagitim.muhasebe,
+        temizlik:  dagitim.temizlik,
+        denetim:   dagitim.denetim,
       }
 
       // Öğretmen türündeki personel ve saatleri
@@ -733,7 +766,10 @@ export default function BordroPage() {
       const ogretmenSaatMap = new Map<number, number>()
       ogretmenler.forEach(p => {
         const pSaatler = puantajData.filter(x => x.personel_id === p.id)
-        const toplamSaat = pSaatler.reduce((sum, x) => sum + (Number(x.saat) || 0), 0)
+        const toplamSaat = pSaatler.filter(x => {
+          const d = Number(x.tarih.split('T')[0].split('-')[2])
+          return !tatilMi(ay, d, yil, tatiller)
+        }).reduce((sum, x) => sum + (Number(x.saat) || 0), 0)
         ogretmenSaatMap.set(p.id, toplamSaat)
       })
       const toplamOgretmenSaat = ogretmenler.reduce((s, p) => s + (ogretmenSaatMap.get(p.id) || 0), 0)
@@ -756,7 +792,7 @@ export default function BordroPage() {
       }
 
       // Sadece aktif personeller üzerinden dağıtım yap (Excel mantığı)
-      const aktifPersonel = aktifPersonelListesi.filter(p => p.aktif !== false)
+      const aktifPersonel = aktifPersonelListesi.filter(isWorking)
       const baskanSayisi = aktifPersonel.filter(p => isBaskan(p.gorev)).length || 1
       const baskanYrdSay = aktifPersonel.filter(p => isBaskanYrd(p.gorev)).length || 1
       const muhasebeSay  = aktifPersonel.filter(p => isMuhasebe(p.gorev)).length || 1
@@ -785,15 +821,15 @@ export default function BordroPage() {
         if (isOgretmen(p.gorev)) {
           sUcretDisplay = fmt(ogretmenBirimSaatUcreti)
         } else if (isBaskan(p.gorev)) {
-          sUcretDisplay = `%${ayarlar.dagitim_baskan || 7}`
+          sUcretDisplay = `%${dagitim.pct_baskan}`
         } else if (isBaskanYrd(p.gorev)) {
-          sUcretDisplay = `%${ayarlar.dagitim_baskan_yrd || 5}`
+          sUcretDisplay = `%${dagitim.pct_baskan_yrd}`
         } else if (isMuhasebe(p.gorev)) {
-          sUcretDisplay = `%${ayarlar.dagitim_muhasebe || 2}`
+          sUcretDisplay = `%${dagitim.pct_muhasebe}`
         } else if (isTemizlik(p.gorev)) {
-          sUcretDisplay = `%${ayarlar.dagitim_temizlik || 4} / ${temizlikSay}`
+          sUcretDisplay = `%${dagitim.pct_temizlik} / ${temizlikSay}`
         } else if (isDenetim(p.gorev)) {
-          sUcretDisplay = `%${ayarlar.dagitim_denetim || 1}`
+          sUcretDisplay = `%${dagitim.pct_denetim}`
         } else {
           sUcretDisplay = "0"
         }
@@ -941,7 +977,7 @@ export default function BordroPage() {
   
   // Bordro henüz hesaplanmadıysa puantaj verilerinden toplamı çek
   const sistemToplamSaat = puantajData.reduce((sum, x) => {
-    const d = new Date(x.tarih).getDate()
+    const d = Number(x.tarih.split('T')[0].split('-')[2])
     if (tatilMi(ay, d, yil, tatiller)) return sum
     return sum + (Number(x.saat) || 0)
   }, 0)
@@ -985,8 +1021,14 @@ return (
         sub={`${ayLabel(ay, yil)} — Ücret hesaplama`}
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary btn-sm" onClick={hesapla} disabled={loading || mailing}>
-              🔄 Hesapla & Kaydet
+            <button 
+              className="btn btn-primary btn-sm" 
+              onClick={hesapla} 
+              disabled={loading || mailing}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <RotateCw size={14} className={loading ? 'animate-spin' : ''} />
+              <span>Hesapla & Kaydet</span>
             </button>
             <button className="btn btn-secondary btn-sm no-print" onClick={handleBulkPrint} disabled={!hesaplandi || mailing}>
               <Printer size={14} style={{ marginRight: 4 }} /> Toplu Zarf
@@ -1134,8 +1176,8 @@ return (
                   : '0 2px 8px rgba(248,113,113,0.15)',
               }}
             >
-              <span style={{ fontSize: 22, lineHeight: 1, marginTop: 1 }}>
-                {toplamTahakkuk > 0 ? '⚠️' : '❌'}
+              <span style={{ lineHeight: 1, marginTop: 1, display: 'flex', alignItems: 'center' }}>
+                {toplamTahakkuk > 0 ? <AlertTriangle size={24} style={{ color: '#d97706' }} /> : <XCircle size={24} style={{ color: '#dc2626' }} />}
               </span>
               <div style={{ flex: 1 }}>
                 {toplamTahakkuk > 0 ? (
@@ -1165,7 +1207,8 @@ return (
                         gap: 6,
                       }}
                     >
-                      🔄 Hesapla &amp; Kaydet
+                      <RotateCw size={14} className={loading ? 'animate-spin' : ''} />
+                      <span>Hesapla &amp; Kaydet</span>
                     </button>
                   </>
                 ) : (
@@ -1199,7 +1242,9 @@ return (
                 boxShadow: '0 2px 8px rgba(245,158,11,0.15)',
               }}
             >
-              <span style={{ fontSize: 22, lineHeight: 1, marginTop: 1 }}>⚠️</span>
+              <span style={{ lineHeight: 1, marginTop: 1, display: 'flex', alignItems: 'center' }}>
+                <AlertTriangle size={24} style={{ color: '#d97706' }} />
+              </span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: '#92400e', marginBottom: 4 }}>
                   Yıllık Vergi Matrahı Değişti — Bordroyu Yeniden Hesaplayın!
@@ -1229,7 +1274,8 @@ return (
                     gap: 6,
                   }}
                 >
-                  🔄 Şimdi Hesapla &amp; Güncelle
+                  <RotateCw size={14} className={loading ? 'animate-spin' : ''} />
+                  <span>Şimdi Hesapla &amp; Güncelle</span>
                 </button>
               </div>
             </div>
@@ -1287,7 +1333,10 @@ return (
                       <tr key={s.personel.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
                         <td style={{ ...tdStyle, textAlign: 'center', position: 'sticky', left: 0, zIndex: 1, background: 'inherit' }}>{i + 1}</td>
                         <td style={{ ...tdLeftStyle, position: 'sticky', left: 25, zIndex: 1, background: 'inherit' }}>{s.personel.gorev}</td>
-                        <td style={{ ...tdLeftStyle, fontWeight: 600, position: 'sticky', left: 145, zIndex: 1, background: 'inherit' }}>{s.personel.ad}</td>
+                        <td style={{ ...tdLeftStyle, fontWeight: 600, position: 'sticky', left: 145, zIndex: 1, background: 'inherit' }}>
+                          {s.personel.ad}
+                          {s.personel.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 10, marginLeft: 6 }}> (Ayrıldı)</span>}
+                        </td>
                         <td style={{ ...tdStyle, textAlign: 'center', position: 'sticky', left: 295, zIndex: 1, background: '#eefaff' }} className="no-print">
                           <button 
                             className="btn btn-outline-info btn-sm" 
@@ -1426,7 +1475,14 @@ return (
           <div className="modal-overlay" onClick={() => setSelectedRow(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, overflowY: 'auto', padding: 20 }}>
             <div className="modal-content" onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 12, maxWidth: '210mm', width: '100%', position: 'relative' }}>
               <div className="no-print" style={{ position: 'absolute', top: 10, right: 10, display: 'flex', gap: 8 }}>
-                <button className="btn btn-primary btn-sm" onClick={() => window.print()}>🖨️ Yazdır</button>
+                <button 
+                  className="btn btn-primary btn-sm" 
+                  onClick={() => window.print()}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Printer size={14} />
+                  <span>Yazdır</span>
+                </button>
                 <button className="btn btn-secondary btn-sm" onClick={() => setSelectedRow(null)}>✕ Kapat</button>
               </div>
               <div className="print-area-zarf"><BordroZarfi row={selectedRow} ayarlar={ayarlar} ay={ay} yil={yil} /></div>

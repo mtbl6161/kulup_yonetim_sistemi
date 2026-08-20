@@ -154,14 +154,14 @@ export default function PuantajPage() {
       const isSabitSaatli = g.includes('temizlik') || g.includes('muhasebe')
       const pPuan = puantaj.filter(x => x.personel_id === p.id)
       const filteredPuan = pPuan.filter(x => {
-        const d = new Date(x.tarih).getDate()
+        const d = Number(x.tarih.split('T')[0].split('-')[2])
         return !tatilMi(ay, d, yil, tatiller)
       })
       const total = isSabitSaatli ? 7 : filteredPuan.reduce((sum, x) => sum + (Number(x.saat) || 0), 0)
 
       return [
         (idx + 1).toString(),
-        p.ad,
+        p.ad + (p.aktif === false ? ' (Ayrıldı)' : ''),
         p.gorev,
         ...days,
         total.toString(),
@@ -274,35 +274,32 @@ export default function PuantajPage() {
   const daysInMonth = gunSayisi(yil, ay)
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1)
 
-  // Personel Kategorizasyonu (Yönergeye Göre)
-  const categories = useMemo(() => {
-    const cats = { egitim: [] as Personel[], yonetim: [] as Personel[], destek: [] as Personel[], diger: [] as Personel[] }
-    personel.forEach(p => {
-      const gorev = (p.gorev || '').toLowerCase();
-      if (gorev.includes('denetim')) return;
-
-      // sgk_li alanı true ise SGK'lı, false ise Kadrolu kabul et
-      const type = p.sgk_li ? 'sgk' : 'kadrolu';
-      
-      if (type !== activeType) return;
-
-      if (gorev.includes('öğretmen') || gorev.includes('usta') || gorev.includes('koordinatör')) cats.egitim.push(p)
-      else if (gorev.includes('başkan') || gorev.includes('müdür')) cats.yonetim.push(p)
-      else if (gorev.includes('muhasebe') || gorev.includes('temizlik') || gorev.includes('beslenme')) cats.destek.push(p)
-      else cats.diger.push(p)
-    })
-    return cats
-  }, [personel, activeType])
-
   const filteredPersonel = useMemo(() => {
     return personel.filter(p => {
       const gorev = (p.gorev || '').toLowerCase();
       if (gorev.includes('denetim')) return false;
 
       const type = p.sgk_li ? 'sgk' : 'kadrolu';
-      return type === activeType;
+      if (type !== activeType) return false;
+
+      if (p.aktif !== false) return true;
+      const hasHours = puantaj.some(x => x.personel_id === p.id && Number(x.saat) > 0);
+      return hasHours;
     })
-  }, [personel, activeType])
+  }, [personel, activeType, puantaj])
+
+  // Personel Kategorizasyonu (Yönergeye Göre)
+  const categories = useMemo(() => {
+    const cats = { egitim: [] as Personel[], yonetim: [] as Personel[], destek: [] as Personel[], diger: [] as Personel[] }
+    filteredPersonel.forEach(p => {
+      const gorev = (p.gorev || '').toLowerCase();
+      if (gorev.includes('öğretmen') || gorev.includes('usta') || gorev.includes('koordinatör')) cats.egitim.push(p)
+      else if (gorev.includes('başkan') || gorev.includes('müdür')) cats.yonetim.push(p)
+      else if (gorev.includes('muhasebe') || gorev.includes('temizlik') || gorev.includes('beslenme')) cats.destek.push(p)
+      else cats.diger.push(p)
+    })
+    return cats
+  }, [filteredPersonel])
 
   const getPuantajValue = (personelId: number, day: number) => {
     if (tatilMi(ay, day, yil, tatiller)) return 0
@@ -503,7 +500,7 @@ export default function PuantajPage() {
                       const g = (p.gorev || '').toLowerCase()
                       const isSabitSaatli = g.includes('temizlik') || g.includes('muhasebe')
                       const filteredPuan = pPuan.filter(x => {
-                        const d = new Date(x.tarih).getDate()
+                        const d = Number(x.tarih.split('T')[0].split('-')[2])
                         return !tatilMi(ay, d, yil, tatiller)
                       })
                       const total = isSabitSaatli ? 7 : filteredPuan.reduce((sum, x) => sum + (Number(x.saat) || 0), 0)
@@ -511,7 +508,10 @@ export default function PuantajPage() {
                       return (
                         <tr key={p.id}>
                           <td style={{ textAlign: 'center' }}>{idx + 1}</td>
-                          <td style={{ fontWeight: 600, fontSize: 12 }}>{p.ad}</td>
+                          <td style={{ fontWeight: 600, fontSize: 12 }}>
+                            {p.ad}
+                            {p.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 10, marginLeft: 6 }} className="no-print"> (Ayrıldı)</span>}
+                          </td>
                           <td style={{ fontSize: 11 }}>{p.gorev}</td>
                           {daysArray.map(d => {
                             const val = getPuantajValue(p.id, d)
@@ -547,7 +547,7 @@ export default function PuantajPage() {
                     if (!isEgitim) return sum
                     const pPuan = puantaj.filter(x => x.personel_id === p.id)
                     const filteredPuan = pPuan.filter(x => {
-                      const d = new Date(x.tarih).getDate()
+                      const d = Number(x.tarih.split('T')[0].split('-')[2])
                       return !tatilMi(ay, d, yil, tatiller)
                     })
                     return sum + filteredPuan.reduce((s, x) => s + (Number(x.saat) || 0), 0)
@@ -577,7 +577,7 @@ export default function PuantajPage() {
                   
                   const pPuan = puantaj.filter(x => x.personel_id === p.id)
                   const filteredPuan = pPuan.filter(x => {
-                    const d = new Date(x.tarih).getDate()
+                    const d = Number(x.tarih.split('T')[0].split('-')[2])
                     return !tatilMi(ay, d, yil, tatiller)
                   })
                   return sum + filteredPuan.reduce((s, x) => s + (Number(x.saat) || 0), 0)

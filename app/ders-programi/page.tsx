@@ -63,6 +63,7 @@ export default function DersProgramiPage() {
   // Sadece ders verebilecek personel (öğretmen, usta öğretici)
   const dersVerebilenPersonel = useMemo(() => {
     return personel.filter(p => {
+      if (p.aktif === false) return false;
       const g = (p.gorev || '').toLocaleLowerCase('tr')
       return g.includes('öğretmen') || g.includes('ogretmen') || g.includes('usta')
     })
@@ -83,7 +84,7 @@ export default function DersProgramiPage() {
 
       const [{ data: pr, error: prErr }, { data: per }, { data: tat }, { data: sin }, { data: ayr }] = await Promise.all([
         supabase.from('ders_programi')
-          .select('*, ogretmen:personel(id,ad,gorev)')
+          .select('*, ogretmen:personel(id,ad,gorev,aktif)')
           .or(`and(ay.eq.${ay},yil.eq.${yil}),ay.is.null,and(ay.eq.${pAy},yil.eq.${pYil}),and(ay.eq.${nAy},yil.eq.${nYil})`)
           .order('gun'),
         supabase.from('personel').select('*').order('ad'),
@@ -196,7 +197,8 @@ export default function DersProgramiPage() {
               row.push({ content: 'Tatil', styles: { fillColor: [253, 232, 230], textColor: [180, 80, 80], fontSize: 5 } })
             } else {
               const ders = dersGetir(sinif.ad, dersNo, vd.day, vd.month, vd.year)
-              const ad = (ders?.ogretmen as any)?.ad || ''
+              const ogr = ders?.ogretmen as any
+              const ad = ogr?.ad ? `${ogr.ad}${ogr.aktif === false ? ' (Ayrıldı)' : ''}` : ''
               row.push(ad)
             }
           }
@@ -278,6 +280,99 @@ export default function DersProgramiPage() {
     setPickerArama('')
   }
 
+  async function syncPuantajForPersonDay(personelId: number, day: number, month: number, year: number) {
+    const { data: entries, error } = await supabase
+      .from('sinif_defteri').select('etkinlik_saati')
+      .eq('ogretmen_id', personelId).eq('gun', day).eq('ay', month).eq('yil', year).eq('durum', 'geldi')
+    if (error) return
+    const totalHours = entries.reduce((sum, e) => sum + (Number(e.etkinlik_saati) || 1), 0)
+    const tarih = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    if (totalHours > 0) {
+      await supabase.from('puantaj').upsert({ personel_id: personelId, tarih, saat: totalHours, okul_id: ayarlar?.okul_id }, { onConflict: 'personel_id,tarih' })
+    } else {
+      await supabase.from('puantaj').delete().match({ personel_id: personelId, tarih })
+    }
+  }
+
+  async function syncPuantajForMonth(m: number, y: number, okulId: number) {
+    try {
+      const { data: defterEntries, error: defterErr } = await supabase
+        .from('sinif_defteri')
+        .select('ogretmen_id, gun, etkinlik_saati, durum')
+        .eq('ay', m)
+        .eq('yil', y)
+        .eq('okul_id', okulId)
+      if (defterErr) throw defterErr
+
+      const startDate = `${y}-${String(m).padStart(2, '0')}-01`
+      const endDate = `${y}-${String(m).padStart(2, '0')}-31`
+      const { data: existingPuantaj, error: puantajErr } = await supabase
+        .from('puantaj')
+        .select('id, personel_id, tarih, saat')
+        .eq('okul_id', okulId)
+        .gte('tarih', startDate)
+        .lte('tarih', endDate)
+      if (puantajErr) throw puantajErr
+
+      const expectedHours: Record<string, number> = {}
+      const affectedPersonelIds = new Set<number>()
+
+      defterEntries?.forEach(entry => {
+        if (entry.ogretmen_id && entry.durum === 'geldi') {
+          const key = `${entry.ogretmen_id}_${entry.gun}`
+          expectedHours[key] = (expectedHours[key] || 0) + (Number(entry.etkinlik_saati) || 1)
+          affectedPersonelIds.add(entry.ogretmen_id)
+        }
+      })
+
+      existingPuantaj?.forEach(p => {
+        if (p.personel_id) {
+          affectedPersonelIds.add(p.personel_id)
+        }
+      })
+
+      const daysInMonth = gunSayisi(y, m)
+      const upserts: any[] = []
+      const deletes: number[] = []
+
+      affectedPersonelIds.forEach(pid => {
+        for (let day = 1; day <= daysInMonth; day++) {
+          const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+          const key = `${pid}_${day}`
+          const totalHours = expectedHours[key] || 0
+          const existing = existingPuantaj?.find(p => p.personel_id === pid && p.tarih === dateStr)
+
+          if (totalHours > 0) {
+            if (!existing || existing.saat !== totalHours) {
+              upserts.push({
+                personel_id: pid,
+                tarih: dateStr,
+                saat: totalHours,
+                okul_id: okulId
+              })
+            }
+          } else {
+            if (existing) {
+              deletes.push(existing.id)
+            }
+          }
+        }
+      })
+
+      const promises: any[] = []
+      if (upserts.length > 0) {
+        promises.push(supabase.from('puantaj').upsert(upserts, { onConflict: 'personel_id,tarih' }))
+      }
+      if (deletes.length > 0) {
+        promises.push(supabase.from('puantaj').delete().in('id', deletes))
+      }
+
+      await Promise.all(promises)
+    } catch (err) {
+      console.error('Error syncing puantaj for month:', err)
+    }
+  }
+
   async function directKaydet(teacherId: number, pk: { day: number; month: number; year: number; sinifId: number; dersNo: number }) {
     if (tatilMi(pk.month, pk.day, pk.year, tatiller)) {
       setMsg('❌ Tatil günlerine ders ataması yapılamaz.')
@@ -303,6 +398,12 @@ export default function DersProgramiPage() {
     const secilenOgretmen = personel.find(p => p.id === teacherId)
     const kulupAdi = sinif?.ad || '-'
     
+    // Eski ders kaydını ve öğretmen/koordinatör bilgilerini çek
+    const oldLesson = program.find(p => p.gun === pk.day && p.ay === pk.month && p.yil === pk.year && p.kulup_adi === kulupAdi && (p.ders_no || 1) === pk.dersNo)
+    const oldTeacherId = oldLesson?.ogretmen_id
+    const oldTeacher = oldTeacherId ? personel.find(p => p.id === oldTeacherId) : null
+    const oldKoordinatorId = oldTeacher?.koordinator_id
+
     const optimisticItem: any = {
       id: Math.random(), // Geçici ID
       gun: pk.day, ay: pk.month, yil: pk.year,
@@ -351,12 +452,24 @@ export default function DersProgramiPage() {
       if (existingDefter) await supabase.from('sinif_defteri').update({ ogretmen_id: teacherId, durum: 'geldi' }).eq('id', existingDefter.id)
       else await supabase.from('sinif_defteri').insert({ ...payload, durum: 'geldi' })
 
+      const koordDersNo = (payload.ders_no || 1) + 10
       if (secilenOgretmen?.koordinator_id) {
-        const koordDersNo = (payload.ders_no || 1) + 10
         const { data: existingKoord } = await supabase.from('sinif_defteri').select('id').match({ gun: pk.day, ay: pk.month, yil: pk.year, kulup_adi: kulupAdi, ders_no: koordDersNo, okul_id: currentOkulId }).maybeSingle()
         if (existingKoord) await supabase.from('sinif_defteri').update({ ogretmen_id: secilenOgretmen.koordinator_id, durum: 'geldi' }).eq('id', existingKoord.id)
         else await supabase.from('sinif_defteri').insert({ ...payload, ogretmen_id: secilenOgretmen.koordinator_id, ders_no: koordDersNo, durum: 'geldi' })
+      } else {
+        // Yeni öğretmenin koordinatörü yoksa, eski koordinatör kaydını siliyoruz
+        await supabase.from('sinif_defteri').delete().match({ gun: pk.day, ay: pk.month, yil: pk.year, kulup_adi: kulupAdi, ders_no: koordDersNo, okul_id: currentOkulId })
       }
+
+      // Etkilenen tüm öğretmen/koordinatörlerin puantajlarını güncelle
+      const uniquePersonelIds = new Set<number>()
+      uniquePersonelIds.add(teacherId)
+      if (secilenOgretmen?.koordinator_id) uniquePersonelIds.add(secilenOgretmen.koordinator_id)
+      if (oldTeacherId) uniquePersonelIds.add(oldTeacherId)
+      if (oldKoordinatorId) uniquePersonelIds.add(oldKoordinatorId)
+
+      await Promise.all(Array.from(uniquePersonelIds).map(pid => syncPuantajForPersonDay(pid, pk.day, pk.month, pk.year)))
     } catch (err: any) {
       setProgram(oldProgram) // Hata olursa eski haline döndür
       setMsg('❌ Kayıt hatası: ' + err.message)
@@ -384,6 +497,9 @@ export default function DersProgramiPage() {
     const oldProgram = program
     setProgram(prev => prev.filter(p => p.id !== id))
 
+    const silinecekOgretmen = personel.find(p => p.id === silinecek.ogretmen_id)
+    const koordinatorId = silinecekOgretmen?.koordinator_id
+
     try {
       await Promise.all([
         supabase.from('ders_programi').delete().eq('id', id),
@@ -392,9 +508,15 @@ export default function DersProgramiPage() {
           ay: silinecek.ay,
           yil: silinecek.yil,
           kulup_adi: silinecek.kulup_adi,
-          ders_no: silinecek.ders_no || 1,
-        }),
+        }).in('ders_no', [silinecek.ders_no || 1, (silinecek.ders_no || 1) + 10]),
       ])
+
+      // Puantajları senkronize et
+      const uniquePersonelIds = new Set<number>()
+      if (silinecek.ogretmen_id) uniquePersonelIds.add(silinecek.ogretmen_id)
+      if (koordinatorId) uniquePersonelIds.add(koordinatorId)
+
+      await Promise.all(Array.from(uniquePersonelIds).map(pid => syncPuantajForPersonDay(pid, silinecek.gun, silinecek.ay ?? ay, silinecek.yil ?? yil)))
     } catch (err: any) {
       // Hata olursa eski haline döndür
       setProgram(oldProgram)
@@ -508,6 +630,9 @@ export default function DersProgramiPage() {
         const { error: defterErr } = await supabase.from('sinif_defteri').insert(defterInserts)
         if (defterErr) throw defterErr
       }
+
+      // Puantajları senkronize et
+      await syncPuantajForMonth(ay, yil, okulId)
 
       setMsg(`✅ Kopyalama tamamlandı: ${dpInserts.length} ders işlendi, boş slot'lar temizlendi.`)
       load()
@@ -704,7 +829,10 @@ export default function DersProgramiPage() {
                                     {hs ? <span style={{fontSize: 10, color: '#6b7280', fontWeight: 600, letterSpacing: 0.3}}>HAFTA<br/>SONU</span> : t ? <span style={{fontSize: 10, color: '#b91c1c', fontWeight: 700, letterSpacing: 0.3}}>RESMİ<br/>TATİL</span> : ders ? (
                                       <div className="cell-content" onClick={(e) => openPicker(e, vd.day, vd.month, vd.year, sinif.id, dersNo, '')}>
                                         <button className="fast-del" onClick={(e) => fastSil(e, ders.id)}>×</button>
-                                        <div className="ogretmen-ad">{(ders.ogretmen as any)?.ad?.toUpperCase()}</div>
+                                        <div className="ogretmen-ad">
+                                          {(ders.ogretmen as any)?.ad?.toUpperCase()}
+                                          {(ders.ogretmen as any)?.aktif === false && <span style={{ color: 'red', fontSize: 9 }}> (AYRILDI)</span>}
+                                        </div>
                                       </div>
                                     ) : (
                                       <button onClick={(e) => openPicker(e, vd.day, vd.month, vd.year, sinif.id, dersNo, '')} className="btn-ata">+</button>

@@ -12,7 +12,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   const isAuthPage = pathname === '/login' || pathname === '/signup'
-  const isFullPage = isAuthPage || pathname.startsWith('/tanitim') || pathname === '/fiyatlandirma' || pathname === '/reset-password' || pathname === '/bakim' || pathname === '/odeme-yap' || pathname === '/abonelik-yenile'
+  const isFullPage = isAuthPage || pathname.startsWith('/tanitim') || pathname === '/fiyatlandirma' || pathname === '/ek-ders-hesaplama' || pathname === '/cocuk-kulubu-bordro-hesaplama' || pathname === '/cocuk-kulubu-aidat-hesaplama' || pathname === '/cocuk-kulubu-butce-tablosu' || pathname === '/gelir-vergisi-dilimleri-2026' || pathname.startsWith('/rehber') || pathname === '/reset-password' || pathname === '/bakim' || pathname === '/odeme-yap' || pathname === '/abonelik-yenile'
   const isSuperAdminPanel = pathname.startsWith('/yonetim') || pathname.startsWith('/admin-panel') || pathname.startsWith('/kullanici-yonetimi') || pathname.startsWith('/sistem-logu') || pathname.startsWith('/denetim')
 
   // Yükleme durumu için 3 saniyelik bir emniyet kilidi

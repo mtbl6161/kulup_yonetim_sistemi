@@ -114,13 +114,27 @@ export default function DashboardPage() {
       pua = data || []
     }
 
-    setOgrenciler(ogr || [])
+    const filteredOgr = (ogr || []).filter(o => {
+      if (o.aktif !== false) return true;
+      const hasCurrentTah = (tah || []).some(t => t.ogrenci_id === o.id);
+      const hasPrevTah = (prevTah || []).some(t => t.ogrenci_id === o.id);
+      return hasCurrentTah || hasPrevTah;
+    })
+
+    const filteredPer = (per || []).filter(p => {
+      if (p.aktif !== false) return true;
+      const hasPuantaj = pua.some(x => x.personel_id === p.id && Number(x.saat) > 0);
+      const hasBordro = (brd || []).some(b => b.personel_id === p.id);
+      return hasPuantaj || hasBordro;
+    })
+
+    setOgrenciler(filteredOgr)
     setTahsilatlar(tah || [])
     setPrevTahsilatlar(prevTah || [])
     setHareketler(hh || [])
     setAyarlar(ayr)
     setTatiller(tat || [])
-    setPersonel(per || [])
+    setPersonel(filteredPer)
     setSiniflar(sin || [])
     setBordrolar(brd || [])
     setPuantajlar(pua || [])
@@ -217,7 +231,8 @@ export default function DashboardPage() {
   }
 
   const getGereken = useCallback((o: Ogrenci) => {
-    if (o.ucretsiz_mi || o.aktif === false) return 0
+    const hasPayment = tahsilatlar.some(t => t.ogrenci_id === o.id)
+    if (o.ucretsiz_mi || (o.aktif === false && !hasPayment)) return 0
     if (!ayarlar) return 0
 
     if (o.gunluk_saat != null && o.gunluk_saat > 0) {
@@ -231,7 +246,7 @@ export default function DashboardPage() {
 
     if (o.kardes_indirimi) u *= 0.75
     return Math.round(u * 100) / 100
-  }, [ay, yil, ayarlar, tatiller])
+  }, [ay, yil, ayarlar, tatiller, tahsilatlar])
 
   const toplamTahsilat = Math.round(tahsilatlar.reduce((s, t) => s + Number(t.tutar), 0) * 100) / 100
   const prevToplamTahsilat = Math.round(prevTahsilatlar.reduce((s, t) => s + Number(t.tutar), 0) * 100) / 100

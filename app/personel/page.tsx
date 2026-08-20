@@ -9,7 +9,7 @@ import { useAuth } from '@/lib/AuthContext'
 import { Personel, Ayarlar } from '@/lib/types'
 import ConfirmModal from '@/components/ConfirmModal'
 import PersonelModal from '@/components/PersonelModal'
-import { Plus } from 'lucide-react'
+import { Plus, Pencil, Trash2, Users, RotateCcw } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
@@ -26,6 +26,7 @@ function PersonelIc() {
   const [msg, setMsg] = useState('')
   const [importAcik, setImportAcik] = useState(false)
   const [ayarlar, setAyarlar] = useState<Ayarlar | null>(null)
+  const [listeTuru, setListeTuru] = useState<'aktif' | 'arsiv'>('aktif')
 
   async function load() {
     setLoading(true)
@@ -33,12 +34,12 @@ function PersonelIc() {
       supabase.from('personel').select('*').order('ad'),
       supabase.from('ayarlar').select('*').single()
     ])
-    const aktifPersonel = (per || []).filter(p => p.aktif !== false)
-    setPersonel(aktifPersonel)
+    setPersonel(per || [])
     setAyarlar(ayr || null)
     setLoading(false)
 
     // URL'den gelen ID varsa modalı aç
+    const aktifPersonel = (per || []).filter(p => p.aktif !== false)
     if (targetId && aktifPersonel.length > 0) {
       const found = aktifPersonel.find(p => p.id === Number(targetId))
       if (found) {
@@ -61,28 +62,66 @@ function PersonelIc() {
 
     const { error } = await supabase
       .from('personel')
-      .delete()
+      .update({ aktif: false })
       .eq('id', id)
 
     if (!error) {
-      if (silinen) logIslem({ islem: 'sil', tablo: 'personel', kayit_id: id, aciklama: `${silinen.ad} silindi` })
+      if (silinen) logIslem({ islem: 'sil', tablo: 'personel', kayit_id: id, aciklama: `${silinen.ad} arşive kaldırıldı` })
       load()
       return
     }
 
-    if (error.code === '23503') {
-      setMsg(`❌ "${silinen?.ad}" silinemedi: Bu personele bağlı kayıtlar var. Lütfen önce "migration_fix_fk_on_delete_set_null.sql" dosyasını Supabase'de çalıştırın.`)
-    } else {
-      setMsg(`❌ Silme hatası (${error.code}): ${error.message}`)
-    }
+    setMsg(`❌ Silme hatası: ${error.message}`)
     setTimeout(() => setMsg(''), 10000)
   }
 
+  async function geriYukle(id: number) {
+    const geriYuklenen = personel.find(p => p.id === id)
+    const { error } = await supabase
+      .from('personel')
+      .update({ aktif: true })
+      .eq('id', id)
+
+    if (!error) {
+      if (geriYuklenen) logIslem({ islem: 'guncelle', tablo: 'personel', kayit_id: id, aciklama: `${geriYuklenen.ad} arşivden geri yüklendi` })
+      load()
+      setMsg('✅ Personel başarıyla geri yüklendi.')
+      setTimeout(() => setMsg(''), 3000)
+      return
+    }
+
+    setMsg(`❌ Geri yükleme hatası: ${error.message}`)
+    setTimeout(() => setMsg(''), 10000)
+  }
 
   function modalKapat() {
     setIsModalOpen(false)
     setEditItem(null)
   }
+
+  const getPriority = (gorev: string = '') => {
+    const g = gorev.toLowerCase();
+    if (g.includes('başkan') && !g.includes('yardımcısı')) return 1;
+    if (g.includes('yardımcısı') || g.includes('müdür')) return 2;
+    if (g.includes('denetim')) return 3;
+    if (g.includes('koordinatör')) return 4;
+    if (g.includes('öğretmen')) return 5;
+    if (g.includes('usta')) return 6;
+    if (g.includes('muhasebe') || g.includes('memur')) return 7;
+    if (g.includes('temizlik') || g.includes('hizmet')) return 8;
+    return 9;
+  };
+
+  const sorted = [...personel]
+    .filter(p => {
+      return listeTuru === 'aktif' ? p.aktif !== false : p.aktif === false
+    })
+    .sort((a, b) => {
+      const p1 = getPriority(a.gorev);
+      const p2 = getPriority(b.gorev);
+      if (p1 !== p2) return p1 - p2;
+      return (a.ad || '').localeCompare(b.ad || '', 'tr');
+    });
 
   return (
     <div>
@@ -93,9 +132,18 @@ function PersonelIc() {
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div className="card-title" style={{ marginBottom: 0 }}>
-              Personel Listesi ({loading ? '...' : personel.length})
+              Personel Listesi ({loading ? '...' : sorted.length})
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
+              <select
+                className="form-select"
+                style={{ width: 180 }}
+                value={listeTuru}
+                onChange={e => setListeTuru(e.target.value as any)}
+              >
+                <option value="aktif">Aktif Personeller</option>
+                <option value="arsiv">Silinenler / Arşiv</option>
+              </select>
               <button className="btn btn-secondary btn-sm" onClick={() => setImportAcik(true)}>
                 📥 Toplu İçe Aktar
               </button>
@@ -118,86 +166,70 @@ function PersonelIc() {
                 </tr>
               </thead>
               <tbody>
-                {(() => {
-                  const getPriority = (gorev: string = '') => {
-                    const g = gorev.toLowerCase();
-                    if (g.includes('başkan') && !g.includes('yardımcısı')) return 1;
-                    if (g.includes('yardımcısı') || g.includes('müdür')) return 2;
-                    if (g.includes('denetim')) return 3;
-                    if (g.includes('koordinatör')) return 4;
-                    if (g.includes('öğretmen')) return 5;
-                    if (g.includes('usta')) return 6;
-                    if (g.includes('muhasebe') || g.includes('memur')) return 7;
-                    if (g.includes('temizlik') || g.includes('hizmet')) return 8;
-                    return 9;
-                  };
-
-                  const sorted = [...personel].sort((a, b) => {
-                    const p1 = getPriority(a.gorev);
-                    const p2 = getPriority(b.gorev);
-                    if (p1 !== p2) return p1 - p2;
-                    return (a.ad || '').localeCompare(b.ad || '', 'tr');
-                  });
-
-                  return sorted.length === 0 ? (
-                    <tr><td colSpan={10}>
-                      <div className="empty-state">
-                        <div className="empty-icon">👩‍🏫</div>
-                        <p>{loading ? 'Yükleniyor...' : 'Personel bulunamadı'}</p>
-                      </div>
-                    </td></tr>
-                  ) : (
-                    sorted.map((p, i) => (
-                      <tr key={p.id} style={{ fontSize: 12 }}>
-                        <td style={{ color: 'var(--text3)', fontSize: 11 }}>{i + 1}</td>
-                        <td>
-                          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text1)' }}>{p.ad}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
-                            {p.tc || 'TC Yok'} • {p.email || 'E-posta Yok'}
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ marginBottom: 4 }}>
-                            <span className="badge badge-blue" style={{ fontSize: 10 }}>{p.gorev}</span>
-                          </div>
-                          <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>
-                            Kod: {p.meslek_kodu || '-'}
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            <Badge variant={p.personel_turu === 'kadrolu' ? 'blue' : 'orange'}>
-                              {p.personel_turu === 'kadrolu' ? 'Kadrolu' : 'SGK\'lı'}
-                            </Badge>
-                            {p.sgk_li && <Badge variant="green">SGK Girişi Var</Badge>}
-                            {p.is_retired && <Badge variant="gray">Emekli</Badge>}
-                            {p.vergi_istisnasi && <Badge variant="orange">İstisna</Badge>}
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ fontWeight: 600, fontSize: 12 }}>
-                            {p.yillik_matrah ? `₺${Number(p.yillik_matrah).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}` : '-'}
-                          </div>
-                          <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.iban || ''}>
-                            {p.iban || 'IBAN Yok'}
-                          </div>
-                        </td>
-                        <td style={{ fontSize: 12 }}>
-                          {(() => {
-                            const koor = personel.find(k => k.id === p.koordinator_id)
-                            return koor ? koor.ad.split(' ')[0] : <span style={{ color: '#ccc' }}>-</span>
-                          })()}
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
+                {sorted.length === 0 ? (
+                  <tr><td colSpan={10}>
+                    <div className="empty-state">
+                      <div className="empty-icon"><Users size={48} style={{ color: 'var(--text3)' }} /></div>
+                      <p>{loading ? 'Yükleniyor...' : 'Personel bulunamadı'}</p>
+                    </div>
+                  </td></tr>
+                ) : (
+                  sorted.map((p, i) => (
+                    <tr key={p.id} style={{ fontSize: 12 }}>
+                      <td style={{ color: 'var(--text3)', fontSize: 11 }}>{i + 1}</td>
+                      <td>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text1)' }}>{p.ad}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+                          {p.tc || 'TC Yok'} • {p.email || 'E-posta Yok'}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ marginBottom: 4 }}>
+                          <span className="badge badge-blue" style={{ fontSize: 10 }}>{p.gorev}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>
+                          Kod: {p.meslek_kodu || '-'}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          <Badge variant={p.personel_turu === 'kadrolu' ? 'blue' : 'orange'}>
+                            {p.personel_turu === 'kadrolu' ? 'Kadrolu' : 'SGK\'lı'}
+                          </Badge>
+                          {p.sgk_li && <Badge variant="green">SGK Girişi Var</Badge>}
+                          {p.is_retired && <Badge variant="gray">Emekli</Badge>}
+                          {p.vergi_istisnasi && <Badge variant="orange">İstisna</Badge>}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600, fontSize: 12 }}>
+                          {p.yillik_matrah ? `₺${Number(p.yillik_matrah).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}` : '-'}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.iban || ''}>
+                          {p.iban || 'IBAN Yok'}
+                        </div>
+                      </td>
+                      <td style={{ fontSize: 12 }}>
+                        {(() => {
+                          const koor = personel.find(k => k.id === p.koordinator_id)
+                          return koor ? koor.ad.split(' ')[0] : <span style={{ color: '#ccc' }}>-</span>
+                        })()}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {listeTuru === 'aktif' ? (
                           <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                            <button className="btn btn-secondary btn-sm" onClick={() => duzenle(p)} style={{ padding: '4px 8px' }}>✏️</button>
-                            <button className="btn btn-danger btn-sm" onClick={() => setSilOnayId(p.id)} style={{ padding: '4px 8px' }}>🗑️</button>
+                            <button className="btn btn-secondary btn-sm" onClick={() => duzenle(p)} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28 }} title="Düzenle"><Pencil size={14} /></button>
+                            <button className="btn btn-danger btn-sm" onClick={() => setSilOnayId(p.id)} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28 }} title="Sil ve Arşivle"><Trash2 size={14} /></button>
                           </div>
-                        </td>
-                      </tr>
-                    ))
-                  );
-                })()}
+                        ) : (
+                          <button className="btn btn-success btn-sm" onClick={() => geriYukle(p.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 8px' }} title="Arşivden Geri Yükle">
+                            <RotateCcw size={13} /> Geri Yükle
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -217,10 +249,10 @@ function PersonelIc() {
         const hedef = personel.find(p => p.id === silOnayId)
         return (
           <ConfirmModal
-            baslik="Personeli Sil"
-            mesaj={`"${hedef?.ad}" adlı personeli silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.`}
-            onayMetni="Evet, Sil"
-            iptalMetni="Vazgeç"
+            baslik="Personeli Sil ve Arşive Kaldır"
+            mesaj={`"${hedef?.ad}" adlı personeli silmek istediğinizden emin misiniz? Personel listeden kaldırılır ancak geçmiş dönemlerdeki tüm bordro ve puantaj verileri ismiyle beraber korunmaya devam eder. Dilediğiniz zaman "Silinenler / Arşiv" seçeneğinden personeli tüm geçmiş bilgileriyle birlikte geri yükleyebilirsiniz.`}
+            onayMetni="Evet, Sil ve Arşivle"
+            iptalMetni="İptal"
             onOnayla={() => sil(silOnayId)}
             onIptal={() => setSilOnayId(null)}
           />

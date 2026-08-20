@@ -17,7 +17,7 @@ interface Props {
 
 const EMPTY: Partial<Ogrenci> = {
   ad: '', soyad: '', tc: '', sinif: '', ogretmen: '',
-  kardes_indirimi: false, anne_adi: '', anne_tel: '',
+  kardes_indirimi: undefined, anne_adi: '', anne_tel: '',
   ucretsiz_mi: false, ucretsiz_nedeni: '', aktif: true,
   gunluk_saat: undefined
 }
@@ -41,6 +41,8 @@ export default function OgrenciModal({ editItem, ayarlar, profilOkulId, siniflar
 
   async function kaydet() {
     if (!form.ad?.trim() || !form.soyad?.trim()) { setMsg('❌ Ad ve soyad zorunlu!'); return }
+    if (!form.sinif) { setMsg('❌ Sınıf seçimi zorunlu!'); return }
+    if (form.kardes_indirimi === undefined || form.kardes_indirimi === null) { setMsg('❌ Kardeş İndirimi seçimi zorunlu!'); return }
 
     const okulId = profilOkulId ?? ayarlar?.okul_id
     if (!okulId) { setMsg('❌ Okul bilgisi bulunamadı.'); return }
@@ -119,11 +121,15 @@ export default function OgrenciModal({ editItem, ayarlar, profilOkulId, siniflar
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Ad</label>
+              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                Ad <span style={{ color: '#dc2626' }}>*</span>
+              </label>
               <input className="form-input" style={{ width: '100%' }} required value={form.ad || ''} onChange={e => setF('ad', e.target.value)} placeholder="Öğrenci Adı" />
             </div>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Soyad</label>
+              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                Soyad <span style={{ color: '#dc2626' }}>*</span>
+              </label>
               <input className="form-input" style={{ width: '100%' }} required value={form.soyad || ''} onChange={e => setF('soyad', e.target.value)} placeholder="Öğrenci Soyadı" />
             </div>
           </div>
@@ -134,7 +140,9 @@ export default function OgrenciModal({ editItem, ayarlar, profilOkulId, siniflar
               <input className="form-input" style={{ width: '100%' }} maxLength={11} value={form.tc || ''} onChange={e => setF('tc', e.target.value)} placeholder="11 hane" />
             </div>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Sınıf</label>
+              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                Sınıf <span style={{ color: '#dc2626' }}>*</span>
+              </label>
               <select className="form-select" style={{ width: '100%' }} value={form.sinif || ''} onChange={e => setF('sinif', e.target.value)}>
                 <option value="">— Seçilmedi —</option>
                 {siniflar.map((s, i) => <option key={i} value={s.ad}>{s.ad}</option>)}
@@ -151,8 +159,19 @@ export default function OgrenciModal({ editItem, ayarlar, profilOkulId, siniflar
               </select>
             </div>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Kardeş İndirimi</label>
-              <select className="form-select" style={{ width: '100%' }} value={form.kardes_indirimi ? 'evet' : 'hayir'} onChange={e => setF('kardes_indirimi', e.target.value === 'evet')}>
+              <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                Kardeş İndirimi <span style={{ color: '#dc2626' }}>*</span>
+              </label>
+              <select 
+                className="form-select" 
+                style={{ width: '100%' }} 
+                value={form.kardes_indirimi === undefined || form.kardes_indirimi === null ? '' : (form.kardes_indirimi ? 'evet' : 'hayir')} 
+                onChange={e => {
+                  const v = e.target.value;
+                  setF('kardes_indirimi', v === '' ? undefined : (v === 'evet'));
+                }}
+              >
+                <option value="">— Seçiniz —</option>
                 <option value="hayir">Hayır</option>
                 <option value="evet">Evet (%25)</option>
               </select>
