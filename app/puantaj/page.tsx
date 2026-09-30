@@ -371,7 +371,7 @@ export default function PuantajPage() {
               🔄 Sınıf Defterinden Getir
             </button>
             <button className="btn btn-secondary btn-sm no-print" onClick={handlePrint}><Printer size={14} style={{ marginRight: 4 }} /> Yazdır</button>
-            <button className="btn btn-primary btn-sm no-print" onClick={handlePdfDownload} style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}>
+            <button className="btn btn-pdf btn-sm no-print" onClick={handlePdfDownload}>
               <Download size={14} style={{ marginRight: 4 }} /> PDF İndir
             </button>
           </div>

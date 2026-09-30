@@ -21,7 +21,8 @@ const GOREVLER: string[] = [
 
 const EMPTY: Partial<Personel> = {
   ad: '', tc: '', gorev: 'Öğretmen', email: '',
-  sgk_li: false, is_retired: false, vergi_istisnasi: false, iban: '', yillik_matrah: 0,
+  sgk_li: false, is_retired: false, vergi_istisnasi: false, vergi_istisna_tipi: 'tam',
+  istisna_gv_tutari: 0, istisna_dv_tutari: 0, iban: '', yillik_matrah: 0,
   personel_turu: 'kadrolu', koordinator_id: null, meslek_kodu: ''
 }
 
@@ -101,6 +102,9 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
     if (form.sgk_li === undefined || form.sgk_li === null) { setMsg('❌ SGK\'lı mı? seçimi zorunlu!'); return }
     if (form.is_retired === undefined || form.is_retired === null) { setMsg('❌ Emekli mi? seçimi zorunlu!'); return }
     if (form.vergi_istisnasi === undefined || form.vergi_istisnasi === null) { setMsg('❌ Vergi İstisnası seçimi zorunlu!'); return }
+    if (form.vergi_istisnasi && form.vergi_istisna_tipi === 'tutar' && !(Number(form.istisna_gv_tutari || 0) > 0) && !(Number(form.istisna_dv_tutari || 0) > 0)) {
+      setMsg('❌ Belirli tutar seçildiğinde en az bir istisna tutarı girilmelidir!'); return
+    }
 
     const okulId = profilOkulId ?? ayarlar?.okul_id
     if (!okulId) { setMsg('❌ Okul bilgisi bulunamadı.'); return }
@@ -280,6 +284,32 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
                 <option value="hayir">Hayır</option>
                 <option value="evet">Evet</option>
               </select>
+              {form.vergi_istisnasi && (
+                <div style={{ marginTop: 10, padding: 12, background: '#fff8ec', border: '1px solid #f5deb3', borderRadius: 10 }}>
+                  <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6, fontSize: 12 }}>İstisna Türü</label>
+                  <select className="form-select" style={{ width: '100%' }} value={form.vergi_istisna_tipi || 'tam'} onChange={e => setF('vergi_istisna_tipi', e.target.value)}>
+                    <option value="tam">Tam İstisna (asgari ücret)</option>
+                    <option value="tutar">Belirli Tutar</option>
+                  </select>
+                  {form.vergi_istisna_tipi === 'tutar' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Gelir V. (₺/ay)</label>
+                        <input className="form-input" style={{ width: '100%' }} type="number" min={0} step="0.01"
+                          value={form.istisna_gv_tutari || ''} onChange={e => setF('istisna_gv_tutari', e.target.value === '' ? 0 : Number(e.target.value))} placeholder="Örn: 400" />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Damga V. (₺/ay)</label>
+                        <input className="form-input" style={{ width: '100%' }} type="number" min={0} step="0.01"
+                          value={form.istisna_dv_tutari || ''} onChange={e => setF('istisna_dv_tutari', e.target.value === '' ? 0 : Number(e.target.value))} placeholder="0" />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#666', fontStyle: 'italic', lineHeight: 1.3 }}>
+                        * Girilen tutar her ay bordroda hesaplanan vergiden düşülür (hesaplanan vergiyi aşamaz).
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 4 }}>Devreden Vergi Matrahı (₺)</label>

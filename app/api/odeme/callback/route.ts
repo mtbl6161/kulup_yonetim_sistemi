@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     
     console.error('[iyzico callback] Veri okuma hatası. Detaylar:', debugInfo)
     return new NextResponse(
-      `<html><body><script>window.parent.location.href = "${currentAppUrl}/odeme-yap?sonuc=hata&mesaj=ID bulunamadı. Veri İçeriği: ${encodeURIComponent(debugInfo || 'Veri Yok')}";</script></body></html>`,
+      `<html><body><script>window.parent.location.href = "${currentAppUrl}/odeme-yap?sonuc=hata&mesaj=${encodeURIComponent('Ödeme doğrulanamadı. Lütfen tekrar deneyin.')}";</script></body></html>`,
       { headers: { 'Content-Type': 'text/html' } }
     )
   }

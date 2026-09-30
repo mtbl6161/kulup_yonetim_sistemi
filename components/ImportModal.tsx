@@ -3,7 +3,7 @@ import { useState, useRef, useCallback } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 import { logIslem } from '@/lib/audit'
-import { Ogrenci, Personel } from '@/lib/types'
+import { Ogrenci, Personel, OgrenciTuru } from '@/lib/types'
 import { Upload, Download, X, CheckCircle, AlertTriangle, FileSpreadsheet, Copy } from 'lucide-react'
 
 type Tip = 'ogrenci' | 'personel'
@@ -20,6 +20,8 @@ interface ParsedSatir {
 
 interface Props {
   tip: Tip
+  /** Öğrenci aktarımında kaydedilecek tür (varsayılan: kulüp) */
+  ogrenciTuru?: OgrenciTuru
   mevcutOgrenciler?: Ogrenci[]
   mevcutPersonel?: Personel[]
   onKapat: () => void
@@ -35,6 +37,13 @@ const OGR_KOLONLAR = [
 const OGR_ORNEK = [
   ['Ali', 'YILMAZ', '12345678901', '1-A', 'Ayşe Öğretmen', 'Fatma', '0532 111 2233', 'Ahmet YILMAZ', 'Hayır', 'Hayır', '', ''],
   ['Zeynep', 'KAYA', '', '2-B', '', 'Emine', '0543 222 3344', 'Hasan KAYA', 'Evet', 'Evet', 'Şehit çocuğu', '2'],
+]
+
+// Okul öğrencisi şablonu: kulübe özgü alanlar (kardeş indirimi, ücretsiz, ders saati) yok
+const OKUL_OGR_KOLONLAR = ['Ad', 'Soyad', 'TC Kimlik No', 'Sınıf', 'Öğretmen', 'Veli Adı', 'Anne Telefonu']
+const OKUL_OGR_ORNEK = [
+  ['Ali', 'YILMAZ', '12345678901', '1-A', 'Ayşe Öğretmen', 'Ahmet YILMAZ', '0532 111 2233'],
+  ['Zeynep', 'KAYA', '', '2-B', '', 'Hasan KAYA', '0543 222 3344'],
 ]
 
 const PER_KOLONLAR = [
@@ -59,7 +68,8 @@ function normalizeAd(s: string): string {
   return s.trim().toUpperCase().replace(/\s+/g, ' ')
 }
 
-function isKolonZorunlu(tip: Tip, k: string): boolean {
+function isKolonZorunlu(tip: Tip, k: string, okulOgrencisi = false): boolean {
+  if (tip === 'ogrenci' && okulOgrencisi) return ['Ad', 'Soyad', 'Sınıf'].includes(k)
   if (tip === 'ogrenci') {
     return [
       'Ad', 'Soyad', 'Sınıf', 'Kardeş İndirimi (Evet/Hayır)'
@@ -73,7 +83,7 @@ function isKolonZorunlu(tip: Tip, k: string): boolean {
 }
 
 // ── Ana bileşen ─────────────────────────────────────────────────
-export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel = [], onKapat, onTamamlandi }: Props) {
+export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrenciler = [], mevcutPersonel = [], onKapat, onTamamlandi }: Props) {
   const [adim, setAdim] = useState<Adim>('yukle')
   const [satirlar, setSatirlar] = useState<ParsedSatir[]>([])
   const [yukleniyor, setYukleniyor] = useState(false)
@@ -81,11 +91,12 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
   const [surukleniyor, setSurukleniyor] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const kolonlar = tip === 'ogrenci' ? OGR_KOLONLAR : PER_KOLONLAR
+  const okulOgr = tip === 'ogrenci' && ogrenciTuru === 'okul'
+  const kolonlar = okulOgr ? OKUL_OGR_KOLONLAR : tip === 'ogrenci' ? OGR_KOLONLAR : PER_KOLONLAR
 
   // ── Şablon indir ──────────────────────────────────────────────
   function sablonIndir() {
-    const ornekler = tip === 'ogrenci' ? OGR_ORNEK : PER_ORNEK
+    const ornekler = okulOgr ? OKUL_OGR_ORNEK : tip === 'ogrenci' ? OGR_ORNEK : PER_ORNEK
     const ws = XLSX.utils.aoa_to_sheet([kolonlar, ...ornekler])
 
     // Sütun genişlikleri
@@ -93,11 +104,11 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
 
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, tip === 'ogrenci' ? 'Öğrenciler' : 'Personel')
-    XLSX.writeFile(wb, tip === 'ogrenci' ? 'ogrenci_sablonu.xlsx' : 'personel_sablonu.xlsx')
+    XLSX.writeFile(wb, okulOgr ? 'okul_ogrenci_sablonu.xlsx' : tip === 'ogrenci' ? 'ogrenci_sablonu.xlsx' : 'personel_sablonu.xlsx')
   }
 
   // ── Satır parse: öğrenci ──────────────────────────────────────
-  function parseOgrenciSatir(ham: Record<string, string>, idx: number, mevcutTcler: Set<string>, mevcutAdlar: Set<string>): ParsedSatir {
+  function parseOgrenciSatir(ham: Record<string, string>, idx: number, mevcutTcler: Set<string>, mevcutAdlar: Set<string>, dosyaTcler: Set<string>): ParsedSatir {
     const hatalar: string[] = []
     const ad = normalizeAd(ham['Ad'] || '')
     const soyad = normalizeAd(ham['Soyad'] || '')
@@ -111,7 +122,9 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
     if (!sinif) hatalar.push('Sınıf boş')
 
     const kardesStr = (ham['Kardeş İndirimi (Evet/Hayır)'] || '').trim().toLowerCase()
-    if (!kardesStr) {
+    if (okulOgr) {
+      // okul öğrencisi: kardeş indirimi kullanılmaz
+    } else if (!kardesStr) {
       hatalar.push('Kardeş İndirimi boş')
     } else if (kardesStr !== 'evet' && kardesStr !== 'hayır') {
       hatalar.push('Kardeş İndirimi "Evet" veya "Hayır" olmalı')
@@ -121,14 +134,18 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
       return { index: idx, durum: 'hatali', hatalar, data: {}, ham }
     }
 
-    // Mükerrer kontrol: önce TC, sonra ad+soyad
+    // Mükerrer kontrol: önce TC, sonra ad+soyad (sistemde ve dosyanın önceki satırlarında)
     const adKey = `${ad}|${soyad}`
     if (tc && mevcutTcler.has(tc)) {
       return { index: idx, durum: 'muskerrer', hatalar: [`TC ${tc} zaten kayıtlı`], data: {}, ham }
     }
+    if (tc && dosyaTcler.has(tc)) {
+      return { index: idx, durum: 'muskerrer', hatalar: [`TC ${tc} dosyada birden fazla satırda var`], data: {}, ham }
+    }
     if (!tc && mevcutAdlar.has(adKey)) {
       return { index: idx, durum: 'muskerrer', hatalar: [`${ad} ${soyad} zaten kayıtlı`], data: {}, ham }
     }
+    if (tc) dosyaTcler.add(tc)
 
     const data: Partial<Ogrenci> = {
       ad,
@@ -143,13 +160,14 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
       ucretsiz_mi: evet(ham['Ücretsiz Mi (Evet/Hayır)'] || ''),
       ucretsiz_nedeni: (ham['Ücretsiz Nedeni'] || '').trim() || undefined,
       gunluk_saat: ham['Günlük Ders Saati Limiti'] ? (parseInt(ham['Günlük Ders Saati Limiti']) || undefined) : undefined,
+      ...(okulOgr ? { ogrenci_turu: 'okul' as const } : {}),
     }
 
     return { index: idx, durum: 'gecerli', hatalar: [], data, ham }
   }
 
   // ── Satır parse: personel ─────────────────────────────────────
-  function parsePersonelSatir(ham: Record<string, string>, idx: number, mevcutTcler: Set<string>, mevcutAdlar: Set<string>): ParsedSatir {
+  function parsePersonelSatir(ham: Record<string, string>, idx: number, mevcutTcler: Set<string>, mevcutAdlar: Set<string>, dosyaTcler: Set<string>): ParsedSatir {
     const hatalar: string[] = []
     const ad = normalizeAd(ham['Ad Soyad'] || '')
     const tc = (ham['TC Kimlik No'] || '').replace(/\s/g, '')
@@ -219,9 +237,13 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
     if (tc && mevcutTcler.has(tc)) {
       return { index: idx, durum: 'muskerrer', hatalar: [`TC ${tc} zaten kayıtlı`], data: {}, ham }
     }
+    if (tc && dosyaTcler.has(tc)) {
+      return { index: idx, durum: 'muskerrer', hatalar: [`TC ${tc} dosyada birden fazla satırda var`], data: {}, ham }
+    }
     if (!tc && mevcutAdlar.has(adKey)) {
       return { index: idx, durum: 'muskerrer', hatalar: [`${ad} zaten kayıtlı`], data: {}, ham }
     }
+    if (tc) dosyaTcler.add(tc)
 
     const data: Partial<Personel> = {
       ad,
@@ -250,7 +272,9 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
         const buffer = e.target?.result
         const wb = XLSX.read(buffer, { type: 'array' })
         const ws = wb.Sheets[wb.SheetNames[0]]
-        const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
+        // Sayı formatındaki hücreler (TC, telefon) number gelir; hepsini metne çevir
+        const rows: Record<string, string>[] = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+          .map(r => Object.fromEntries(Object.entries(r).map(([k, v]) => [k.trim(), String(v ?? '').trim()])))
 
         if (rows.length === 0) {
           alert('Dosya boş veya okunamadı.')
@@ -273,10 +297,11 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
           })
         }
 
+        const dosyaTcler = new Set<string>()
         const parsed = rows.map((row, i) =>
           tip === 'ogrenci'
-            ? parseOgrenciSatir(row as Record<string, string>, i + 2, mevcutTcler, mevcutAdlar)
-            : parsePersonelSatir(row as Record<string, string>, i + 2, mevcutTcler, mevcutAdlar)
+            ? parseOgrenciSatir(row, i + 2, mevcutTcler, mevcutAdlar, dosyaTcler)
+            : parsePersonelSatir(row, i + 2, mevcutTcler, mevcutAdlar, dosyaTcler)
         )
 
         setSatirlar(parsed)
@@ -322,7 +347,9 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
 
     setYukleniyor(false)
     if (error) {
-      alert('Kayıt hatası: ' + error.message)
+      alert(error.code === '23505' && /tc/i.test(error.message)
+        ? 'Kayıt hatası: Dosyadaki TC\'lerden biri sistemde zaten kayıtlı (başka bir kurumda veya görünmeyen bir kayıtta olabilir). Hiçbir satır eklenmedi.'
+        : 'Kayıt hatası: ' + error.message)
       return
     }
 
@@ -363,7 +390,7 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <FileSpreadsheet size={20} style={{ color: 'var(--accent)' }} />
             <strong style={{ fontSize: 16 }}>
-              {tip === 'ogrenci' ? 'Öğrenci' : 'Personel'} Toplu İçe Aktar
+              {okulOgr ? 'Okul Öğrencisi' : tip === 'ogrenci' ? 'Öğrenci' : 'Personel'} Toplu İçe Aktar
             </strong>
           </div>
           <button onClick={onKapat} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999' }}>
@@ -454,7 +481,7 @@ export default function ImportModal({ tip, mevcutOgrenciler = [], mevcutPersonel
                 </div>
                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, userSelect: 'text' }}>
                   {kolonlar.map(k => {
-                    const zorunlu = isKolonZorunlu(tip, k);
+                    const zorunlu = isKolonZorunlu(tip, k, okulOgr);
                     return (
                       <span key={k} style={{
                         fontSize: 11, padding: '2px 8px', borderRadius: 6,

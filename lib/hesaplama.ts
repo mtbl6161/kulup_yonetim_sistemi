@@ -58,6 +58,19 @@ export function tatilMi(ay: number, gun: number, yil?: number, customTatiller?: 
   return false
 }
 
+/**
+ * Kulüp başlangıç tarihi (Ayarlar > Tatil Takvimi) okula özel bir tatil kaydı olarak tutulur:
+ * 1 Eylül → başlangıçtan önceki gün. Bu ad ile tanınır.
+ */
+export const KULUP_BASLANGIC_TATIL_AD = 'Kulüp Başlangıcı Öncesi'
+
+/** 'YYYY-MM-DD' tarihine gün ekler (yerel saat, taşmalar otomatik) */
+export function gunEkle(iso: string, gun: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const t = new Date(y, m - 1, d + gun)
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
+}
+
 /** Aydaki iş günü sayısı (haftasonu + tatil hariç) */
 export function isGunuSayisi(yil: number, ay: number, customTatiller?: any[]): number {
   const toplam = gunSayisi(yil, ay)
@@ -172,7 +185,9 @@ export function bordroHesapla(
   isRetired: boolean, // New parameter
   gorev?: string,
   havuzBrut?: number,
-  vergiIstisnasi?: boolean
+  vergiIstisnasi?: boolean,
+  // Verilirse tam asgari ücret istisnası yerine bu sabit tutarlar düşülür
+  manuelIstisna?: { gv: number; dv: number }
 ): BordroSonuc {
   const br0 = havuzBrut !== undefined ? havuzBrut : toplamSaat * ayarlar.saat_ucreti
   let brut = Math.round(br0 * 100 + 1e-9) / 100
@@ -218,7 +233,11 @@ export function bordroHesapla(
   let dv_istisna = 0
 
   // Asgari Ücret Vergi İstisnası (İndirimi)
-  if (vergiIstisnasi) {
+  if (vergiIstisnasi && manuelIstisna) {
+    // Personele özel sabit tutarlı istisna (örn. 400 TL) — hesaplanan vergiyi aşamaz
+    gv_istisna = Math.round(Math.min(gv_hesaplanan, Math.max(0, manuelIstisna.gv || 0)) * 100 + 1e-9) / 100
+    dv_istisna = Math.round(Math.min(dv_hesaplanan, Math.max(0, manuelIstisna.dv || 0)) * 100 + 1e-9) / 100
+  } else if (vergiIstisnasi) {
     // GV İstisnası
     if (ayarlar.gv_istisna_sabiti && ayarlar.gv_istisna_sabiti > 0) {
       gv_istisna = ayarlar.gv_istisna_sabiti

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
 import { fmtTL, ayLabel, isGunuSayisi, tarihFmt, tatilMi, RESMI_TATILLER } from '@/lib/hesaplama'
-import { Ogrenci, Tahsilat, HesapHareketi, Ayarlar, Personel } from '@/lib/types'
+import { Ogrenci, Tahsilat, HesapHareketi, Ayarlar, Personel, kulupOgrencisi } from '@/lib/types'
 import Link from 'next/link'
 
 import { useAuth } from '@/lib/AuthContext'
@@ -128,7 +128,7 @@ export default function DashboardPage() {
       return hasPuantaj || hasBordro;
     })
 
-    setOgrenciler(filteredOgr)
+    setOgrenciler(filteredOgr.filter(kulupOgrencisi))
     setTahsilatlar(tah || [])
     setPrevTahsilatlar(prevTah || [])
     setHareketler(hh || [])

@@ -1,0 +1,7 @@
+# Gerçek veli/öğrenci verisi içeren çalışma dosyaları — deploy'a dahil edilmemeli
+*.xlsx
+*.xlsm
+*.xls
+
+# Ortam değişkenleri Vercel panelinden gelir, dosyalar yüklenmemeli
+.env*

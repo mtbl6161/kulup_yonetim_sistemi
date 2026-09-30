@@ -39,7 +39,6 @@ export async function GET(request: NextRequest) {
   if (error) return serverError(error)
   
   // SUNUCU KONSOLU İÇİN (Hata tespiti)
-  console.log(`[Audit API] ${data?.length || 0} kayıt bulundu ve gönderiliyor.`)
   
   return NextResponse.json({ loglar: data })
 }

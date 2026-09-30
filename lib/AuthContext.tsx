@@ -121,7 +121,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single()
 
       if (pErr) {
-        console.warn('Profil bulunamadı:', pErr)
         setLoading(false)
         return
       }

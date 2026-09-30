@@ -6,7 +6,7 @@ import {
   UserPlus, Trash2, Mail, Lock, Building, AlertTriangle, CheckCircle, XCircle,
   GraduationCap, Users, Search, ClipboardList, RefreshCw, ShieldCheck,
   LayoutDashboard, School, Activity, CreditCard, Wallet, TrendingUp, Megaphone,
-  MapPin, Eye, ChevronRight, Compass, Zap, Star, Settings, Key, Info, User, LogOut, CalendarDays
+  MapPin, Eye, ChevronRight, Compass, Zap, Star, Settings, Key, Info, User, LogOut, CalendarDays, X
 } from 'lucide-react'
 import React, { memo } from 'react'
 
@@ -690,7 +690,7 @@ export default function YonetimDashboard() {
                               {new Date(t.baslangic_tarihi).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
                               {t.baslangic_tarihi !== t.bitis_tarihi && ` – ${new Date(t.bitis_tarihi).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}`}
                             </span>
-                            <button onClick={() => resmiTatilSil(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
+                            <button onClick={() => resmiTatilSil(t.id)} aria-label="Kaldır" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', lineHeight: 1, padding: 0, display: 'inline-flex', alignItems: 'center' }}><X size={14} /></button>
                           </div>
                         ))}
                       </div>

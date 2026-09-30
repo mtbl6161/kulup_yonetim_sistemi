@@ -198,7 +198,13 @@ function PersonelIc() {
                           </Badge>
                           {p.sgk_li && <Badge variant="green">SGK Girişi Var</Badge>}
                           {p.is_retired && <Badge variant="gray">Emekli</Badge>}
-                          {p.vergi_istisnasi && <Badge variant="orange">İstisna</Badge>}
+                          {p.vergi_istisnasi && (
+                            <Badge variant="orange">
+                              {p.vergi_istisna_tipi === 'tutar'
+                                ? `İstisna: ₺${(Number(p.istisna_gv_tutari || 0) + Number(p.istisna_dv_tutari || 0)).toLocaleString('tr-TR')}`
+                                : 'Tam İstisna'}
+                            </Badge>
+                          )}
                         </div>
                       </td>
                       <td>

@@ -360,6 +360,7 @@ export default function SinifDefteriPage() {
   }
 
   async function programdanAktarGercek() {
+    setConf(null)
     try {
       setPickerSaving(true)
       setMsg('⌛ Aktarım başlıyor...')
@@ -778,7 +779,10 @@ export default function SinifDefteriPage() {
         pdf.setFont('NotoSans', 'normal')
         pdf.text(`${ayLabel(ay, yil).toUpperCase()} (${gorunum === 'aylik' ? 'AYLIK' : 'HAFTALIK'})`, PW / 2, 22, { align: 'center' })
 
-        const currentHours = typeLabel === 'Ders' ? [1, 2, 3, 4, 5, 6] : [11, 12, 13, 14, 15, 16]
+        const pdfDersSaati = Math.max(1, Math.min(10, ayarlar?.ders_saati_sayisi ?? 6))
+        const currentHours = typeLabel === 'Ders'
+          ? Array.from({ length: pdfDersSaati }, (_, i) => i + 1)
+          : Array.from({ length: pdfDersSaati }, (_, i) => i + 11)
 
         if (gorunum === 'aylik') {
           // --- AYLIK GÖRÜNÜM ---
@@ -924,8 +928,9 @@ export default function SinifDefteriPage() {
   }
 
   const gorunenSiniflar = seciliSinif ? siniflar.filter(s => s.id === seciliSinif) : siniflar
-  const DERS_SAATLERI = [1, 2, 3, 4, 5, 6]
-  const KOORD_SAATLERI = [11, 12, 13, 14, 15, 16]
+  const dersSaatiSayisi = Math.max(1, Math.min(10, ayarlar?.ders_saati_sayisi ?? 6))
+  const DERS_SAATLERI = Array.from({ length: dersSaatiSayisi }, (_, i) => i + 1)
+  const KOORD_SAATLERI = Array.from({ length: dersSaatiSayisi }, (_, i) => i + 11)
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
@@ -981,25 +986,9 @@ export default function SinifDefteriPage() {
                 </button>
               ))}
             </div>
-            <button 
-              className="btn btn-sm" 
-              onClick={handlePdfDownload} 
-              style={{ 
-                background: 'var(--danger)', 
-                color: '#fff', 
-                border: 'none', 
-                fontWeight: 600, 
-                padding: '6px 12px', 
-                fontSize: 13, 
-                borderRadius: 6, 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 6,
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={e => e.currentTarget.style.background = 'var(--danger-hover)'}
-              onMouseOut={e => e.currentTarget.style.background = 'var(--danger)'}
+            <button
+              className="btn btn-pdf btn-sm"
+              onClick={handlePdfDownload}
             >
               <Download size={14} /> PDF İndir
             </button>

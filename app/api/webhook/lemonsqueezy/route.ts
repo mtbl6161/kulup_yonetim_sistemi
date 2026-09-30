@@ -19,7 +19,6 @@ export async function POST(req: NextRequest) {
   const eventName = payload.meta.event_name
   const data = payload.data
 
-  console.log(`🔔 Lemon Squeezy Webhook: ${eventName}`, data.id)
 
   try {
     // 2. Ödeme Başarılı Olayını Yakala
@@ -28,7 +27,6 @@ export async function POST(req: NextRequest) {
       const customData = payload.meta.custom_data
       const okulId = customData?.okul_id
       
-      console.log(`🔍 İşlemdeki Okul ID: ${okulId}`)
 
       if (okulId) {
         // RLS'i aşmak için Service Role Key ile yeni bir client oluştur
@@ -60,7 +58,6 @@ export async function POST(req: NextRequest) {
           yeniBitis.setFullYear(yeniBitis.getFullYear() + 1)
         }
 
-        console.log(`⏳ Süre hesaplandı: ${interval} - Yeni Tarih: ${yeniBitis.toISOString()}`)
 
         const { error: updateErr } = await supabaseAdmin.from('okullar').update({
           odeme_durumu: 'aktif',
@@ -74,7 +71,6 @@ export async function POST(req: NextRequest) {
           throw updateErr
         }
 
-        console.log(`✅ Okul Lisansı Güncellendi: Okul ID ${okulId}`)
       }
     }
 

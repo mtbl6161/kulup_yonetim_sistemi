@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Topbar from '@/components/Topbar'
 import { supabase } from '@/lib/supabase'
 import { Ayarlar, VergiDilimi, Tatil } from '@/lib/types'
+import { AYLAR, isGunuSayisi, gunEkle, KULUP_BASLANGIC_TATIL_AD } from '@/lib/hesaplama'
 import { 
   Building2, 
   Banknote, 
@@ -87,6 +88,47 @@ export default function AyarlarPage() {
   const [tatiller, setTatiller] = useState<Tatil[]>([])
   const [tatilForm, setTatilForm] = useState({ ad: '', bas: '', bit: '', tip: 'ozel' })
   const [tatilSaving, setTatilSaving] = useState(false)
+
+  // Kulüp başlangıç tarihi: eğitim yılının 1 Eylül'ünden başlangıçtan önceki güne kadar okula özel
+  // "tatil" kaydı olarak tutulur → iş günü, aidat, puantaj, ders programı ve sınıf defteri otomatik uyar.
+  const varsayilanEgitimYili = new Date().getMonth() + 1 >= 9 ? new Date().getFullYear() : new Date().getFullYear() - 1
+  const [kbYil, setKbYil] = useState(varsayilanEgitimYili)
+  const [kbTarih, setKbTarih] = useState('')
+  const [kbSaving, setKbSaving] = useState(false)
+  const kbMevcut = tatiller.find(t => t.okul_id !== null && t.ad === KULUP_BASLANGIC_TATIL_AD && t.baslangic_tarihi.startsWith(`${kbYil}-09-01`))
+  useEffect(() => {
+    setKbTarih(kbMevcut ? gunEkle(kbMevcut.bitis_tarihi.split('T')[0], 1) : '')
+  }, [kbMevcut?.id, kbYil]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function tatilleriYenile() {
+    const { data } = await supabase.from('tatiller').select('*').or(`okul_id.eq.${okulData?.id ?? 0},okul_id.is.null`).order('baslangic_tarihi', { ascending: true })
+    if (data) setTatiller(data)
+  }
+
+  async function kulupBaslangicKaydet(kaldir = false) {
+    if (!okulData?.id) { setMsg({ type: 'error', text: 'Okul bilgisi bulunamadı, sayfayı yenileyin.' }); return }
+    const yilBas = `${kbYil}-09-01`, yilBit = `${kbYil + 1}-08-31`
+    if (!kaldir) {
+      if (!kbTarih) { setMsg({ type: 'error', text: 'Kulüp başlangıç tarihini seçin.' }); return }
+      if (kbTarih < yilBas || kbTarih > yilBit) { setMsg({ type: 'error', text: `Tarih ${kbYil}-${kbYil + 1} eğitim yılı içinde olmalı (01.09.${kbYil} – 31.08.${kbYil + 1}).` }); return }
+    }
+    setKbSaving(true)
+    if (kbMevcut) {
+      const { error } = await supabase.from('tatiller').delete().eq('id', kbMevcut.id)
+      if (error) { setKbSaving(false); setMsg({ type: 'error', text: 'Hata: ' + error.message }); return }
+    }
+    // 1 Eylül'de başlıyorsa kapatılacak gün yok
+    if (!kaldir && kbTarih > yilBas) {
+      const { error } = await supabase.from('tatiller').insert({
+        ad: KULUP_BASLANGIC_TATIL_AD, baslangic_tarihi: yilBas, bitis_tarihi: gunEkle(kbTarih, -1), tip: 'ozel', okul_id: okulData.id,
+      })
+      if (error) { setKbSaving(false); setMsg({ type: 'error', text: 'Hata: ' + error.message }); return }
+    }
+    await tatilleriYenile()
+    setKbSaving(false)
+    setMsg({ type: 'success', text: kaldir ? '✅ Kulüp başlangıç tarihi kaldırıldı.' : `✅ Kulüp başlangıcı ${new Date(kbTarih).toLocaleDateString('tr-TR')} olarak kaydedildi. Öncesindeki günler iş gününden düşüldü.` })
+    setTimeout(() => setMsg(null), 4000)
+  }
   const [tatilEkleAcik, setTatilEkleAcik] = useState(false)
   const [conf, setConf] = useState<{
     open: boolean,
@@ -114,7 +156,6 @@ export default function AyarlarPage() {
           .single()
 
         if (pErr || !profil?.okul_id) {
-          console.warn('⚠️ Profil veya okul_id bulunamadı:', pErr?.message)
           // Yine de global tatilleri çek
           const { data: tat } = await supabase.from('tatiller').select('*').is('okul_id', null).order('baslangic_tarihi', { ascending: true })
           if (tat) setTatiller(tat)
@@ -180,6 +221,12 @@ export default function AyarlarPage() {
   }
 
   async function kaydet() {
+    const saatUcreti = Number(form.saat_ucreti)
+    if (!(saatUcreti > 0)) {
+      setMsg({ type: 'error', text: 'Manuel saat ücreti 0\'dan büyük olmalı (öğrenci aidatı bu ücretle hesaplanır).' })
+      return
+    }
+
     setSaving(true)
     setMsg(null)
 
@@ -197,7 +244,8 @@ export default function AyarlarPage() {
           ...validData, 
           gv_istisna_sabiti: form.gv_istisna_sabiti ?? 0,
           dv_istisna_sabiti: form.dv_istisna_sabiti ?? 0,
-          ogrenci_saat_ucreti: form.ogrenci_saat_ucreti ?? 0,
+          saat_ucreti: saatUcreti,
+          ogrenci_saat_ucreti: saatUcreti, // eski alan; saat_ucreti ile eş tutulur
           updated_at: new Date().toISOString() 
         },
         { onConflict: 'okul_id' }
@@ -559,12 +607,18 @@ export default function AyarlarPage() {
                     </div>
                     <div>
                       <label htmlFor="ay-ogrenci-ucret" className="form-label">Manuel Saat Ücreti (₺)</label>
-                      <input id="ay-ogrenci-ucret" className="form-input" type="number" step="0.01" value={form.ogrenci_saat_ucreti || 0} onChange={e => setF('ogrenci_saat_ucreti', parseFloat(e.target.value))} />
-                      <p style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>* Öğrenci gelir havuzu bu ücret üzerinden hesaplanır.</p>
+                      {/* Aidat hesabı (Ödeme Takibi, Genel Bakış, Bilanço) ayarlar.saat_ucreti'ni kullanır */}
+                      <input id="ay-ogrenci-ucret" className="form-input" type="number" step="0.01" min="0" value={form.saat_ucreti ?? ''} onChange={e => setF('saat_ucreti', e.target.value === '' ? null : parseFloat(e.target.value))} />
+                      <p style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>
+                        * Öğrenci aidatı ve gelir havuzu bu ücret üzerinden hesaplanır.
+                        {form.saat_ucreti != null && Number(form.saat_ucreti).toFixed(2) !== sUcret && (
+                          <> Formüle göre hesaplanan: ₺{sUcret} — <button type="button" onClick={() => setF('saat_ucreti', parseFloat(sUcret))} style={{ border: 'none', background: 'none', padding: 0, color: 'var(--accent)', fontWeight: 700, cursor: 'pointer', fontSize: 10, textDecoration: 'underline' }}>bunu kullan</button></>
+                        )}
+                      </p>
                     </div>
                     <div>
                       <label htmlFor="ay-ogretmen-manuel-ucret" className="form-label">Öğretmen Manuel Saat Ücreti (₺)</label>
-                      <input id="ay-ogretmen-manuel-ucret" className="form-input" type="number" step="0.01" value={form.ogretmen_saat_ucreti || 0} onChange={e => setF('ogretmen_saat_ucreti', parseFloat(e.target.value))} />
+                      <input id="ay-ogretmen-manuel-ucret" className="form-input" type="number" step="0.01" min="0" value={form.ogretmen_saat_ucreti ?? ''} onChange={e => setF('ogretmen_saat_ucreti', e.target.value === '' ? null : parseFloat(e.target.value))} />
                       <p style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>* Boş bırakılırsa havuz paylaşımı (dinamik) uygulanır.</p>
                     </div>
                   </div>
@@ -688,6 +742,36 @@ export default function AyarlarPage() {
 
             {/* TAB 4: TATİL YÖNETİMİ */}
             {activeTab === 'tatil' && (
+              <>
+              <div className="card" style={{ margin: '0 0 20px' }}>
+                <div className="card-title"><Calendar size={20} color="var(--accent)" /> Kulüp Başlangıç Tarihi</div>
+                <p style={{ fontSize: 12.5, color: 'var(--text2)', margin: '0 0 14px', lineHeight: 1.6 }}>
+                  Kulüp eğitim yılına geç başladıysa başlangıç tarihini girin. Bu tarihten önceki günler iş günü sayılmaz: aylık iş günü, öğrenci aidatı, puantaj, ders programı ve sınıf defteri buna göre hesaplanır.
+                </p>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div>
+                    <label className="form-label">Eğitim Yılı</label>
+                    <select className="form-select" style={{ width: 140 }} value={kbYil} onChange={e => setKbYil(Number(e.target.value))}>
+                      {[varsayilanEgitimYili - 1, varsayilanEgitimYili, varsayilanEgitimYili + 1].map(y => <option key={y} value={y}>{y}-{y + 1}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">Kulübün Başladığı Gün</label>
+                    <input className="form-input" type="date" style={{ width: 180 }} min={`${kbYil}-09-01`} max={`${kbYil + 1}-08-31`} value={kbTarih} onChange={e => setKbTarih(e.target.value)} />
+                  </div>
+                  <button className="btn btn-primary btn-sm" disabled={kbSaving} onClick={() => kulupBaslangicKaydet()}>{kbSaving ? 'Kaydediliyor...' : 'Kaydet'}</button>
+                  {kbMevcut && <button className="btn btn-secondary btn-sm" disabled={kbSaving} onClick={() => kulupBaslangicKaydet(true)}>Kaldır</button>}
+                </div>
+                {kbMevcut && (
+                  <div className="alert alert-info" style={{ marginTop: 14, marginBottom: 0 }}>
+                    <Info size={16} />
+                    <span>
+                      {new Date(kbMevcut.baslangic_tarihi).toLocaleDateString('tr-TR')} – {new Date(kbMevcut.bitis_tarihi).toLocaleDateString('tr-TR')} arası kulüp kapalı sayılıyor.
+                      {' '}{AYLAR[Number(kbTarih.slice(5, 7))]} ayı iş günü: <strong>{isGunuSayisi(Number(kbTarih.slice(0, 4)), Number(kbTarih.slice(5, 7)), tatiller)}</strong>
+                    </span>
+                  </div>
+                )}
+              </div>
               <div className="card" style={{ margin: 0 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
 
@@ -764,6 +848,7 @@ export default function AyarlarPage() {
 
                 </div>
               </div>
+              </>
             )}
 
             {/* TAB 6: LİSANS & ÖDEME */}
@@ -990,6 +1075,9 @@ export default function AyarlarPage() {
                 <div style={{ marginBottom: 24 }}>
                   <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 4 }}>Hesaplanan Saat Ücreti</div>
                   <div style={{ fontSize: 32, fontWeight: 800, fontFamily: 'Playfair Display, serif' }}>₺{sUcret}</div>
+                  <div style={{ fontSize: 12, opacity: 0.85, marginTop: 6 }}>
+                    Aidatta uygulanan: <strong>₺{form.saat_ucreti != null ? Number(form.saat_ucreti).toFixed(2) : '—'}</strong>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

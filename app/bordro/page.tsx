@@ -12,7 +12,7 @@ import {
 import { Personel, SinifDefteri, Ayarlar, Bordro, BordroSonuc, Tahakkuk, Puantaj, BordroSatir } from '@/lib/types'
 import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
-import { Users, Layers, Calendar, Clock, TrendingUp, Wallet, CheckCircle2, FileText, Printer, Download, Mail, Info, RotateCw, AlertTriangle, XCircle } from 'lucide-react'
+import { Users, Layers, Calendar, Clock, TrendingUp, Wallet, CheckCircle2, FileText, Printer, Download, Mail, Info, RotateCw, AlertTriangle, XCircle, X } from 'lucide-react'
 import { useRef } from 'react'
 import BordroZarfi from '@/components/BordroZarfi'
 import ConfirmModal from '@/components/ConfirmModal'
@@ -137,7 +137,8 @@ export default function BordroPage() {
           return s
         }, 0)
       }
-      const ogretmenBirimSaatUcreti = toplamOgretmenSaat > 0 ? Math.round((pools.ogretmen / toplamOgretmenSaat) * 100) / 100 : 0
+      // Küsürat atılır: 480,90 → 480,00
+      const ogretmenBirimSaatUcreti = toplamOgretmenSaat > 0 ? Math.floor(pools.ogretmen / toplamOgretmenSaat) : 0
 
       const satirlar: BordroSatir[] = (brd || []).map((b: any) => {
         const p = b.personel
@@ -713,7 +714,6 @@ export default function BordroPage() {
       
       const gercekGelir = (currentTahs || []).reduce((sum, t) => sum + (Number(t.tutar) || 0), 0)
       
-      console.log('💰 Gerçek Gelir Havuzu:', gercekGelir)
       setMsg(`📊 Gerçekleşen Tahsilat Toplamı: ${fmt(gercekGelir)} TL Havuz`)
 
       // 2. Tahakkuk (havuz) kaydını bu gerçek rakamla güncelle/eşitle
@@ -780,7 +780,7 @@ export default function BordroPage() {
         // Kullanıcı manuel ücret girmemişse havuzu saatlere böl (Dinamik), girmişse onu kullan (Manuel)
         ogretmenBirimSaatUcreti = (ayarlar.ogretmen_saat_ucreti && ayarlar.ogretmen_saat_ucreti > 0) 
           ? ayarlar.ogretmen_saat_ucreti 
-          : Math.round((pools.ogretmen / toplamOgretmenSaat) * 100) / 100
+          : Math.floor(pools.ogretmen / toplamOgretmenSaat) // küsürat atılır: 480,90 → 480,00
         
         ogretmenler.forEach(p => {
           const saat = ogretmenSaatMap.get(p.id) || 0
@@ -814,7 +814,8 @@ export default function BordroPage() {
 
         const hamBrut = havuzBrut
         const mevcut = kaydedilmis.find(b => b.personel_id === p.id)
-        const sonuc = bordroHesapla(hesapAyarlar, pSaat, Number(p.yillik_matrah || 0), !!p.sgk_li, !!p.is_retired, p.gorev, havuzBrut, p.vergi_istisnasi)
+        const sonuc = bordroHesapla(hesapAyarlar, pSaat, Number(p.yillik_matrah || 0), !!p.sgk_li, !!p.is_retired, p.gorev, havuzBrut, p.vergi_istisnasi,
+          p.vergi_istisna_tipi === 'tutar' ? { gv: Number(p.istisna_gv_tutari || 0), dv: Number(p.istisna_dv_tutari || 0) } : undefined)
         
         // Excel uyumlu "Saat Ücreti" gösterim metni (display string)
         let sUcretDisplay: string
@@ -892,7 +893,6 @@ export default function BordroPage() {
       }))
 
       // Önce bu ay/yıl/okul için mevcut kayıtları sil
-      console.log('🗑️ Eski bordro kayıtları siliniyor... okul_id:', okulId, 'ay:', ay, 'yil:', yil)
       const { error: delErr } = await supabase
         .from('bordro')
         .delete()
@@ -902,7 +902,6 @@ export default function BordroPage() {
       if (delErr) throw new Error('Bordro silinemedi: ' + delErr.message)
 
       // Sonra yeni hesaplanan değerleri ekle
-      console.log('💾 Bordro yeniden ekleniyor...', kayitlar.length, 'kayıt')
       const { error: saveErr } = await supabase.from('bordro').insert(kayitlar)
       if (saveErr) throw new Error('Bordro kaydedilemedi: ' + saveErr.message + ' | Kod: ' + saveErr.code)
 
@@ -1033,10 +1032,10 @@ return (
             <button className="btn btn-secondary btn-sm no-print" onClick={handleBulkPrint} disabled={!hesaplandi || mailing}>
               <Printer size={14} style={{ marginRight: 4 }} /> Toplu Zarf
             </button>
-            <button className="btn btn-primary btn-sm no-print" onClick={handlePdfDownload} style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }} disabled={mailing}>
+            <button className="btn btn-pdf btn-sm no-print" onClick={handlePdfDownload} disabled={mailing}>
               <Download size={14} style={{ marginRight: 4 }} /> PDF İndir
             </button>
-            <button className="btn btn-secondary btn-sm no-print" onClick={topluMailGonder} disabled={!hesaplandi || mailing} style={{ background: 'var(--info)', color: 'white', borderColor: 'var(--info)' }}>
+            <button className="btn btn-info btn-sm no-print" onClick={topluMailGonder} disabled={!hesaplandi || mailing}>
               <Mail size={14} style={{ marginRight: 4 }} /> Toplu Mail Gönder
             </button>
           </div>
@@ -1338,9 +1337,9 @@ return (
                           {s.personel.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 10, marginLeft: 6 }}> (Ayrıldı)</span>}
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'center', position: 'sticky', left: 295, zIndex: 1, background: '#eefaff' }} className="no-print">
-                          <button 
-                            className="btn btn-outline-info btn-sm" 
-                            style={{ padding: '2px 4px', background: s.personel.email ? 'var(--info)' : '#ccc', color: 'white', border: 'none' }} 
+                          <button
+                            className="btn btn-info btn-sm"
+                            style={{ padding: '2px 4px' }}
                             title={s.personel.email ? `Mail Gönder: ${s.personel.email}` : 'E-posta adresi eksik'}
                             disabled={!s.personel.email || mailing}
                             onClick={() => tekMailGonder(s)}
@@ -1483,7 +1482,7 @@ return (
                   <Printer size={14} />
                   <span>Yazdır</span>
                 </button>
-                <button className="btn btn-secondary btn-sm" onClick={() => setSelectedRow(null)}>✕ Kapat</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => setSelectedRow(null)}><X size={14} /> Kapat</button>
               </div>
               <div className="print-area-zarf"><BordroZarfi row={selectedRow} ayarlar={ayarlar} ay={ay} yil={yil} /></div>
             </div>

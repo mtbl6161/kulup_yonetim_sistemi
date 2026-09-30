@@ -5,7 +5,7 @@ import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
 import { DersProgrami, Personel, Tatil, Sinif, Ayarlar } from '@/lib/types'
 import { GUNLER, AYLAR, gunSayisi, tatilMi, ayLabel } from '@/lib/hesaplama'
-import { Download, Calendar, Zap, CalendarDays } from 'lucide-react'
+import { Download, Calendar, Zap, CalendarDays, Clock, X } from 'lucide-react'
 import React from 'react'
 import ConfirmModal from '@/components/ConfirmModal'
 
@@ -644,8 +644,28 @@ export default function DersProgramiPage() {
     }
   }
 
+  async function dersSaatiGuncelle(yeni: number) {
+    const clamped = Math.max(1, Math.min(10, yeni))
+    if (!ayarlar) {
+      setMsg('⚠️ Ayarlar henüz yüklenmedi, lütfen tekrar deneyin.')
+      setTimeout(() => setMsg(''), 3000)
+      return
+    }
+    if (clamped === (ayarlar.ders_saati_sayisi ?? 6)) return
+    const oncekiAyarlar = ayarlar
+    // Optimistic: arayüzü anında güncelle
+    setAyarlar({ ...ayarlar, ders_saati_sayisi: clamped })
+    const { error } = await supabase.from('ayarlar').update({ ders_saati_sayisi: clamped }).eq('id', ayarlar.id)
+    if (error) {
+      setAyarlar(oncekiAyarlar)
+      setMsg('❌ Ders saati güncellenemedi: ' + error.message)
+      setTimeout(() => setMsg(''), 3000)
+    }
+  }
+
   const gorunenSiniflar = seciliSinif ? siniflar.filter(s => s.id === seciliSinif) : siniflar
-  const DERS_SAATLERI = [1, 2, 3, 4, 5, 6]
+  const dersSaatiSayisi = Math.max(1, Math.min(10, ayarlar?.ders_saati_sayisi ?? 6))
+  const DERS_SAATLERI = Array.from({ length: dersSaatiSayisi }, (_, i) => i + 1)
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
@@ -654,7 +674,7 @@ export default function DersProgramiPage() {
         sub={`${ayLabel(ay, yil)} — Ders Programı Yönetimi`}
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-sm" onClick={handlePdfDownload} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px' }}>
+            <button className="btn btn-pdf btn-sm" onClick={handlePdfDownload}>
               <Download size={14} /> PDF
             </button>
           </div>
@@ -694,22 +714,60 @@ export default function DersProgramiPage() {
                 style={{
                   background: 'transparent', border: 'none',
                   color: palette.fg, cursor: 'pointer',
-                  fontSize: 18, lineHeight: 1, padding: 0,
-                  opacity: 0.6,
+                  lineHeight: 1, padding: 0, opacity: 0.6,
+                  display: 'inline-flex', alignItems: 'center',
                 }}
                 aria-label="Kapat"
-              >×</button>
+              ><X size={16} /></button>
             </div>
           )
         })()}
 
-        <div className="card no-print" style={{ padding: '12px 16px', marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 10 }}>Sınıf Seçimi</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={() => setSeciliSinif(null)} className={`btn ${seciliSinif === null ? 'btn-primary' : 'btn-secondary'}`} style={{ borderRadius: 20, fontSize: 12 }}>Tüm Sınıflar</button>
-            {siniflar.map(s => (
-              <button key={s.id} onClick={() => setSeciliSinif(s.id)} className={`btn ${seciliSinif === s.id ? 'btn-primary' : 'btn-secondary'}`} style={{ borderRadius: 20, fontSize: 12 }}>{s.ad}</button>
-            ))}
+        <div className="card no-print" style={{ padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 10 }}>Sınıf Seçimi</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button onClick={() => setSeciliSinif(null)} className={`btn ${seciliSinif === null ? 'btn-primary' : 'btn-secondary'}`} style={{ borderRadius: 20, fontSize: 12 }}>Tüm Sınıflar</button>
+              {siniflar.map(s => (
+                <button key={s.id} onClick={() => setSeciliSinif(s.id)} className={`btn ${seciliSinif === s.id ? 'btn-primary' : 'btn-secondary'}`} style={{ borderRadius: 20, fontSize: 12 }}>{s.ad}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ flexShrink: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Clock size={13} /> Günlük Ders Saati
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
+                <button
+                  onClick={() => dersSaatiGuncelle(dersSaatiSayisi - 1)}
+                  disabled={dersSaatiSayisi <= 1}
+                  aria-label="Ders saatini azalt"
+                  style={{
+                    width: 34, height: 34, border: 'none', background: '#f8f9fa',
+                    fontSize: 18, fontWeight: 700, lineHeight: 1,
+                    color: dersSaatiSayisi <= 1 ? '#ccc' : 'var(--accent)',
+                    cursor: dersSaatiSayisi <= 1 ? 'not-allowed' : 'pointer',
+                  }}
+                >−</button>
+                <div style={{ width: 46, textAlign: 'center', fontSize: 15, fontWeight: 800, color: '#1f2937' }}>{dersSaatiSayisi}</div>
+                <button
+                  onClick={() => dersSaatiGuncelle(dersSaatiSayisi + 1)}
+                  disabled={dersSaatiSayisi >= 10}
+                  aria-label="Ders saati ekle"
+                  style={{
+                    width: 34, height: 34, border: 'none', background: '#f8f9fa',
+                    fontSize: 18, fontWeight: 700, lineHeight: 1,
+                    color: dersSaatiSayisi >= 10 ? '#ccc' : 'var(--accent)',
+                    cursor: dersSaatiSayisi >= 10 ? 'not-allowed' : 'pointer',
+                  }}
+                >+</button>
+              </div>
+              <span style={{ fontSize: 11, color: '#6b7280', maxWidth: 150, lineHeight: 1.4 }}>
+                Tabloya günde {dersSaatiSayisi} ders satırı gösterilir.
+              </span>
+            </div>
           </div>
         </div>
 
@@ -828,7 +886,7 @@ export default function DersProgramiPage() {
                                   <td key={vd.day} style={{ ...tdStyleObj, background: bgColor, color: hs ? '#999' : 'inherit', borderRight: '1px solid #eee' }}>
                                     {hs ? <span style={{fontSize: 10, color: '#6b7280', fontWeight: 600, letterSpacing: 0.3}}>HAFTA<br/>SONU</span> : t ? <span style={{fontSize: 10, color: '#b91c1c', fontWeight: 700, letterSpacing: 0.3}}>RESMİ<br/>TATİL</span> : ders ? (
                                       <div className="cell-content" onClick={(e) => openPicker(e, vd.day, vd.month, vd.year, sinif.id, dersNo, '')}>
-                                        <button className="fast-del" onClick={(e) => fastSil(e, ders.id)}>×</button>
+                                        <button className="fast-del" onClick={(e) => fastSil(e, ders.id)} aria-label="Sil"><X size={12} /></button>
                                         <div className="ogretmen-ad">
                                           {(ders.ogretmen as any)?.ad?.toUpperCase()}
                                           {(ders.ogretmen as any)?.aktif === false && <span style={{ color: 'red', fontSize: 9 }}> (AYRILDI)</span>}
@@ -919,9 +977,10 @@ export default function DersProgramiPage() {
                     background: '#fee2e2', color: '#dc2626',
                     border: '1px solid #fecaca', borderRadius: 8,
                     fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   }}
                 >
-                  × Atamayı Kaldır
+                  <X size={14} /> Atamayı Kaldır
                 </button>
               )}
             </div>

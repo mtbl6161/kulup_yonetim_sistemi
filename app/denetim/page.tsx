@@ -210,7 +210,7 @@ export default function DenetimPage() {
     if (okullarData) {
       const okullarWithDetails = await Promise.all(okullarData.map(async (o) => {
         const [ogr, per, son] = await Promise.all([
-          supabase.from('ogrenciler').select('id', { count: 'exact', head: true }).eq('okul_id', o.id),
+          supabase.from('ogrenciler').select('id', { count: 'exact', head: true }).eq('okul_id', o.id).neq('ogrenci_turu', 'okul'),
           supabase.from('personel').select('id', { count: 'exact', head: true }).eq('okul_id', o.id),
           supabase.from('audit_log').select('created_at').eq('okul_id', o.id).order('created_at', { ascending: false }).limit(1).single()
         ])

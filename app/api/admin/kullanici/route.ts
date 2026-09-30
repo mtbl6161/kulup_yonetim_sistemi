@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
       .from('ogrenciler')
       .select('*', { count: 'exact', head: true })
       .eq('okul_id', oid)
+      .neq('ogrenci_turu', 'okul')
     
     const { count: personelCount } = await admin
       .from('personel')

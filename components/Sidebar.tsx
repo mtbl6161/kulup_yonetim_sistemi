@@ -5,12 +5,16 @@ import { usePathname } from 'next/navigation'
 import { AYLAR } from '@/lib/hesaplama'
 import { useAy } from '@/lib/AyContext'
 import { useAuth } from '@/lib/AuthContext'
-import { LogOut, User, LayoutDashboard, Users, Calendar, BookOpen, Clock, BarChart3, Wallet, Landmark, TrendingUp, FileText, Settings, GraduationCap, School, ChevronDown, ClipboardList, Activity, Calculator, Globe } from 'lucide-react'
+import { LogOut, User, LayoutDashboard, Users, Calendar, BookOpen, Clock, BarChart3, Wallet, Landmark, TrendingUp, FileText, Settings, GraduationCap, School, ChevronDown, ClipboardList, Activity, Calculator, Globe, BookText } from 'lucide-react'
 
-const NAV = [
+type Alan = 'kulup' | 'okul'
+
+// alan: 'kulup' | 'okul' → yalnızca o sekmede görünür; alan yoksa her iki sekmede de görünür
+const NAV: { baslik: string; id: string; alan?: Alan; adminOnly?: boolean; superAdminOnly?: boolean; items: any[] }[] = [
   {
     baslik: 'Kurumsal Kayıtlar',
     id: 'kurumsal',
+    alan: 'kulup',
     adminOnly: true,
     items: [
       { href: '/ogrenciler', label: 'Öğrenci Listesi', sub: 'Kayıt, tahsilat ve sınıf atamaları', tags: 'yeni, ekle, kayıt, para', icon: <GraduationCap size={18} /> },
@@ -21,6 +25,7 @@ const NAV = [
   {
     baslik: 'Eğitim ve Planlama',
     id: 'egitim',
+    alan: 'kulup',
     adminOnly: true,
     items: [
       { href: '/ders-programi', label: 'Ders Programı', sub: 'Haftalık plan ve öğretmen atama', tags: 'takvim, plan, hoca', icon: <Calendar size={18} /> },
@@ -28,18 +33,28 @@ const NAV = [
     ],
   },
   {
-    baslik: 'Maaş ve Ödeme',
+    baslik: 'Tahsilat',
+    id: 'tahsilat',
+    alan: 'kulup',
+    adminOnly: true,
+    items: [
+      { href: '/odeme', label: 'Ödeme Takibi', sub: 'Aidat gecikmeleri ve tahsilat', tags: 'borç, ödeme, gecikme, aidat', icon: <Wallet size={18} /> },
+    ],
+  },
+  {
+    baslik: 'Bordro ve Maaş',
     id: 'maas',
+    alan: 'kulup',
     adminOnly: true,
     items: [
       { href: '/puantaj', label: 'Puantaj Girişi', sub: 'Çalışma saati ve hoca onayı', tags: 'saat, hesapla, onay', icon: <Clock size={18} /> },
       { href: '/bordro', label: 'Bordro Özeti', sub: 'Maaş hesaplama ve ödeme fişleri', tags: 'maaş, banka, para, fiş', icon: <BarChart3 size={18} /> },
-      { href: '/odeme', label: 'Ödeme Takibi', sub: 'Aidat gecikmeleri ve tahsilat', tags: 'borç, ödeme, gecikme', icon: <Wallet size={18} /> },
     ],
   },
   {
     baslik: 'Muhasebe',
     id: 'muhasebe',
+    alan: 'kulup',
     adminOnly: true,
     items: [
       { href: '/muhasebe', label: 'Muhasebe Yönetimi', sub: 'Hesap planı ve mali kayıtlar', tags: 'muhasebe, kayıt, defter', icon: <Calculator size={18} /> },
@@ -48,11 +63,39 @@ const NAV = [
   {
     baslik: 'Finansal Raporlar',
     id: 'finans',
+    alan: 'kulup',
     adminOnly: true,
     items: [
       { href: '/hesap-hareketleri', label: 'Hesap Hareketleri', sub: 'Tüm para akışını inceleyin', tags: 'para, banka, giriş, çıkış', icon: <Landmark size={18} /> },
       { href: '/gelir-gider', label: 'Gelir / Gider Özet', sub: 'Kar / Zarar analizi yapın', tags: 'fatura, harcama, kar', icon: <TrendingUp size={18} /> },
       { href: '/bilanco', label: 'Bilanço', sub: 'Genel finansal durum tablosu', tags: 'rapor, nakit, varlık', icon: <FileText size={18} /> },
+    ],
+  },
+  {
+    baslik: 'Okul Kayıtları',
+    id: 'okul-kayit',
+    alan: 'okul',
+    adminOnly: true,
+    items: [
+      { href: '/okul-ogrenciler', label: 'Okul Öğrencileri', sub: 'Kulübe kayıtlı olmayan okul öğrencileri', tags: 'okul, öğrenci, kayıt, ekle, liste, sınıf', icon: <GraduationCap size={18} /> },
+    ],
+  },
+  {
+    baslik: 'Okul Tahsilatları',
+    id: 'okul-tahsilat',
+    alan: 'okul',
+    adminOnly: true,
+    items: [
+      { href: '/tahsilat-takip', label: 'Tahsilat Takip', sub: 'Okul, kulüp, kırtasiye ve etkinlik tahsilatları', tags: 'tahsilat, kategori, kırtasiye, etkinlik, okul, kulüp, borç, ödedi', icon: <ClipboardList size={18} /> },
+    ],
+  },
+  {
+    baslik: 'Okul Muhasebesi',
+    id: 'okul-muhasebe',
+    alan: 'okul',
+    adminOnly: true,
+    items: [
+      { href: '/isletme-defteri', label: 'İşletme Defteri', sub: 'Yasal gelir-gider defteri ve banka hareketleri', tags: 'işletme, defter, gelir, gider, kapak, banka, ekstre, resmi, devir', icon: <BookText size={18} /> },
     ],
   },
   {
@@ -81,15 +124,33 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
   const { ay, yil, setAy, setYil } = useAy()
   const [openSection, setOpenSection] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [alan, setAlan] = useState<Alan>('kulup')
 
   
   const currentYear = new Date().getFullYear()
   const isSuperAdmin = profil?.rol === 'super_admin'
 
+  // Kaydedilmiş alan tercihini yükle
+  useEffect(() => {
+    try {
+      const kayitli = localStorage.getItem('sidebar_alan')
+      if (kayitli === 'kulup' || kayitli === 'okul') setAlan(kayitli)
+    } catch {}
+  }, [])
+
   useEffect(() => {
     const currentSection = NAV.find(s => s.items.some(i => i.href === pathname))
-    if (currentSection) setOpenSection(currentSection.id)
+    if (currentSection) {
+      setOpenSection(currentSection.id)
+      // Açılan sayfa başka alana aitse o alana geç
+      if (currentSection.alan === 'kulup' || currentSection.alan === 'okul') setAlan(currentSection.alan)
+    }
   }, [pathname])
+
+  const alanSec = (a: Alan) => {
+    setAlan(a)
+    try { localStorage.setItem('sidebar_alan', a) } catch {}
+  }
 
   const toggleSection = (id: string) => {
     setOpenSection(openSection === id ? null : id)
@@ -271,6 +332,59 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
       )}
 
 
+      {!isSuperAdmin && (
+        <div style={{ padding: collapsed ? '10px 12px' : '4px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div
+            role="tablist"
+            style={{
+              display: 'flex',
+              flexDirection: collapsed ? 'column' : 'row',
+              gap: 4,
+              padding: 4,
+              background: 'rgba(0,0,0,0.18)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 12,
+            }}
+          >
+            {([
+              { id: 'kulup', label: 'Kulüp', icon: <Users size={15} /> },
+              { id: 'okul', label: 'Okul', icon: <School size={15} /> },
+            ] as { id: Alan; label: string; icon: React.ReactNode }[]).map(t => {
+              const aktif = alan === t.id
+              return (
+                <button
+                  key={t.id}
+                  role="tab"
+                  aria-selected={aktif}
+                  onClick={() => alanSec(t.id)}
+                  title={t.label}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 7,
+                    padding: collapsed ? '8px 0' : '8px 10px',
+                    border: 'none',
+                    borderRadius: 9,
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    fontWeight: aktif ? 700 : 500,
+                    color: aktif ? 'var(--accent)' : 'rgba(255,255,255,0.7)',
+                    background: aktif ? '#fff' : 'transparent',
+                    boxShadow: aktif ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {t.icon}
+                  {!collapsed && <span>{t.label}</span>}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       <nav style={{ flex: 1, padding: '12px 0', overflowY: 'auto' }}>
         {/* Web Sitesi Linki (En Üstte) */}
         {!search && (
@@ -279,11 +393,11 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
               href="/tanitim"
               className="sidebar-link"
               style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                padding: collapsed ? '12px 0' : '12px 24px',
+                display: 'flex', alignItems: 'center', gap: 13,
+                padding: collapsed ? '11px 0' : '10px 22px',
                 justifyContent: collapsed ? 'center' : 'flex-start',
-                fontSize: 15, color: pathname === '/tanitim' ? '#fff' : 'rgba(255,255,255,0.75)',
-                background: pathname === '/tanitim' ? 'rgba(255,255,255,0.12)' : 'transparent',
+                fontSize: 14, color: pathname === '/tanitim' ? '#fff' : 'rgba(255,255,255,0.75)',
+                background: pathname === '/tanitim' ? 'rgba(255,255,255,0.10)' : 'transparent',
                 borderLeft: pathname === '/tanitim' ? '3px solid var(--accent-light)' : '3px solid transparent',
                 fontWeight: pathname === '/tanitim' ? 600 : 400,
                 textDecoration: 'none', whiteSpace: 'nowrap',
@@ -291,14 +405,9 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
               }}
             >
               <Globe size={18} style={{ color: pathname === '/tanitim' ? 'var(--accent-light)' : 'inherit' }} />
-              {!collapsed && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <span>Web Sitesi</span>
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>Tanıtım sayfasına git</span>
-                </div>
-              )}
+              {!collapsed && <span>Web Sitesi</span>}
             </Link>
-            {!collapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', margin: '8px 24px 16px' }} />}
+            {!collapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', margin: '8px 24px 12px' }} />}
           </div>
         )}
 
@@ -309,11 +418,11 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
               href="/"
               className="sidebar-link"
               style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                padding: collapsed ? '12px 0' : '12px 24px',
+                display: 'flex', alignItems: 'center', gap: 13,
+                padding: collapsed ? '11px 0' : '10px 22px',
                 justifyContent: collapsed ? 'center' : 'flex-start',
-                fontSize: 15, color: pathname === '/' ? '#fff' : 'rgba(255,255,255,0.75)',
-                background: pathname === '/' ? 'rgba(255,255,255,0.12)' : 'transparent',
+                fontSize: 14, color: pathname === '/' ? '#fff' : 'rgba(255,255,255,0.75)',
+                background: pathname === '/' ? 'rgba(255,255,255,0.10)' : 'transparent',
                 borderLeft: pathname === '/' ? '3px solid var(--accent-light)' : '3px solid transparent',
                 fontWeight: pathname === '/' ? 600 : 400,
                 textDecoration: 'none', whiteSpace: 'nowrap',
@@ -321,14 +430,9 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
               }}
             >
               <LayoutDashboard size={18} style={{ color: pathname === '/' ? 'var(--accent-light)' : 'inherit' }} />
-              {!collapsed && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <span>Genel Bakış</span>
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>Dashboard ve istatistikler</span>
-                </div>
-              )}
+              {!collapsed && <span>Genel Bakış</span>}
             </Link>
-            {!collapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', margin: '8px 24px 16px' }} />}
+            {!collapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', margin: '8px 24px 12px' }} />}
           </div>
         )}
         {NAV.map((section: any) => {
@@ -336,6 +440,8 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
           if (section.adminOnly && isSuperAdmin) return null
 
           const q = search.toLowerCase().trim()
+          // Arama yapılırken tüm alanlarda ara; aksi halde sadece seçili sekmenin bölümleri
+          if (!q && section.alan && section.alan !== alan) return null
           const filteredItems = section.items.filter((item: any) => {
             if (item.superAdminOnly && !isSuperAdmin) return false
             if (item.adminOnly && isSuperAdmin) return false
@@ -357,23 +463,23 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
                   onClick={() => toggleSection(section.id)}
                   style={{
                     width: '100%',
-                    padding: '10px 20px',
+                    padding: '14px 22px 6px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     background: 'transparent',
                     border: 'none',
-                    color: 'rgba(255,255,255,0.45)',
-                    fontSize: 13,
-                    fontWeight: 800,
-                    letterSpacing: '0.05em',
+                    color: 'rgba(255,255,255,0.38)',
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    letterSpacing: '0.09em',
                     textTransform: 'uppercase',
                     cursor: 'pointer',
                     textAlign: 'left'
                   }}
                 >
                   {section.baslik}
-                  <ChevronDown size={14} style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)' }} />
+                  <ChevronDown size={13} style={{ opacity: 0.55, transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
                 </button>
               )}
               
@@ -384,57 +490,33 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
                     key={item.href}
                     href={item.href}
                     className="sidebar-link"
-                    title={collapsed ? item.label : undefined}
+                    title={collapsed ? item.label : (item.sub || item.label)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 16,
-                      padding: collapsed ? '12px 0' : '15px 24px',
+                      gap: 13,
+                      padding: collapsed ? '11px 0' : '9px 22px',
                       justifyContent: collapsed ? 'center' : 'flex-start',
-                      color: isActive ? '#fff' : 'rgba(255,255,255,0.65)',
-                      background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
-                      borderRadius: collapsed ? 0 : '0 24px 24px 0',
-                      marginRight: collapsed ? 0 : 16,
-                      fontWeight: isActive ? 700 : 500,
+                      color: isActive ? '#fff' : 'rgba(255,255,255,0.72)',
+                      background: isActive ? 'rgba(255,255,255,0.10)' : 'transparent',
+                      fontWeight: isActive ? 600 : 400,
                       textDecoration: 'none',
                       whiteSpace: 'nowrap',
-                      transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                      position: 'relative',
-                      borderLeft: '4px solid',
+                      transition: 'all 0.15s',
+                      borderLeft: '3px solid',
                       borderColor: isActive ? 'var(--accent-light)' : 'transparent',
-                      boxShadow: isActive ? '0 4px 15px rgba(0,0,0,0.1)' : 'none'
                     }}
                   >
-                    <span style={{ 
+                    <span style={{
                       color: isActive ? 'var(--accent-light)' : 'inherit',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      filter: isActive ? 'drop-shadow(0 0 8px var(--accent-light))' : 'none',
-                      transform: isActive ? 'scale(1.1)' : 'scale(1)',
-                      transition: 'all 0.3s'
+                      flexShrink: 0,
                     }}>
                       {item.icon}
                     </span>
-                    {!collapsed && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <span style={{ fontSize: 15, letterSpacing: '0.01em' }}>{item.label}</span>
-                        {item.sub && (
-                          <span style={{ fontSize: 11, color: isActive ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)', fontWeight: 400 }}>{item.sub}</span>
-                        )}
-                      </div>
-                    )}
-                    {isActive && !collapsed && (
-                      <div style={{
-                        position: 'absolute',
-                        right: 12,
-                        width: 8,
-                        height: 8,
-                        background: 'var(--accent-light)',
-                        borderRadius: '50%',
-                        boxShadow: '0 0 10px var(--accent-light)'
-                      }} />
-                    )}
+                    {!collapsed && <span style={{ fontSize: 14 }}>{item.label}</span>}
                   </Link>
                 )
               })}

@@ -7,7 +7,7 @@ import ConfirmModal from '@/components/ConfirmModal'
 import { supabase } from '@/lib/supabase'
 import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
-import { Ogrenci, Ayarlar, Personel } from '@/lib/types'
+import { Ogrenci, Ayarlar, Personel, kulupOgrencisi } from '@/lib/types'
 import OgrenciModal from '@/components/OgrenciModal'
 import { Plus, Search, Pencil, Trash2, GraduationCap, RotateCcw } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
@@ -19,6 +19,7 @@ function OgrencilerIc() {
   const targetId = searchParams.get('id')
 
   const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
+  const [tumOgrenciler, setTumOgrenciler] = useState<Ogrenci[]>([]) // mükerrer kontrolü için (okul öğrencileri dahil)
   const [personel, setPersonel] = useState<Personel[]>([])
   const [siniflar, setSiniflar] = useState<any[]>([])
   const [editItem, setEditItem] = useState<Ogrenci | null>(null)
@@ -41,7 +42,9 @@ function OgrencilerIc() {
       supabase.from('ayarlar').select('*').single()
     ])
     
-    setOgrenciler(ogr || [])
+    // Okul öğrencileri (ogrenci_turu='okul') Okul > Okul Öğrencileri ekranında yönetilir
+    setOgrenciler((ogr || []).filter(kulupOgrencisi))
+    setTumOgrenciler(ogr || [])
     setPersonel((per || []).filter(p => p.aktif !== false))
     setSiniflar(sin || [])
     setAyarlar(ayr || null)
@@ -252,7 +255,7 @@ function OgrencilerIc() {
       {importAcik && (
         <ImportModal
           tip="ogrenci"
-          mevcutOgrenciler={ogrenciler}
+          mevcutOgrenciler={tumOgrenciler}
           onKapat={() => setImportAcik(false)}
           onTamamlandi={() => { setImportAcik(false); load() }}
         />

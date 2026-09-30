@@ -5,11 +5,11 @@ import Badge from '@/components/Badge'
 import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
 import { fmtTL, ayLabel, isGunuSayisi, tarihFmt } from '@/lib/hesaplama'
-import { Ogrenci, Tahsilat, Ayarlar } from '@/lib/types'
+import { Ogrenci, Tahsilat, Ayarlar, kulupOgrencisi } from '@/lib/types'
 import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
 import ConfirmModal from '@/components/ConfirmModal'
-import { Printer, Wallet, History, Save, Loader2, CreditCard, Trash2, CheckCircle2 } from 'lucide-react'
+import { Printer, Wallet, History, Save, Loader2, CreditCard, Trash2, CheckCircle2, X } from 'lucide-react'
 
 export default function OdemePage() {
   const { ay, yil } = useAy()
@@ -46,7 +46,7 @@ export default function OdemePage() {
       supabase.from('siniflar').select('*'),
       supabase.from('tatiller').select('*').or(`okul_id.eq.${okul?.id ?? 0},okul_id.is.null`)
     ])
-    const filteredOgr = (ogr || []).filter(o => {
+    const filteredOgr = (ogr || []).filter(kulupOgrencisi).filter(o => {
       if (o.aktif !== false) return true;
       const hasTahsilat = (tah || []).some(t => t.ogrenci_id === o.id);
       return hasTahsilat;
@@ -665,9 +665,10 @@ export default function OdemePage() {
           }}>
             <button 
               onClick={() => setShowHistory(false)}
-              style={{ position: 'absolute', top: 15, right: 15, border: 'none', background: 'none', fontSize: 24, cursor: 'pointer', color: 'var(--text3)' }}
+              style={{ position: 'absolute', top: 15, right: 15, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)', display: 'inline-flex', padding: 0 }}
+              aria-label="Kapat"
             >
-              ✕
+              <X size={22} />
             </button>
             <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <History size={20} style={{ color: 'var(--accent)' }} />

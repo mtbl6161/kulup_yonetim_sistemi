@@ -88,6 +88,7 @@ export interface Ayarlar {
   sgk_araci_no?: string       // 3 hane
   sgk_kanun_no?: string       // 5 hane (05510 vb)
   sgk_belge_turu?: string     // 2 hane (01 vb)
+  ders_saati_sayisi?: number // Ders programında gösterilen günlük ders saati sayısı (varsayılan 6)
   updated_at?: string
   okul_id?: number
 }
@@ -101,6 +102,11 @@ export type GorevKategorisi =
   | 'Başkan'
   | 'Başkan Yrd.'
   | 'Denetim Yetkilisi'
+
+export type OgrenciTuru = 'kulup' | 'okul'
+
+/** Kulüp öğrencisi mi? (alan boşsa eski kayıt → kulüp) */
+export const kulupOgrencisi = (o: { ogrenci_turu?: OgrenciTuru | null }) => o.ogrenci_turu !== 'okul'
 
 export interface Ogrenci {
   id: number
@@ -117,6 +123,7 @@ export interface Ogrenci {
   ucretsiz_nedeni?: string
   gunluk_saat?: number      // Bireysel saat kısıtı
   aktif?: boolean           // migration ile eklendi
+  ogrenci_turu?: OgrenciTuru // 'kulup' (varsayılan) | 'okul' — migration_ogrenci_turu.sql
   lemonsqueezy_customer_id?: string
   lemonsqueezy_subscription_id?: string
   created_at?: string
@@ -132,6 +139,9 @@ export interface Personel {
   kadro_durumu?: string
   sgk_li: boolean
   vergi_istisnasi: boolean
+  vergi_istisna_tipi?: 'tam' | 'tutar' // migration_personel_istisna_tutari.sql
+  istisna_gv_tutari?: number           // 'tutar' tipinde aylık GV istisnası
+  istisna_dv_tutari?: number           // 'tutar' tipinde aylık DV istisnası
   iban?: string
   yillik_matrah: number
   meslek_kodu?: string
@@ -245,6 +255,89 @@ export interface HesapHareketi {
   yil?: number              // migration ile eklendi
   created_at?: string
   okul_id?: number
+}
+
+// ============================================================
+// Tahsilat Takip Modülü (Okul / Kulüp / Kırtasiye / Etkinlik vb.)
+// ============================================================
+export type TahsilatKategoriTip = 'aylik' | 'donemlik' | 'tek_seferlik'
+export type TahsilatVeriKaynagi = 'manuel' | 'otomatik_kulup'
+export type TahsilatKapsam = 'tumu' | 'secili'
+
+export interface TahsilatKategori {
+  id: number
+  ad: string
+  tip: TahsilatKategoriTip
+  veri_kaynagi: TahsilatVeriKaynagi
+  kapsam: TahsilatKapsam
+  varsayilan_tutar?: number | null       // kulüp öğrencisi ücreti
+  varsayilan_tutar_okul?: number | null  // okul öğrencisi ücreti
+  sira?: number
+  aktif?: boolean
+  okul_id?: number
+  created_at?: string
+}
+
+export interface TahsilatKategoriOgrenci {
+  id: number
+  kategori_id: number
+  ogrenci_id: number
+  okul_id?: number
+  created_at?: string
+  ogrenci?: Ogrenci
+}
+
+export interface TahsilatKaydi {
+  id: number
+  kategori_id: number
+  ogrenci_id: number
+  donem: string            // aylik: '2025-09' | donemlik: 'D1'/'D2' | tek_seferlik: '-'
+  tutar?: number | null
+  tarih?: string | null
+  aciklama?: string | null
+  okul_id?: number
+  created_at?: string
+  ogrenci?: Ogrenci
+}
+
+/** Öğrenciye özel taksit planı (migration_tahsilat_taksit.sql). Ödenen taksit = tahsilat_kayitlari.donem '<donem>/T<n>' */
+export interface TahsilatTaksitPlani {
+  id: number
+  kategori_id: number
+  ogrenci_id: number
+  donem: string             // taksitlendirilen dönem: '-' | '2026-D1' | '2026-D2'
+  vadeler: string[]         // ISO tarih, taksit sırasıyla
+  tutarlar: number[]        // her taksitin tutarı
+  aciklama?: string | null
+  okul_id?: number
+  created_at?: string
+}
+
+// ============================================================
+// İşletme Hesabı Defteri Modülü (yasal gelir/gider defteri)
+// ============================================================
+export type IsletmeTur = 'gelir' | 'gider'
+
+export interface IsletmeHareket {
+  id: number
+  tarih: string
+  belge_no?: string | null
+  aciklama?: string | null
+  tutar: number
+  tur: IsletmeTur
+  kaynak?: 'manuel' | 'banka'
+  ay?: number
+  yil?: number
+  okul_id?: number
+  created_at?: string
+}
+
+export interface IsletmeDevir {
+  id: number
+  yil: number
+  devreden_tutar: number
+  okul_id?: number
+  created_at?: string
 }
 
 export interface Yoklama {

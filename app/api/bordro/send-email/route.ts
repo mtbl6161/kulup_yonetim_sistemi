@@ -73,7 +73,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Mail gönderilemedi', details: error.message }, { status: 500 })
     }
 
-    console.log('✅ Resend Send Success:', data?.id)
     return NextResponse.json({ success: true, remaining, messageId: data?.id })
   } catch (err: any) {
     console.error('❌ Send Email Error:', err)
