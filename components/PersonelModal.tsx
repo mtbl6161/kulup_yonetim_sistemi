@@ -57,35 +57,29 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
     setForm(f => ({ ...f, [key]: val }))
   }
 
-  function handleMatrahBlur() {
-    const val = Number(form.yillik_matrah)
-    // Eğer SGK'lı değilse, değer 0 ise veya bu rakamı zaten az önce sorduysak çık
-    if (!form.sgk_li || !val || val <= 0 || val === lastAskedMatrah) return
-
-    const kisiPay = ayarlar?.sgk_kisi_pay || 0.14
-    const issizlikPay = ayarlar?.sgk_issizlik_kisi || 0.01
-    
-    const mesaj = `Girdiğiniz ₺${val.toLocaleString('tr-TR')} tutarından SGK Kişi Payı (%${kisiPay * 100}) ve İşsizlik Payı (%${issizlikPay * 100}) düşülsün mu?`
-    
-    // Tıklama olaylarıyla çakışmaması için çok kısa bir gecikme ile açalım
-    setTimeout(() => {
-      setLastAskedMatrah(val)
-      setMatrahConfirmData({ val, msg: mesaj })
-    }, 100)
-  }
-
+  // Matrah sorusunun cevabı gelince kaydı o değerle sürdür
   function applyMatrahDeduction() {
     if (!matrahConfirmData) return
     const { val } = matrahConfirmData
     const kisiPay = ayarlar?.sgk_kisi_pay || 0.14
     const issizlikPay = ayarlar?.sgk_issizlik_kisi || 0.01
-    
+
     const yeniMatrah = Math.round(val * (1 - (kisiPay + issizlikPay)) * 100) / 100
     setF('yillik_matrah', yeniMatrah)
+    setLastAskedMatrah(yeniMatrah)
     setMatrahConfirmData(null)
+    kaydet(yeniMatrah)
   }
 
-  async function kaydet() {
+  function matrahOlduguGibi() {
+    if (!matrahConfirmData) return
+    const { val } = matrahConfirmData
+    setLastAskedMatrah(val)
+    setMatrahConfirmData(null)
+    kaydet(val)
+  }
+
+  async function kaydet(onayliMatrah?: number) {
     if (!form.ad?.trim()) { setMsg('❌ Adı Soyadı zorunlu!'); return }
 
     const tcTemiz = (form.tc || '').trim()
@@ -109,6 +103,19 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
 
     const okulId = profilOkulId ?? ayarlar?.okul_id
     if (!okulId) { setMsg('❌ Okul bilgisi bulunamadı.'); return }
+
+    // Devreden matrah değiştiyse SGK payları düşülsün mü diye sor; kayıt cevaptan sonra sürer
+    const matrah = onayliMatrah ?? (Number(form.yillik_matrah) || 0)
+    if (onayliMatrah === undefined && form.sgk_li && matrah > 0
+        && matrah !== Number(editItem?.yillik_matrah || 0) && matrah !== lastAskedMatrah) {
+      const kisiPay = ayarlar?.sgk_kisi_pay || 0.14
+      const issizlikPay = ayarlar?.sgk_issizlik_kisi || 0.01
+      setMatrahConfirmData({
+        val: matrah,
+        msg: `Girdiğiniz ₺${matrah.toLocaleString('tr-TR')} tutarından SGK Kişi Payı (%${kisiPay * 100}) ve İşsizlik Payı (%${issizlikPay * 100}) düşülsün mü?`,
+      })
+      return
+    }
 
     setSaving(true)
     setMsg('')
@@ -134,6 +141,7 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
       iban: ibanTemiz,
       gorev: form.gorev || 'Öğretmen',
       koordinator_id: form.koordinator_id || null,
+      yillik_matrah: matrah,
       okul_id: okulId
     }
 
@@ -344,7 +352,6 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
                 onBlur={(e) => {
                   const val = parseFloat(e.target.value);
                   setF('yillik_matrah', isNaN(val) ? 0 : val);
-                  handleMatrahBlur();
                 }}
               />
             </div>
@@ -362,7 +369,7 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
         {/* Butonlar */}
         <div style={{ padding: '16px 24px', background: '#f9fafb', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'flex-end', gap: 12, flexShrink: 0 }}>
           <button className="btn btn-secondary" onClick={onClose} disabled={saving} style={{ padding: '10px 20px', minWidth: 100 }}>Vazgeç</button>
-          <button className="btn btn-primary" onClick={kaydet} disabled={saving} style={{ padding: '10px 20px', minWidth: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <button className="btn btn-primary" onClick={() => kaydet()} disabled={saving} style={{ padding: '10px 20px', minWidth: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             {saving ? '⏳...' : (
               <>
                 <Save size={18} />
@@ -381,7 +388,7 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
           iptalMetni="Olduğu Gibi Kalsın"
           tehlikeli={false}
           onOnayla={applyMatrahDeduction}
-          onIptal={() => setMatrahConfirmData(null)}
+          onIptal={matrahOlduguGibi}
         />
       )}
 
