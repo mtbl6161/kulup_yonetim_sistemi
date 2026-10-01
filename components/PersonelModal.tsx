@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Save, UserPlus, UserCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { logIslem } from '@/lib/audit'
@@ -33,6 +33,7 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
   const [koordinatorler, setKoordinatorler] = useState<{ id: number; ad: string }[]>([])
   const [matrahConfirmData, setMatrahConfirmData] = useState<{ val: number, msg: string } | null>(null)
   const [lastAskedMatrah, setLastAskedMatrah] = useState<number | null>(null)
+  const overlayDown = useRef(false)
 
   useEffect(() => {
     if (editItem) {
@@ -159,7 +160,14 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      // Yalnızca karartılmış alana basılıp orada bırakılırsa kapat.
+      // (Inputta metin seçerken fare dışarıda bırakılınca ya da onay penceresinin
+      //  arka planına tıklanınca form istemeden kapanıyordu.)
+      onMouseDown={e => { overlayDown.current = e.target === e.currentTarget }}
+      onClick={e => { if (overlayDown.current && e.target === e.currentTarget) onClose(); overlayDown.current = false }}
+    >
       <div 
         className="personel-modal-content" 
         onClick={e => e.stopPropagation()} 
