@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { rateLimit, getIp } from '@/lib/rate-limit'
 import { serverError } from '@/lib/api-error'
+import { denemeBitisTarihi } from '@/lib/deneme'
 
 export async function POST(request: NextRequest) {
   // 10 dakikada 5 kayıt denemesi (IP bazlı)
@@ -58,11 +59,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  // Ücretsiz 7 Günlük Deneme Süresi Hesapla
-  const denemeBitis = new Date()
-  denemeBitis.setDate(denemeBitis.getDate() + 7)
+  const denemeBitis = denemeBitisTarihi()
 
-  // Okul oluştur — 7 gün ücretsiz deneme (deneme statüsü)
+  // Okul oluştur — ücretsiz deneme (deneme statüsü)
   const name = schoolName?.trim() || user.email!.split('@')[0] + ' Okulu'
   const { data: school, error: schoolError } = await adminClient
     .from('okullar')

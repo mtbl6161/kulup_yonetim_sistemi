@@ -73,21 +73,56 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Geçersiz il' }, { status: 400 })
   }
 
-  // Auth kullanıcısı oluştur
-  const { data: userData, error: userError } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  })
-  if (userError) return serverError(userError)
+  if (String(password).length < 6) {
+    return NextResponse.json({ error: 'Şifre en az 6 karakter olmalıdır' }, { status: 400 })
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase()
+
+  // Bu e-posta ile daha önce auth kullanıcısı açılmış mı? (ör. panel dışından
+  // oluşturulup profili hiç yazılmamış hesaplar). Profilsizse denetçi olarak bağla.
+  const { data: { users } } = await admin.auth.admin.listUsers({ perPage: 1000 })
+  const mevcut = users.find(u => u.email?.toLowerCase() === normalizedEmail)
+
+  let userId: string
+  let yeniKullanici = false
+
+  if (mevcut) {
+    const { data: mevcutProfil } = await admin
+      .from('profiller').select('rol').eq('id', mevcut.id).maybeSingle()
+    if (mevcutProfil) {
+      const rolAdi = mevcutProfil.rol === 'denetim_yetkilisi' ? 'denetim yetkilisi'
+                   : mevcutProfil.rol === 'super_admin' ? 'sistem yöneticisi' : 'okul yöneticisi'
+      return NextResponse.json(
+        { error: `Bu e-posta zaten ${rolAdi} olarak kayıtlı` },
+        { status: 409 }
+      )
+    }
+    const { error: updError } = await admin.auth.admin.updateUserById(mevcut.id, {
+      password,
+      email_confirm: true,
+    })
+    if (updError) return serverError(updError)
+    userId = mevcut.id
+  } else {
+    // Auth kullanıcısı oluştur
+    const { data: userData, error: userError } = await admin.auth.admin.createUser({
+      email: normalizedEmail,
+      password,
+      email_confirm: true,
+    })
+    if (userError) return serverError(userError)
+    userId = userData.user.id
+    yeniKullanici = true
+  }
 
   // Profil oluştur (okul_id yok, il_id var)
   const { error: profileError } = await admin
     .from('profiller')
-    .insert({ id: userData.user.id, il_id, rol: 'denetim_yetkilisi' })
+    .insert({ id: userId, il_id, rol: 'denetim_yetkilisi' })
 
   if (profileError) {
-    await admin.auth.admin.deleteUser(userData.user.id)
+    if (yeniKullanici) await admin.auth.admin.deleteUser(userId)
     return serverError(profileError, 'profil-olustur')
   }
 
@@ -96,10 +131,10 @@ export async function POST(request: NextRequest) {
     islem: 'ekle',
     tablo: 'profiller',
     kullanici_id: caller.id,
-    aciklama: `Denetim yetkilisi (${email}) oluşturuldu — ${il.ad} ili`,
+    aciklama: `Denetim yetkilisi (${normalizedEmail}) ${yeniKullanici ? 'oluşturuldu' : 'mevcut hesaba bağlandı'} — ${il.ad} ili`,
   })
 
-  return NextResponse.json({ ok: true, userId: userData.user.id })
+  return NextResponse.json({ ok: true, userId })
 }
 
 // Denetim yetkilisi sil

@@ -40,6 +40,7 @@ export async function proxy(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     const isAuthPage     = pathname === '/login' || pathname === '/signup'
     const isPaymentPage  = pathname === '/odeme-yap' || pathname === '/abonelik-yenile'
+    const isKurulumPage  = pathname === '/kurulum'
     const isPublicPage   = isAuthPage
                         || pathname === '/reset-password'
                         || pathname === '/bakim'
@@ -87,12 +88,17 @@ export async function proxy(request: NextRequest) {
     }
 
     // 4. ROL & LİSANS KONTROLÜ
-    if (user && pathname !== '/reset-password' && !isPaymentPage) {
+    if (user && pathname !== '/reset-password' && !isPaymentPage && !isKurulumPage) {
       const { data: profil } = await supabase
         .from('profiller')
         .select('rol, okul_id')
         .eq('id', user.id)
         .single()
+
+      // Auth hesabı var ama profil/okul kaydı yarım kalmış → deneme kurulumunu tamamlat
+      if (!profil) {
+        return NextResponse.redirect(new URL('/kurulum', request.url))
+      }
 
       const rol = profil?.rol
 
@@ -129,10 +135,6 @@ export async function proxy(request: NextRequest) {
                         new Date(okul.lisans_bitis) > new Date()
 
         const lisansGecerli = isDeneme || isAktif
-
-        if (lisansGecerli && isPaymentPage) {
-          return NextResponse.redirect(new URL('/', request.url))
-        }
 
         if (!lisansGecerli) {
           const dahahaOnceAktifti = okul?.lisans_bitis != null

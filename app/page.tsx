@@ -32,7 +32,8 @@ import {
   Activity,
   Zap,
   Target,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles
 } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -268,7 +269,9 @@ export default function DashboardPage() {
     const bugun = new Date()
     const bitis = new Date(okul.lisans_bitis)
     const kalanGun = Math.ceil((bitis.getTime() - bugun.getTime()) / (1000 * 60 * 60 * 24))
-    if (kalanGun <= 0) return null 
+    if (kalanGun <= 0) return null
+    // Deneme sürümündeki kurumlara ödeme baskısı yapma — sadece kalan günü bilgi olarak göster
+    if (okul.odeme_durumu === 'deneme') return { kalanGun, seviye: 'deneme' as const }
     if (kalanGun <= 7) return { kalanGun, seviye: 'kritik' as const }
     if (kalanGun <= 30) return { kalanGun, seviye: 'uyari' as const }
     return null
@@ -389,7 +392,21 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
-          {lisansBitisBanner && (
+          {lisansBitisBanner?.seviye === 'deneme' && (
+            <div style={{
+              background: 'var(--accent-lighter)',
+              border: '1px solid var(--accent-light)',
+              padding: '14px 24px', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap'
+            }}>
+              <Sparkles size={20} color="var(--accent)" />
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Ücretsiz deneme sürümündesiniz</div>
+                <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>Tüm özellikleri <strong>{lisansBitisBanner.kalanGun} gün</strong> boyunca ücretsiz kullanabilirsiniz. Dilediğiniz zaman abone olabilirsiniz.</div>
+              </div>
+              <Link href="/odeme-yap" style={{ padding: '8px 16px', background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Planları Gör</Link>
+            </div>
+          )}
+          {lisansBitisBanner && lisansBitisBanner.seviye !== 'deneme' && (
             <div style={{
               background: lisansBitisBanner.seviye === 'kritik' ? 'var(--danger-light)' : 'var(--warn-light)',
               border: `1px solid ${lisansBitisBanner.seviye === 'kritik' ? 'var(--danger-border)' : 'var(--warn-border)'}`,

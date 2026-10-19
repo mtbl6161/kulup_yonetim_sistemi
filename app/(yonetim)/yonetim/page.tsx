@@ -1,4 +1,5 @@
 'use client'
+import { DENEME_GUN } from '@/lib/deneme'
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
@@ -255,10 +256,13 @@ export default function YonetimDashboard() {
       duyurulariGetir().then(() => setDuyurularYuklendi(true));
     } else if (sekme === 'iller' && !illerYuklendi) {
       illeriGetir().then(() => setIllerYuklendi(true));
+    } else if (sekme === 'kullanicilar') {
+      if (!illerYuklendi) illeriGetir().then(() => setIllerYuklendi(true));
+      if (!denetimYuklendi) denetimListesiGetir().then(() => setDenetimYuklendi(true));
     } else if (sekme === 'tatiller') {
       resmiTatilleriGetir()
     }
-  }, [sekme, bakimGetir, loglariGetir, odemeleriGetir, illeriGetir, duyurulariGetir, loglarYuklendi, odemelerYuklendi, illerYuklendi, duyurularYuklendi])
+  }, [sekme, bakimGetir, loglariGetir, odemeleriGetir, illeriGetir, duyurulariGetir, denetimListesiGetir, loglarYuklendi, odemelerYuklendi, illerYuklendi, duyurularYuklendi, denetimYuklendi])
 
   async function resmiTatilleriGetir() {
     const { data } = await supabase.from('tatiller').select('*').is('okul_id', null).order('baslangic_tarihi')
@@ -327,18 +331,64 @@ export default function YonetimDashboard() {
   }
 
   // ── Form İşlemleri ────────────────────────────────
+  // ── Süresi dolan denemelere ek süre ───────────
+  const [uzatmaAdaylari, setUzatmaAdaylari] = useState<{ okul_id: number; okul_adi: string; lisans_bitis: string; email: string }[]>([])
+  const [uzatmaSecili, setUzatmaSecili] = useState<number[]>([])
+  const [uzatmaYukleniyor, setUzatmaYukleniyor] = useState(false)
+  const [uzatmaGonderiliyor, setUzatmaGonderiliyor] = useState(false)
+  const [uzatmaSonuc, setUzatmaSonuc] = useState<{ okul_adi: string; email: string; uzatildi: boolean; mail: boolean; hata?: string }[] | null>(null)
+
+  const uzatmaAdaylariGetir = useCallback(async () => {
+    if (!session) return
+    setUzatmaYukleniyor(true)
+    const res = await fetch('/api/admin/deneme-uzat', { headers: apiHeaders() })
+    if (res.ok) {
+      const data = await res.json()
+      setUzatmaAdaylari(data.adaylar || [])
+      setUzatmaSecili((data.adaylar || []).map((a: any) => a.okul_id))
+    }
+    setUzatmaYukleniyor(false)
+  }, [session, apiHeaders])
+
+  useEffect(() => { if (sekme === 'kullanicilar') uzatmaAdaylariGetir() }, [sekme, uzatmaAdaylariGetir])
+
+  async function handleDenemeUzat() {
+    if (!uzatmaSecili.length) return
+    if (!confirm(`${uzatmaSecili.length} kuruma ${DENEME_GUN} gün ücretsiz deneme tanımlanacak ve yöneticilerine e-posta gönderilecek. Onaylıyor musunuz?`)) return
+    setUzatmaGonderiliyor(true); setHata(null); setBasari(null)
+    const res = await fetch('/api/admin/deneme-uzat', { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ okulIds: uzatmaSecili }) })
+    const body = await res.json()
+    if (!res.ok) setHata(body.error)
+    else {
+      setUzatmaSonuc(body.sonuclar || [])
+      const basarili = (body.sonuclar || []).filter((s: any) => s.uzatildi).length
+      setBasari(`${basarili} kuruma ${DENEME_GUN} gün deneme tanımlandı.`)
+      uzatmaAdaylariGetir(); listeyiGetir()
+    }
+    setUzatmaGonderiliyor(false)
+  }
+
   async function handleOlustur(e: React.SyntheticEvent) {
     e.preventDefault()
     setOlusturuluyor(true); setHata(null); setBasari(null)
-    const res = await fetch('/api/admin/kullanici', {
-      method: 'POST',
-      headers: apiHeaders(),
-      body: JSON.stringify({ email, password, schoolName: formRol === 'okul_admin' ? schoolName : null, rol: formRol, il_id: formIlId })
-    })
+    if (formRol === 'denetim_yetkilisi' && !formIlId) {
+      setHata('Bölge yetkilisi için il seçmelisiniz.'); setOlusturuluyor(false); return
+    }
+    const res = formRol === 'denetim_yetkilisi'
+      ? await fetch('/api/admin/denetim-kullanici', {
+          method: 'POST',
+          headers: apiHeaders(),
+          body: JSON.stringify({ email: email.trim(), password, il_id: formIlId })
+        })
+      : await fetch('/api/admin/kullanici', {
+          method: 'POST',
+          headers: apiHeaders(),
+          body: JSON.stringify({ email: email.trim(), password, schoolName })
+        })
     const body = await res.json()
     if (!res.ok) { setHata(body.error) }
     else {
-      setBasari('Hesap oluşturuldu.');
+      setBasari(formRol === 'denetim_yetkilisi' ? 'Bölge yetkilisi hesabı oluşturuldu.' : `Okul hesabı ${DENEME_GUN} günlük ücretsiz deneme ile oluşturuldu.`);
       setEmail(''); setPassword(''); setSchoolName(''); setFormIlId(null);
       listeyiGetir(); denetimListesiGetir();
     }
@@ -519,12 +569,45 @@ export default function YonetimDashboard() {
 
           {sekme === 'kullanicilar' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              <div style={S.card}><div style={{ padding: 24 }}><h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 900 }}>Kurum & Yetkili Tanımlama</h3><form onSubmit={handleOlustur}><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, alignItems: 'flex-end' }}><div><label style={S.label}>Rol</label><select style={S.input} value={formRol} onChange={e => setFormRol(e.target.value as any)}><option value="okul_admin">Okul Admin</option><option value="denetim_yetkilisi">Bölge Yetkilisi</option></select></div>{formRol === 'okul_admin' && <div><label style={S.label}>Kurum Adı</label><input style={S.input} value={schoolName} onChange={e => setSchoolName(e.target.value)} /></div>}<div><label style={S.label}>E-posta</label><input style={S.input} value={email} onChange={e => setEmail(e.target.value)} /></div><div><label style={S.label}>Şifre</label><input type="password" style={S.input} value={password} onChange={e => setPassword(e.target.value)} /></div><button style={{ ...S.btn(T.primary), height: 40, justifyContent: 'center' }}>Oluştur</button></div></form></div></div>
+              {(uzatmaAdaylari.length > 0 || uzatmaSonuc) && (
+                <div style={S.card}><div style={{ padding: 24 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900 }}>Süresi Dolan Denemeler</h3>
+                      <div style={{ fontSize: 12, color: T.secondary, marginTop: 4 }}>Seçilen kurumlara bir defalık {DENEME_GUN} gün ücretsiz deneme tanımlanır ve yöneticisine e-posta gider.</div>
+                    </div>
+                    {uzatmaAdaylari.length > 0 && <button onClick={handleDenemeUzat} disabled={uzatmaGonderiliyor || !uzatmaSecili.length} style={{ ...S.btn(T.success), height: 40, opacity: uzatmaGonderiliyor || !uzatmaSecili.length ? 0.6 : 1 }}>{uzatmaGonderiliyor ? 'Gönderiliyor…' : `${uzatmaSecili.length} kuruma ${DENEME_GUN} gün ver + e-posta gönder`}</button>}
+                  </div>
+                  {uzatmaYukleniyor ? <div style={{ fontSize: 12, color: T.secondary }}>Yükleniyor…</div> : uzatmaAdaylari.length > 0 && (
+                    <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead><tr><th style={S.th}><input type="checkbox" checked={uzatmaSecili.length === uzatmaAdaylari.length} onChange={e => setUzatmaSecili(e.target.checked ? uzatmaAdaylari.map(a => a.okul_id) : [])} /></th>{['Kurum', 'Yönetici E-posta', 'Deneme Bitişi'].map(h => <th key={h} style={S.th}>{h}</th>)}</tr></thead>
+                      <tbody>{uzatmaAdaylari.map(a => (
+                        <tr key={a.okul_id}>
+                          <td style={S.td}><input type="checkbox" checked={uzatmaSecili.includes(a.okul_id)} onChange={e => setUzatmaSecili(prev => e.target.checked ? [...prev, a.okul_id] : prev.filter(id => id !== a.okul_id))} /></td>
+                          <td style={S.td}><span style={{ fontWeight: 700 }}>{a.okul_adi}</span></td>
+                          <td style={S.td}>{a.email}</td>
+                          <td style={S.td}>{new Date(a.lisans_bitis).toLocaleDateString('tr-TR')}</td>
+                        </tr>
+                      ))}</tbody>
+                    </table></div>
+                  )}
+                  {uzatmaSonuc && uzatmaSonuc.length > 0 && (
+                    <div style={{ marginTop: 12, fontSize: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {uzatmaSonuc.map((r, i) => (
+                        <div key={i} style={{ color: r.uzatildi && r.mail ? T.success : T.danger }}>
+                          {r.okul_adi} ({r.email}): {r.uzatildi ? 'süre tanımlandı' : 'süre tanımlanamadı'}{r.uzatildi && (r.mail ? ', e-posta gönderildi' : ', e-posta GÖNDERİLEMEDİ')}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div></div>
+              )}
+              <div style={S.card}><div style={{ padding: 24 }}><h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 900 }}>Kurum & Yetkili Tanımlama</h3><form onSubmit={handleOlustur}><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, alignItems: 'flex-end' }}><div><label style={S.label}>Rol</label><select style={S.input} value={formRol} onChange={e => setFormRol(e.target.value as any)}><option value="okul_admin">Okul Admin</option><option value="denetim_yetkilisi">Bölge Yetkilisi</option></select></div>{formRol === 'okul_admin' && <div><label style={S.label}>Kurum Adı</label><input style={S.input} value={schoolName} onChange={e => setSchoolName(e.target.value)} /></div>}{formRol === 'denetim_yetkilisi' && <div><label style={S.label}>İl</label><select style={S.input} value={formIlId ?? ''} onChange={e => setFormIlId(e.target.value ? Number(e.target.value) : null)}><option value="">İl seçin…</option>{[...iller].sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map(il => <option key={il.id} value={il.id}>{il.ad}</option>)}</select></div>}<div><label style={S.label}>E-posta</label><input style={S.input} value={email} onChange={e => setEmail(e.target.value)} /></div><div><label style={S.label}>Şifre</label><input type="password" style={S.input} value={password} onChange={e => setPassword(e.target.value)} /></div><button disabled={olusturuluyor} style={{ ...S.btn(T.primary), height: 40, justifyContent: 'center', opacity: olusturuluyor ? 0.6 : 1 }}>{olusturuluyor ? 'Oluşturuluyor…' : 'Oluştur'}</button></div></form></div></div>
               <div style={S.card}>
                 <div style={{ padding: '18px 24px', borderBottom: `1px solid ${T.border}`, display: 'flex', justifyContent: 'space-between' }}><div style={{ display: 'flex', background: T.muted, borderRadius: 8, padding: 2 }}>{['okullar', 'yetkililer'].map(id => ( <button key={id} onClick={() => setKisiSekme(id as any)} style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: kisiSekme === id ? T.card : 'transparent', color: kisiSekme === id ? T.primary : T.secondary, fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>{id === 'okullar' ? 'Kurumlar' : 'Yetkililer'}</button> ))}</div></div>
                 <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead><tr>{['Ad / E-posta', 'Bölge', 'Durum', 'İşlem'].map(h => <th key={h} style={S.th}>{h}</th>)}</tr></thead>
-                  <tbody>{(kisiSekme === 'okullar' ? liste.filter(k => k.rol !== 'denetim_yetkilisi') : denetimListe).map(k => ( <tr key={k.id}><td style={S.td}><div style={{ fontWeight: 700 }}>{k.okullar?.ad || k.email}</div><div style={{ fontSize: 11, color: T.secondary }}>{k.email}</div></td><td style={S.td}>{iller.find(i => i.id === okulIlMap[k.okullar?.id || 0])?.ad || '—'}</td><td style={S.td}><span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 5, background: k.banned ? `${T.danger}15` : `${T.success}15`, color: k.banned ? T.danger : T.success }}>{k.banned ? 'PASİF' : 'AKTİF'}</span></td><td style={S.td}><div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><button onClick={() => setSelectedUser(k)} style={{ ...S.btn(T.muted, T.secondary), padding: 8 }}><Lock size={14} /></button><button onClick={() => handleToggleBan(k)} style={{ ...S.btn(T.muted, k.banned ? T.success : T.warning), padding: 8 }}>{k.banned ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}</button></div></td></tr> ))}</tbody>
+                  <tbody>{(kisiSekme === 'okullar' ? liste.filter(k => k.rol !== 'denetim_yetkilisi') : denetimListe).map(k => ( <tr key={k.id}><td style={S.td}><div style={{ fontWeight: 700 }}>{k.okullar?.ad || k.email}</div><div style={{ fontSize: 11, color: T.secondary }}>{k.email}</div></td><td style={S.td}>{k.iller?.ad || iller.find(i => i.id === okulIlMap[k.okullar?.id || 0])?.ad || '—'}</td><td style={S.td}><span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 5, background: k.banned ? `${T.danger}15` : `${T.success}15`, color: k.banned ? T.danger : T.success }}>{k.banned ? 'PASİF' : 'AKTİF'}</span></td><td style={S.td}><div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><button onClick={() => setSelectedUser(k)} style={{ ...S.btn(T.muted, T.secondary), padding: 8 }}><Lock size={14} /></button><button onClick={() => handleToggleBan(k)} style={{ ...S.btn(T.muted, k.banned ? T.success : T.warning), padding: 8 }}>{k.banned ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}</button></div></td></tr> ))}</tbody>
                 </table></div>
               </div>
             </div>

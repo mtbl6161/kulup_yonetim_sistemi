@@ -1,5 +1,6 @@
 'use client'
 import { useState, Suspense } from 'react'
+import Link from 'next/link'
 import { useAuth } from '@/lib/AuthContext'
 import {
   CreditCard, CheckCircle2, ShieldCheck, Zap, 
@@ -16,6 +17,10 @@ function OdemeYapIc() {
   const [error, setError] = useState<string | null>(null)
   
   const tutar = secDonem === 'year' ? YILLIK : AYLIK
+
+  const denemeKalanGun = okul?.odeme_durumu === 'deneme' && okul.lisans_bitis
+    ? Math.ceil((new Date(okul.lisans_bitis).getTime() - Date.now()) / 86400000)
+    : 0
 
   const handleOnlineOdeme = async () => {
     if (!okul) return
@@ -58,7 +63,16 @@ function OdemeYapIc() {
             <ShieldCheck size={24} color="var(--accent)" />
           </div>
           <h1 style={h1Style}>Hesap Aktivasyonu</h1>
-          <p style={subStyle}>Kurumunuz için aboneliğinizi başlatın.</p>
+          <p style={subStyle}>
+            {denemeKalanGun > 0
+              ? <>Ücretsiz denemenizin bitmesine <strong>{denemeKalanGun} gün</strong> var. Dilerseniz şimdiden abone olabilirsiniz.</>
+              : 'Kurumunuz için aboneliğinizi başlatın.'}
+          </p>
+          {denemeKalanGun > 0 && (
+            <Link href="/" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 700, color: 'var(--accent)', textDecoration: 'none' }}>
+              ← Panele Dön
+            </Link>
+          )}
         </div>
 
         {/* Pricing Selector */}

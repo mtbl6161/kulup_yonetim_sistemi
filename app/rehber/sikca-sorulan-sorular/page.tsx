@@ -39,7 +39,7 @@ const SORULAR = [
   },
   {
     q: 'Klüp360 ücretsiz mi?',
-    a: 'Hesaplama araçları tamamen ücretsiz ve kayıtsızdır. Tüm personelin bordrosunu, tahsilatı ve tahakkuku otomatik yönetmek için 7 gün ücretsiz deneme sunulur.',
+    a: 'Hesaplama araçları tamamen ücretsiz ve kayıtsızdır. Tüm personelin bordrosunu, tahsilatı ve tahakkuku otomatik yönetmek için 15 gün ücretsiz deneme sunulur.',
   },
 ]
 

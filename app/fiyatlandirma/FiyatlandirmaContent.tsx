@@ -59,7 +59,7 @@ export default function FiyatlandirmaContent() {
             </div>
           ) : <div className="fp-note-sp" />}
 
-          <Link href="/signup" className="fp-cta">7 Gün Ücretsiz Dene <ArrowRight size={19} /></Link>
+          <Link href="/signup" className="fp-cta">15 Gün Ücretsiz Dene <ArrowRight size={19} /></Link>
           <p className="fp-cta-note">Kredi kartı gerekmez</p>
         </div>
 

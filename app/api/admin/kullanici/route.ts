@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { serverError } from '@/lib/api-error'
 import { logAudit } from '@/lib/audit.server'
+import { denemeBitisTarihi, DENEME_GUN } from '@/lib/deneme'
 
 function adminClient() {
   return createClient(
@@ -131,8 +132,10 @@ export async function POST(request: NextRequest) {
     .from('okullar')
     .insert({ 
       ad: schoolName.trim(),
-      lisans_bitis: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(), // +1 Yıl
-      odeme_durumu: 'aktif'
+      // Panelden açılan okullar da önce ücretsiz deneme ile başlar;
+      // ödeme alınınca lisans "Kurum Portföyü"nden aktif yapılır.
+      lisans_bitis: denemeBitisTarihi().toISOString(),
+      odeme_durumu: 'deneme'
     })
     .select('id')
     .single()
@@ -158,7 +161,7 @@ export async function POST(request: NextRequest) {
     tablo: 'profiller',
     okul_id: school.id,
     kullanici_id: caller.id,
-    aciklama: `Yeni okul (${schoolName}) ve yönetici hesabı (${email}) oluşturuldu.`
+    aciklama: `Yeni okul (${schoolName}) ve yönetici hesabı (${email}) oluşturuldu — ${DENEME_GUN} gün deneme.`
   })
 
   return NextResponse.json({ ok: true, userId: newUser.id })
