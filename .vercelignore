@@ -5,3 +5,6 @@
 
 # Ortam değişkenleri Vercel panelinden gelir, dosyalar yüklenmemeli
 .env*
+
+# Kök dizindeki beyanname/stopaj gibi resmi belgeler
+/*.pdf
