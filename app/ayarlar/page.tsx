@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Topbar from '@/components/Topbar'
+import SayiInput from '@/components/SayiInput'
 import { supabase } from '@/lib/supabase'
 import { Ayarlar, VergiDilimi, Tatil } from '@/lib/types'
 import { AYLAR, isGunuSayisi, gunEkle, KULUP_BASLANGIC_TATIL_AD } from '@/lib/hesaplama'
@@ -588,15 +589,15 @@ export default function AyarlarPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                     <div>
                       <label htmlFor="ay-katsayi" className="form-label">Maaş Katsayısı</label>
-                      <input id="ay-katsayi" className="form-input" type="number" step="0.000001" value={form.katsayi || 0} onChange={e => setF('katsayi', parseFloat(e.target.value))} />
+                      <SayiInput id="ay-katsayi" className="form-input" value={form.katsayi} onChange={v => setF('katsayi', v ?? 0)} />
                     </div>
                     <div>
                       <label htmlFor="ay-gosterge" className="form-label">Ek Ders Göstergesi</label>
-                      <input id="ay-gosterge" className="form-input" type="number" value={form.gosterge || 0} onChange={e => setF('gosterge', parseInt(e.target.value))} />
+                      <SayiInput id="ay-gosterge" className="form-input" value={form.gosterge} onChange={v => setF('gosterge', v ?? 0)} />
                     </div>
                     <div>
                       <label htmlFor="ay-gunluk-saat" className="form-label">Günlük Sabit Çalışma Saati</label>
-                      <input id="ay-gunluk-saat" className="form-input" type="number" value={form.gunluk_saat || 6} onChange={e => setF('gunluk_saat', parseInt(e.target.value))} />
+                      <SayiInput id="ay-gunluk-saat" className="form-input" value={form.gunluk_saat} onChange={v => setF('gunluk_saat', v ?? 0)} />
                     </div>
                     <div>
                       <label htmlFor="ay-yemek" className="form-label">Yemek Hizmeti Durumu</label>
@@ -608,7 +609,7 @@ export default function AyarlarPage() {
                     <div>
                       <label htmlFor="ay-ogrenci-ucret" className="form-label">Manuel Saat Ücreti (₺)</label>
                       {/* Aidat hesabı (Ödeme Takibi, Genel Bakış, Bilanço) ayarlar.saat_ucreti'ni kullanır */}
-                      <input id="ay-ogrenci-ucret" className="form-input" type="number" step="0.01" min="0" value={form.saat_ucreti ?? ''} onChange={e => setF('saat_ucreti', e.target.value === '' ? null : parseFloat(e.target.value))} />
+                      <SayiInput id="ay-ogrenci-ucret" className="form-input" value={form.saat_ucreti} onChange={v => setF('saat_ucreti', v)} />
                       <p style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>
                         * Öğrenci aidatı ve gelir havuzu bu ücret üzerinden hesaplanır.
                         {form.saat_ucreti != null && Number(form.saat_ucreti).toFixed(2) !== sUcret && (
@@ -618,7 +619,7 @@ export default function AyarlarPage() {
                     </div>
                     <div>
                       <label htmlFor="ay-ogretmen-manuel-ucret" className="form-label">Öğretmen Manuel Saat Ücreti (₺)</label>
-                      <input id="ay-ogretmen-manuel-ucret" className="form-input" type="number" step="0.01" min="0" value={form.ogretmen_saat_ucreti ?? ''} onChange={e => setF('ogretmen_saat_ucreti', e.target.value === '' ? null : parseFloat(e.target.value))} />
+                      <SayiInput id="ay-ogretmen-manuel-ucret" className="form-input" value={form.ogretmen_saat_ucreti} onChange={v => setF('ogretmen_saat_ucreti', v)} />
                       <p style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>* Boş bırakılırsa havuz paylaşımı (dinamik) uygulanır.</p>
                     </div>
                   </div>
@@ -629,24 +630,34 @@ export default function AyarlarPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>
                     <div>
                       <label htmlFor="ay-asgari-ucret" className="form-label">Asgari Brüt Ücret</label>
-                      <input id="ay-asgari-ucret" className="form-input" type="number" value={form.asgari_ucret || 0} onChange={e => setF('asgari_ucret', parseFloat(e.target.value))} />
+                      <SayiInput id="ay-asgari-ucret" className="form-input" value={form.asgari_ucret} onChange={v => setF('asgari_ucret', v ?? 0)} />
                     </div>
                     <div>
                       <label htmlFor="ay-tavan" className="form-label">E.Y.D.M. Tavan Ücret</label>
-                      <input id="ay-tavan" className="form-input" type="number" value={form.tavan_katsayi || 0} onChange={e => setF('tavan_katsayi', parseFloat(e.target.value))} />
+                      <SayiInput id="ay-tavan" className="form-input" value={form.tavan_katsayi} onChange={v => setF('tavan_katsayi', v ?? 0)} />
+                    </div>
+                    <div />
+                    <div>
+                      <label htmlFor="ay-gv-istisna" className="form-label">Asgari Ücret GV İstisnası (₺/ay)</label>
+                      <SayiInput id="ay-gv-istisna" className="form-input" placeholder="Boş: otomatik" value={form.gv_istisna_sabiti || null} onChange={v => setF('gv_istisna_sabiti', v ?? 0)} />
+                      <p style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>* Ay ay değişir; boş bırakılırsa asgari ücretten hesaplanır.</p>
+                    </div>
+                    <div>
+                      <label htmlFor="ay-dv-istisna" className="form-label">Asgari Ücret DV İstisnası (₺/ay)</label>
+                      <SayiInput id="ay-dv-istisna" className="form-input" placeholder="Boş: otomatik" value={form.dv_istisna_sabiti || null} onChange={v => setF('dv_istisna_sabiti', v ?? 0)} />
                     </div>
                     <div />
                     <div>
                       <label htmlFor="ay-sgk-kisi" className="form-label">Kişi SGK Payı (%)</label>
-                      <input id="ay-sgk-kisi" className="form-input" type="number" step="any" value={Number(((form.sgk_kisi_pay || 0) * 100).toFixed(4))} onChange={e => setF('sgk_kisi_pay', parseFloat(e.target.value) / 100)} />
+                      <SayiInput id="ay-sgk-kisi" className="form-input" carpan={100} value={form.sgk_kisi_pay} onChange={v => setF('sgk_kisi_pay', v ?? 0)} />
                     </div>
                     <div>
                       <label htmlFor="ay-sgk-issizlik" className="form-label">Kişi İşsizlik Payı (%)</label>
-                      <input id="ay-sgk-issizlik" className="form-input" type="number" step="any" value={Number(((form.sgk_issizlik_kisi || 0) * 100).toFixed(4))} onChange={e => setF('sgk_issizlik_kisi', parseFloat(e.target.value) / 100)} />
+                      <SayiInput id="ay-sgk-issizlik" className="form-input" carpan={100} value={form.sgk_issizlik_kisi} onChange={v => setF('sgk_issizlik_kisi', v ?? 0)} />
                     </div>
                     <div>
                       <label htmlFor="ay-damga" className="form-label">Damga Vergisi (Binde ‰)</label>
-                      <input id="ay-damga" className="form-input" type="number" step="any" placeholder="Örn: 7.59" value={Number(((form.damga_vergi_orani || 0) * 1000).toFixed(5))} onChange={e => setF('damga_vergi_orani', parseFloat(e.target.value) / 1000)} />
+                      <SayiInput id="ay-damga" className="form-input" carpan={1000} placeholder="Örn: 7,59" value={form.damga_vergi_orani} onChange={v => setF('damga_vergi_orani', v ?? 0)} />
                     </div>
                   </div>
                 </div>
@@ -705,23 +716,22 @@ export default function AyarlarPage() {
                         <tr key={i}>
                           <td className="fw-600">{i + 1}. Dilim</td>
                           <td>
-                            <input 
-                              aria-label={`${i + 1}. dilim üst limit`} 
-                              className="form-input" 
-                              type="number" 
-                              value={d.ust || ''} 
-                              onChange={e => setDilim(i, 'ust', e.target.value === '' ? 0 : parseFloat(e.target.value))} 
+                            <SayiInput
+                              aria-label={`${i + 1}. dilim üst limit`}
+                              className="form-input"
+                              value={d.ust || null}
+                              onChange={v => setDilim(i, 'ust', v ?? 0)}
                             />
                           </td>
                           <td>
                             <div style={{ position: 'relative' }}>
                               <span style={{ position: 'absolute', right: 10, top: 8, color: 'var(--text3)' }}>%</span>
-                              <input 
-                                aria-label={`${i + 1}. dilim vergi oranı`} 
-                                className="form-input" 
-                                type="number" 
-                                value={isNaN(d.oran) ? '' : d.oran * 100} 
-                                onChange={e => setDilim(i, 'oran', e.target.value === '' ? 0 : parseFloat(e.target.value) / 100)} 
+                              <SayiInput
+                                aria-label={`${i + 1}. dilim vergi oranı`}
+                                className="form-input"
+                                carpan={100}
+                                value={d.oran}
+                                onChange={v => setDilim(i, 'oran', v ?? 0)}
                               />
                             </div>
                           </td>

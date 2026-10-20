@@ -342,6 +342,66 @@ export function isDenetim(gorev: string | null | undefined): boolean {
   return (gorev || '').toLowerCase().includes('denetim')
 }
 
+// ============================================================
+// Birden fazla görevi olan personel (örn. Koordinatör Öğretmen + Başkan Yrd.)
+// Kural: kişi yalnızca brütü en yüksek görevin ücretini alır; diğer görevin
+// payı dağıtılmaz, okulun havuzunda (temel gider) kalır.
+// ============================================================
+
+/** Ad karşılaştırması için Türkçe harf/boşluk farklarını yok sayar (HAFİZE = HAFIZE) */
+function adNormalize(ad: string | null | undefined): string {
+  return (ad || '').toLocaleUpperCase('tr-TR')
+    .replace(/İ/g, 'I').replace(/Ş/g, 'S').replace(/Ğ/g, 'G').replace(/Ü/g, 'U').replace(/Ö/g, 'O').replace(/Ç/g, 'C')
+    .replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Aynı kişiye ait kayıtları gruplar: aynı T.C. ya da (aynı IBAN + aynı ad).
+ * IBAN+ad eşleşmesi, eskiden T.C. tekrarına izin verilmediği için farklı T.C. ile açılmış kayıtları yakalar.
+ * Dönüş: personel id → grup anahtarı
+ */
+export function kisiGruplari(personel: { id: number; ad: string; tc?: string | null; iban?: string | null }[]): Map<number, string> {
+  const ebeveyn = new Map<number, number>()
+  const bul = (x: number): number => { while (ebeveyn.get(x) !== x) x = ebeveyn.get(x)!; return x }
+  const birlestir = (a: number, b: number) => { ebeveyn.set(bul(a), bul(b)) }
+  personel.forEach(p => ebeveyn.set(p.id, p.id))
+
+  const tcMap = new Map<string, number>()
+  const ibanAdMap = new Map<string, number>()
+  for (const p of personel) {
+    const tc = (p.tc || '').trim()
+    if (tc) { const o = tcMap.get(tc); if (o !== undefined) birlestir(p.id, o); else tcMap.set(tc, p.id) }
+    const iban = (p.iban || '').replace(/\s/g, '').toUpperCase()
+    const ad = adNormalize(p.ad)
+    if (iban && ad) {
+      const k = iban + '|' + ad
+      const o = ibanAdMap.get(k); if (o !== undefined) birlestir(p.id, o); else ibanAdMap.set(k, p.id)
+    }
+  }
+  const sonuc = new Map<number, string>()
+  personel.forEach(p => sonuc.set(p.id, String(bul(p.id))))
+  return sonuc
+}
+
+/**
+ * Aynı kişinin birden fazla görev satırı varsa yalnızca brütü en yüksek olanı bırakır.
+ * Elenen satırlar { kalan, elenen } olarak döner (elenenlerin ücreti okulda kalır).
+ */
+export function mukerrerGorevAyikla<T extends { personel: { id: number; ad: string; tc?: string | null; iban?: string | null }; sonuc: { brut: number } }>(
+  satirlar: T[]
+): { kalan: T[]; elenen: T[] } {
+  const grup = kisiGruplari(satirlar.map(s => s.personel))
+  const enYuksek = new Map<string, T>()
+  for (const s of satirlar) {
+    const k = grup.get(s.personel.id)!
+    const mevcut = enYuksek.get(k)
+    if (!mevcut || s.sonuc.brut > mevcut.sonuc.brut) enYuksek.set(k, s)
+  }
+  const kalan: T[] = [], elenen: T[] = []
+  for (const s of satirlar) (enYuksek.get(grup.get(s.personel.id)!) === s ? kalan : elenen).push(s)
+  return { kalan, elenen }
+}
+
 export interface ActiveCategories {
   baskan: boolean
   baskan_yrd: boolean

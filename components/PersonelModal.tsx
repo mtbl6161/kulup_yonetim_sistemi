@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { logIslem } from '@/lib/audit'
 import { Personel, Ayarlar } from '@/lib/types'
 import ConfirmModal from '@/components/ConfirmModal'
+import SayiInput from '@/components/SayiInput'
 
 interface Props {
   editItem: Personel | null
@@ -120,16 +121,18 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
     setSaving(true)
     setMsg('')
 
-    // TC tekrar kontrolü
+    // TC tekrar kontrolü — aynı kişi farklı görevle ikinci kez eklenebilir
+    // (örn. Koordinatör Öğretmen + Başkan Yrd.; bordroda yalnızca yüksek ücretli görev ödenir)
     let tcQuery = supabase
       .from('personel')
       .select('id, ad')
       .eq('tc', tcTemiz)
       .eq('okul_id', okulId)
+      .eq('gorev', form.gorev || 'Öğretmen')
     if (editItem) tcQuery = tcQuery.neq('id', editItem.id)
     const { data: mevcut } = await tcQuery
     if (mevcut && mevcut.length > 0) {
-      setMsg(`❌ Bu T.C. Kimlik No zaten kayıtlı: ${mevcut[0].ad}`)
+      setMsg(`❌ Bu T.C. Kimlik No bu görevle zaten kayıtlı: ${mevcut[0].ad}`)
       setSaving(false)
       return
     }
@@ -154,7 +157,9 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
 
     setSaving(false)
     if (error) {
-      setMsg('❌ Hata: ' + error.message)
+      setMsg(error.code === '23505' && error.message.includes('tc')
+        ? '❌ Bu T.C. Kimlik No zaten kayıtlı. Aynı kişiyi ikinci görevle eklemek için veritabanı güncellemesi (migration_personel_tc_gorev_unique.sql) gerekli.'
+        : '❌ Hata: ' + error.message)
       return
     }
 
@@ -311,13 +316,13 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
                       <div>
                         <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Gelir V. (₺/ay)</label>
-                        <input className="form-input" style={{ width: '100%' }} type="number" min={0} step="0.01"
-                          value={form.istisna_gv_tutari || ''} onChange={e => setF('istisna_gv_tutari', e.target.value === '' ? 0 : Number(e.target.value))} placeholder="Örn: 400" />
+                        <SayiInput className="form-input" style={{ width: '100%' }}
+                          value={form.istisna_gv_tutari || null} onChange={v => setF('istisna_gv_tutari', v ?? 0)} placeholder="Örn: 400" />
                       </div>
                       <div>
                         <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Damga V. (₺/ay)</label>
-                        <input className="form-input" style={{ width: '100%' }} type="number" min={0} step="0.01"
-                          value={form.istisna_dv_tutari || ''} onChange={e => setF('istisna_dv_tutari', e.target.value === '' ? 0 : Number(e.target.value))} placeholder="0" />
+                        <SayiInput className="form-input" style={{ width: '100%' }}
+                          value={form.istisna_dv_tutari || null} onChange={v => setF('istisna_dv_tutari', v ?? 0)} placeholder="0" />
                       </div>
                       <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#666', fontStyle: 'italic', lineHeight: 1.3 }}>
                         * Girilen tutar her ay bordroda hesaplanan vergiden düşülür (hesaplanan vergiyi aşamaz).
@@ -332,27 +337,13 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
               <div style={{ fontSize: 10, color: '#666', marginBottom: 4, fontStyle: 'italic', lineHeight: 1.2 }}>
                 * İçinde bulunulan ay <b>hariç</b>, yıl başından beri biriken toplamı giriniz.
               </div>
-              <input 
-                className="form-input" 
-                style={{ width: '100%' }} 
-                type="text" 
-                value={form.yillik_matrah === 0 ? '' : form.yillik_matrah} 
-                onChange={e => {
-                  let val = e.target.value;
-                  // Türkçe binlik/ondalık ayracı (133.633,97) yapıştırılırsa düzelt
-                  if (val.includes('.') && val.includes(',')) {
-                    val = val.replace(/\./g, '').replace(',', '.');
-                  } else if (val.includes(',')) {
-                    val = val.replace(',', '.');
-                  }
-                  // Sadece rakam ve noktaya izin ver
-                  val = val.replace(/[^0-9.]/g, '');
-                  setF('yillik_matrah', val as any);
-                }} 
-                onBlur={(e) => {
-                  const val = parseFloat(e.target.value);
-                  setF('yillik_matrah', isNaN(val) ? 0 : val);
-                }}
+              {/* Türkçe yazım: 290.660 → 290660, 133.633,97 → 133633.97 */}
+              <SayiInput
+                className="form-input"
+                style={{ width: '100%' }}
+                placeholder="Örn: 133.633,97"
+                value={Number(form.yillik_matrah) || null}
+                onChange={v => setF('yillik_matrah', v ?? 0)}
               />
             </div>
           </div>
@@ -389,6 +380,7 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
           tehlikeli={false}
           onOnayla={applyMatrahDeduction}
           onIptal={matrahOlduguGibi}
+          onKapat={() => setMatrahConfirmData(null)}
         />
       )}
 

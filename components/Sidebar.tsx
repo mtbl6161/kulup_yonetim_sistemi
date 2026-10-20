@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { AYLAR } from '@/lib/hesaplama'
 import { useAy } from '@/lib/AyContext'
 import { useAuth } from '@/lib/AuthContext'
-import { LogOut, User, LayoutDashboard, Users, Calendar, BookOpen, Clock, BarChart3, Wallet, Landmark, TrendingUp, FileText, Settings, GraduationCap, School, ChevronDown, ClipboardList, Activity, Calculator, Globe, BookText } from 'lucide-react'
+import { LogOut, User, LayoutDashboard, Users, Calendar, BookOpen, Clock, BarChart3, Wallet, Landmark, TrendingUp, FileText, Settings, GraduationCap, School, ChevronDown, ClipboardList, Activity, Calculator, Globe, BookText, FolderCheck } from 'lucide-react'
 
 type Alan = 'kulup' | 'okul'
 
@@ -58,6 +58,7 @@ const NAV: { baslik: string; id: string; alan?: Alan; adminOnly?: boolean; super
     adminOnly: true,
     items: [
       { href: '/muhasebe', label: 'Muhasebe Yönetimi', sub: 'Hesap planı ve mali kayıtlar', tags: 'muhasebe, kayıt, defter', icon: <Calculator size={18} /> },
+      { href: '/evrak-dosyasi', label: 'Denetim Dosyası', sub: 'Aylık denetim evraklarını yükle ve gönder', tags: 'denetim, evrak, belge, yükle, gönder, il, mem, dosya', icon: <FolderCheck size={18} /> },
     ],
   },
   {

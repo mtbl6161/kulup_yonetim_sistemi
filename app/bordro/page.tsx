@@ -7,7 +7,8 @@ import {
   ayLabel, fmtTL, fmt, bordroHesapla, isGunuSayisi, tavanHesapla, gunSayisi,
   AYLAR, gvDilimiBul, tatilMi, gelirVergisiHesapla,
   tahakkukDagitimHesapla, detectActiveCategories,
-  isOgretmen, isBaskan, isBaskanYrd, isMuhasebe, isTemizlik, isDenetim
+  isOgretmen, isBaskan, isBaskanYrd, isMuhasebe, isTemizlik, isDenetim,
+  mukerrerGorevAyikla,
 } from '@/lib/hesaplama'
 import { Personel, SinifDefteri, Ayarlar, Bordro, BordroSonuc, Tahakkuk, Puantaj, BordroSatir } from '@/lib/types'
 import { logIslem } from '@/lib/audit'
@@ -801,7 +802,7 @@ export default function BordroPage() {
 
       const hesapAyarlar: Ayarlar = { ...ayarlar, tavan_katsayi: effectiveTavan }
 
-      const yeniSatirlar: BordroSatir[] = aktifPersonelListesi.map(p => {
+      const tumSatirlar: BordroSatir[] = aktifPersonelListesi.map(p => {
         const pSaat = ogretmenSaatMap.get(p.id) || 0
         let havuzBrut: number
         if (isOgretmen(p.gorev)) havuzBrut = ogretmenBrutMap.get(p.id) || 0
@@ -860,6 +861,9 @@ export default function BordroPage() {
         }
       })
 
+      // Aynı kişi birden fazla görevdeyse yalnızca yüksek ücretli görev ödenir; diğerinin payı okulda kalır
+      const { kalan: yeniSatirlar, elenen: elenenGorevler } = mukerrerGorevAyikla(tumSatirlar)
+
       setSatirlar(yeniSatirlar)
       setHesaplandi(true)
       setMatrahDegistiPersonel([]) // Hesaplama yapıldığına göre uyarıları temizle
@@ -911,7 +915,9 @@ export default function BordroPage() {
         okul_id: okulId,
         aciklama: `${ayLabel(ay, yil)} bordrosu hesaplandı (${yeniSatirlar.length} personel)` 
       })
-      setMsg('✅ Bordro hesaplandı ve kaydedildi.')
+      setMsg('✅ Bordro hesaplandı ve kaydedildi.' + (elenenGorevler.length > 0
+        ? ` İkinci görev ücreti ödenmedi (okulda kaldı): ${elenenGorevler.map(s => `${s.personel.ad} – ${s.personel.gorev} ${fmt(s.sonuc.brut)} TL`).join(', ')}`
+        : ''))
       await load() // Verileri tekrar çekerek DB ile senkronize et
     } catch (err: any) {
       console.error('❌ Bordro hesaplama hatası:', err)

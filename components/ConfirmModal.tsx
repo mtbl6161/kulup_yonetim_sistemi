@@ -10,6 +10,8 @@ interface Props {
   basari?: boolean
   onOnayla: () => void
   onIptal: () => void
+  // Arka plana tıklanınca; verilmezse onIptal (iptal düğmesi bir işlem yapıyorsa ayrı verilmeli)
+  onKapat?: () => void
 }
 
 export default function ConfirmModal({
@@ -21,10 +23,11 @@ export default function ConfirmModal({
   basari = false,
   onOnayla,
   onIptal,
+  onKapat,
 }: Props) {
   return (
     <div
-      onClick={onIptal}
+      onClick={onKapat ?? onIptal}
       style={{
         position: 'fixed', inset: 0,
         background: 'rgba(0,0,0,0.45)',

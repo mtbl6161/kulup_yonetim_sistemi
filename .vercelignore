@@ -8,3 +8,8 @@
 
 # Kök dizindeki beyanname/stopaj gibi resmi belgeler
 /*.pdf
+
+# Yerel çalışma klasörleri (yedekler, Excel'den çıkarılmış veri, betikler) — deploy'a dahil edilmemeli
+scratch/
+worksheets/
+tmp/
