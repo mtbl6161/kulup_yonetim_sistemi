@@ -201,7 +201,8 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
         {msg && <div role="status" style={{ padding: 12, borderRadius: 10, fontSize: 13, background: msg.tip === 'ok' ? 'var(--success-light)' : 'var(--danger-light)', color: msg.tip === 'ok' ? '#1a6b34' : 'var(--danger)' }}>{msg.text}</div>}
         {islem && <div role="status" style={{ padding: 12, borderRadius: 10, fontSize: 13, background: 'var(--info-light)' }}>⏳ {islem}</div>}
 
-        <ol style={{ listStyle: 'none', margin: 0, padding: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+        {/* flexShrink: 0 — overflow:hidden bir flex öğesi küçülüp içeriği kesiyor, kaydırma çıkmıyordu */}
+        <ol style={{ listStyle: 'none', margin: 0, padding: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', flexShrink: 0 }}>
           {maddeler.map(m => {
             const mb = maddeBelgeleri(m)
             const guncelSecili = onizleme?.tur === 'guncel' && onizleme.madde.id === m.id
