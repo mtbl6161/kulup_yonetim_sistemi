@@ -231,12 +231,9 @@ export default function AyarlarPage() {
     setSaving(true)
     setMsg(null)
 
-    // gv_istisna_sabiti ve dv_istisna_sabiti artık kaydediliyor
-    // Sadece DB şemasında olmayan alanları filtrele
-    const { 
-      mudur_unvani, duzenleyen_adi, duzenleyen_unvani, ssk_sube, imza_url,
-      ...validData 
-    } = form as any
+    // mudur_unvani, duzenleyen_adi/unvani, ssk_sube, imza_url de ayarlar tablosunda var;
+    // eskiden burada ayıklandıkları için kaydedilmiyorlardı (PDF'lerde "Düzenleyen" boş çıkıyordu)
+    const validData = form
 
     const { error } = await supabase
       .from('ayarlar')

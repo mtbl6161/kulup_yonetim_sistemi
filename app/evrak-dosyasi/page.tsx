@@ -10,7 +10,8 @@ import {
   DenetimMadde, DenetimBelge, DenetimTeslim, DENETIM_BUCKET, MAKS_DOSYA_BOYUTU, KABUL_EDILEN, TESLIM_DURUM_ETIKET,
   belgeDonemde, donemBelgeleriniGetir, depoYolu, boyutFmt, otomatikBelgeUret, kontrolListesiUret, belgeAc, belgeIndir, blobKaydet, dosyayiZiple,
 } from '@/lib/denetimDosyasi'
-import { FolderCheck, Upload, Eye, Download, Trash2, Send, FileArchive, ListChecks, Sparkles, CalendarRange, AlertTriangle } from 'lucide-react'
+import { FolderCheck, Upload, Eye, Download, Trash2, Send, FileArchive, ListChecks, AlertTriangle } from 'lucide-react'
+import MaddeEtiketleri from '@/components/MaddeEtiketleri'
 
 const DURUM_RENK: Record<string, string> = {
   taslak: 'badge-gray', gonderildi: 'badge-blue', onaylandi: 'badge-green', iade: 'badge-red',
@@ -18,11 +19,12 @@ const DURUM_RENK: Record<string, string> = {
 }
 
 export default function DenetimDosyasiPage() {
-  const { ay, yil } = useAy()
+  const { ay, yil, setAyYil } = useAy()
   const { okul } = useAuth()
   const [maddeler, setMaddeler] = useState<DenetimMadde[]>([])
   const [belgeler, setBelgeler] = useState<DenetimBelge[]>([])
   const [teslim, setTeslim] = useState<DenetimTeslim | null>(null)
+  const [bordroVar, setBordroVar] = useState(true)
   const [yukleniyor, setYukleniyor] = useState(true)
   const [islem, setIslem] = useState<string | null>(null) // devam eden işlem mesajı
   const [msg, setMsg] = useState<{ tip: 'ok' | 'hata'; text: string } | null>(null)
@@ -48,6 +50,8 @@ export default function DenetimDosyasiPage() {
       setMaddeler((m.data || []) as DenetimMadde[])
       setTeslim((t.data as DenetimTeslim) || null)
       setBelgeler(b)
+      const { count } = await supabase.from('bordro').select('id', { count: 'exact', head: true }).eq('okul_id', okulId).eq('yil', yil).eq('ay', ay)
+      setBordroVar(!!count)
     } catch (e) {
       setMsg({ tip: 'hata', text: 'Denetim dosyası yüklenemedi: ' + (e as Error).message + ' (Veritabanı kurulumu yapıldı mı? migration_denetim_dosyasi.sql)' })
     } finally {
@@ -207,6 +211,17 @@ export default function DenetimDosyasiPage() {
           {!acik && <div style={{ fontSize: 12, color: 'var(--text2)' }}>Dosya kilitli. Denetçi iade ederse yeniden düzenleyebilirsiniz.</div>}
         </div>
 
+        {!yukleniyor && !bordroVar && (!teslim || teslim.durum === 'taslak') && (
+          <div className="alert alert-info" style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ flex: 1, minWidth: 240 }}>
+              <b>{AYLAR[ay]} {yil} için bordro henüz hesaplanmamış</b>; bordro, puantaj ve bilanço belgeleri boş çıkar.
+              Denetim dosyası genellikle bir önceki ay için hazırlanır.
+            </span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => ay === 1 ? setAyYil(12, yil - 1) : setAyYil(ay - 1, yil)}>
+              {AYLAR[ay === 1 ? 12 : ay - 1]} {ay === 1 ? yil - 1 : yil} dosyasına geç
+            </button>
+          </div>
+        )}
         {teslim?.durum === 'iade' && (
           <div className="alert alert-danger" style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
             <AlertTriangle size={18} style={{ flexShrink: 0 }} />
@@ -232,11 +247,9 @@ export default function DenetimDosyasiPage() {
                     {m.sira_no}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13.5 }}>
-                      {m.baslik}
-                      {m.tip === 'otomatik' && <span className="badge badge-blue" style={{ marginLeft: 8 }}><Sparkles size={10} style={{ verticalAlign: -1 }} /> Sistemden otomatik</span>}
-                      {m.yillik && <span className="badge badge-orange" style={{ marginLeft: 8 }}><CalendarRange size={10} style={{ verticalAlign: -1 }} /> Yılda bir</span>}
-                      {!m.zorunlu && <span className="badge badge-gray" style={{ marginLeft: 8 }}>İsteğe bağlı</span>}
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 8px', fontWeight: 600, fontSize: 13.5 }}>
+                      <span>{m.baslik}</span>
+                      <MaddeEtiketleri madde={m} />
                     </div>
                     {m.aciklama && <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{m.aciklama}</div>}
                     {m.tip === 'otomatik' && otomatikKopya.length === 0 && (

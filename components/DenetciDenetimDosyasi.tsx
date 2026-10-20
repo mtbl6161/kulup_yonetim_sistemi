@@ -6,7 +6,8 @@ import {
   DenetimMadde, DenetimBelge, DenetimTeslim, TESLIM_DURUM_ETIKET, DENETIM_BUCKET,
   belgeDonemde, donemBelgeleriniGetir, boyutFmt, belgeIndir, blobKaydet, kontrolListesiUret, dosyayiZiple, otomatikBelgeUret,
 } from '@/lib/denetimDosyasi'
-import { Download, FileArchive, ListChecks, CheckCircle2, Undo2, Sparkles, CalendarRange, X, ExternalLink, ArrowRight } from 'lucide-react'
+import { Download, FileArchive, ListChecks, CheckCircle2, Undo2, X, ExternalLink, ArrowRight, FileSearch } from 'lucide-react'
+import MaddeEtiketleri from '@/components/MaddeEtiketleri'
 
 const RENK: Record<string, { bg: string; fg: string }> = {
   taslak: { bg: 'var(--surface2)', fg: 'var(--text2)' },
@@ -209,11 +210,9 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
                 <span aria-hidden="true" style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12,
                   background: mb.length ? 'var(--success-light)' : m.tip === 'otomatik' ? 'var(--info-light)' : 'var(--danger-light)', color: mb.length ? '#1a6b34' : m.tip === 'otomatik' ? '#1a5b8a' : 'var(--danger)' }}>{m.sira_no}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>
-                    <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{m.sira_no}. </span>
-                    {m.baslik}
-                    {m.tip === 'otomatik' && <span style={{ marginLeft: 8, fontSize: 11, color: '#1a5b8a', fontWeight: 600 }}><Sparkles size={11} aria-hidden="true" style={{ verticalAlign: -1 }} /> sistem</span>}
-                    {m.yillik && <span style={{ marginLeft: 8, fontSize: 11, color: '#8a5a12', fontWeight: 600 }}><CalendarRange size={11} aria-hidden="true" style={{ verticalAlign: -1 }} /> yıllık</span>}
+                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 8px', fontWeight: 600, fontSize: 13.5 }}>
+                    <span><span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{m.sira_no}. </span>{m.baslik}</span>
+                    <MaddeEtiketleri madde={m} />
                   </div>
                   {mb.length === 0 && m.tip !== 'otomatik' && <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 4 }}>Belge yok{!m.zorunlu ? ' (isteğe bağlı)' : ''}</div>}
                   {mb.map(b => (
@@ -227,9 +226,9 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
                   ))}
                   {m.tip === 'otomatik' && (
                     <button type="button" onClick={() => guncelGoster(m)} disabled={!!islem} aria-pressed={guncelSecili}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', marginTop: 6, padding: '7px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', fontSize: 12.5, color: '#1a5b8a',
-                        background: guncelSecili ? 'var(--info-light)' : 'transparent', border: '1px dashed #9cc0dc' }}>
-                      <Sparkles size={13} aria-hidden="true" />
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', marginTop: 6, padding: '7px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', fontSize: 12.5, color: '#35566f',
+                        background: guncelSecili ? '#eef3f7' : 'transparent', border: '1px solid #cbd8e3' }}>
+                      <FileSearch size={14} aria-hidden="true" />
                       {mb.length === 0 ? 'Gönderim kopyası yok — okulun güncel verisinden görüntüle' : 'Güncel veriyle karşılaştır'}
                     </button>
                   )}
