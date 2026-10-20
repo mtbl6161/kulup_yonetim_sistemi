@@ -66,6 +66,8 @@ DECLARE v_il INTEGER;
 BEGIN
   v_il := COALESCE(CASE WHEN denetim_yetkilisi_mi() THEN get_my_il_id() END, get_my_okul_il_id());
   IF v_il IS NULL THEN RETURN; END IF;
+  -- Eşzamanlı çağrılar listeyi iki kez oluşturmasın
+  PERFORM pg_advisory_xact_lock(hashtext('denetim_maddeleri_hazirla'), v_il);
   IF EXISTS (SELECT 1 FROM denetim_maddeleri WHERE il_id = v_il) THEN RETURN; END IF;
   INSERT INTO denetim_maddeleri (il_id, sira_no, baslik, tip, otomatik_kod, yillik) VALUES
     (v_il, 1,  'Kulüp Açılış Onayı ve varsa Ek Onay', 'yukleme', NULL, true),
