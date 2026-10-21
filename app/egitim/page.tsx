@@ -82,11 +82,11 @@ const GUIDES = [
         <div style={{ background: 'var(--surface2)', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', lineHeight: '1.5' }}>
           <strong>Görev Limitleri:</strong>
           <ul style={{ margin: '6px 0 0 0', paddingLeft: '16px' }}>
-            <li>Usta Öğretici: %400</li>
-            <li>Öğretmen: %300</li>
+            <li>Resmî görevi olmayan (SGK&apos;lı) öğretmen / usta öğretici: %400</li>
+            <li>Resmî görevli (kadrolu) öğretmen / usta öğretici: %300</li>
             <li>Müdür / Başkan / Koordinatör / Denetçi: %275</li>
             <li>Başkan Yardımcısı: %250</li>
-            <li>Muhasebe / Temizlik (Destek): %80</li>
+            <li>Muhasebe / Temizlik (Destek): %200</li>
           </ul>
         </div>
       </div>

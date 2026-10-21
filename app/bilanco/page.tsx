@@ -157,8 +157,8 @@ export default function BilancoPage() {
 
   // Tavan hesapları — net ve brüt tavanlar hesaplanır
   const tavanHesaplari = TAVAN_KATEGORILER.map(kat => {
-    const brut = tavanHesapla(kat.gorev, tavanKatsayi)
-    const yuzde = gorevTavanYuzdesi(kat.gorev)
+    const brut = tavanHesapla(kat.gorev, tavanKatsayi, kat.sgkLi)
+    const yuzde = gorevTavanYuzdesi(kat.gorev, kat.sgkLi)
     
     let net = brut
     if (kat.gorev.toLowerCase().includes('denetim')) {

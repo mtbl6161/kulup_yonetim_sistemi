@@ -786,7 +786,7 @@ export default function BordroPage() {
         ogretmenler.forEach(p => {
           const saat = ogretmenSaatMap.get(p.id) || 0
           let pay = ogretmenBirimSaatUcreti * saat
-          const tavan = tavanHesapla(p.gorev, effectiveTavan)
+          const tavan = tavanHesapla(p.gorev, effectiveTavan, !!p.sgk_li)
           if (pay > tavan) pay = tavan
           ogretmenBrutMap.set(p.id, Math.round(pay * 100) / 100)
         })

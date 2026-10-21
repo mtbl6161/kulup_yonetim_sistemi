@@ -2,13 +2,15 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { FileText, RefreshCw, BarChart2, Calendar, UserCheck, ClipboardList, Activity, FolderOpen, Maximize2, Minimize2 } from 'lucide-react'
+import { FileText, RefreshCw, BarChart2, Calendar, UserCheck, ClipboardList, Activity } from 'lucide-react'
 import DenetciDenetimDosyasi from '@/components/DenetciDenetimDosyasi'
+import DenetciHesapKontrol, { useHesapKontrol } from '@/components/DenetciHesapKontrol'
 import { DenetimMaddeEditor } from '@/components/DenetimEvrakYonetimi'
-import { DenetimMenu, DenetimIsKuyrugu, DenetimOkulListesi, DurumRozeti, useDonemDurumlari, varsayilanDonem, PanelBolum } from '@/components/DenetimPanel'
+import { DenetimIsKuyrugu, useDonemDurumlari, varsayilanDonem } from '@/components/DenetimPanel'
+import { DenetimUstBar, DenetimOkullar, OkulIncelemeBasligi, VeriSecici, Bolum, OkulSekme, VeriSekme } from '@/components/DenetimDuzen'
 import {
   isGunuSayisi, gunSayisi, tahakkukDagitimHesapla,
-  tavanHesapla, gorevTavanYuzdesi, AYLAR, tatilMi,
+  tavanHesapla, gorevTavanYuzdesi, tatilMi,
   detectActiveCategories, bordroHesapla
 } from '@/lib/hesaplama'
 import { Ayarlar } from '@/lib/types'
@@ -58,8 +60,6 @@ const TAVAN_KATEGORILER = [
   { label: 'Denetim Yetkilisi',           gorev: 'Denetim Yetkilisi',    sgkLi: false },
 ]
 
-const OKUL_SEKMELERI: string[] = ['belgeler', 'bordro', 'bilanco', 'ders-programi', 'sinif-defteri']
-
 const AY_ADI = ['','Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
 
 function fmt(v: number | undefined | null) {
@@ -74,7 +74,14 @@ function sum(rows: BordroSatir[], key: keyof BordroSatir) {
 
 export default function DenetimPage() {
   const { profil, il, loading, signOut, refresh } = useAuth()
-  const [sekme, setSekme] = useState<'ozet' | 'bordro' | 'bilanco' | 'loglar' | 'ders-programi' | 'sinif-defteri' | 'profil' | 'belgeler' | 'dosyalar' | 'evrak-listesi'>('ozet')
+  // Ekran: menü bölümleri ya da açık bir okulun inceleme ekranı
+  const [ekran, setEkran] = useState<Bolum | 'okul'>('kuyruk')
+  const [geriBolum, setGeriBolum] = useState<Bolum>('kuyruk')   // okul ekranından dönülecek bölüm
+  const [okulSekme, setOkulSekme] = useState<OkulSekme>('evrak')
+  const [veriSekme, setVeriSekme] = useState<VeriSekme>('bordro')
+  const [ayarSekme, setAyarSekme] = useState<'evrak-listesi' | 'profil'>('evrak-listesi')
+  const [gezinme, setGezinme] = useState<number[]>([])         // okul açılan listenin sırası (‹ › için)
+  const [kararYenile, setKararYenile] = useState(0)            // dosya kararı sonrası evrak listesini yeniden yükle
 
   // Profil state
   const [profilAd, setProfilAd] = useState('')
@@ -94,8 +101,6 @@ export default function DenetimPage() {
   // Panelin genel dönemi ("2026-9"); tüm okul görünümleri bu ayı gösterir
   const [secilenAyKey, setSecilenAyKey] = useState<string>(varsayilanDonem)
   const [durumYenile, setDurumYenile] = useState(0)
-  // Okul ekranında tam ekran: menü ve okul listesi gizlenir, tarayıcı da tam ekrana geçer (geniş tablolar için)
-  const [tamEkran, setTamEkran] = useState(false)
   const [ilceler, setIlceler] = useState<{ id: number; ad: string }[]>([])
   const [filtreIlceId, setFiltreIlceId] = useState<number | null>(null)
   
@@ -112,36 +117,21 @@ export default function DenetimPage() {
   const selectedOkul = okullar.find(o => o.id === secilenOkulId)
   const [selYil, selAy] = secilenAyKey.split('-').map(Number)
 
-  // Menü bölümü ↔ sekme eşlemesi
-  const bolum: PanelBolum = sekme === 'ozet' ? 'kuyruk' : OKUL_SEKMELERI.includes(sekme) ? 'okullar' : (sekme as PanelBolum)
-  function bolumSec(b: PanelBolum) {
-    if (b === 'kuyruk') setSekme('ozet')
-    else if (b === 'okullar') setSekme(s => OKUL_SEKMELERI.includes(s) ? s : 'belgeler')
-    else setSekme(b)
-  }
-  // Tarayıcı tam ekranından (Esc) çıkılınca paneli de normale döndür; tarayıcı tam ekranı desteklemiyorsa Esc ile çık
-  useEffect(() => {
-    if (!tamEkran) return
-    const degisti = () => { if (!document.fullscreenElement) setTamEkran(false) }
-    const tus = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.fullscreenElement) setTamEkran(false) }
-    document.addEventListener('fullscreenchange', degisti)
-    document.addEventListener('keydown', tus)
-    return () => { document.removeEventListener('fullscreenchange', degisti); document.removeEventListener('keydown', tus) }
-  }, [tamEkran])
+  // Okul Verileri sekmesinde gösterilen ham veri (veri yükleme motoru buna göre çeker)
+  const aktifVeri: VeriSekme | null = ekran === 'okul' && okulSekme === 'veri' ? veriSekme : null
+  const bolum: Bolum = ekran === 'okul' ? geriBolum : ekran
 
-  function tamEkranDegistir() {
-    if (!tamEkran) {
-      setTamEkran(true)
-      document.documentElement.requestFullscreen?.().catch(() => { /* desteklenmiyorsa yalnızca panel içi tam ekran */ })
-    } else {
-      setTamEkran(false)
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
-    }
+  function bolumSec(b: Bolum) {
+    setEkran(b)
   }
 
-  function okulIncele(okulId: number) {
+  function okulIncele(okulId: number, liste?: number[]) {
+    if (ekran !== 'okul') setGeriBolum(ekran)
+    if (liste) setGezinme(liste)
+    else if (!gezinme.includes(okulId)) setGezinme([])
+    if (ekran !== 'okul') setOkulSekme('evrak') // ‹ › ile gezinirken açık sekme korunur
     setSecilenOkulId(okulId)
-    setSekme('belgeler')
+    setEkran('okul')
   }
 
   // Dönemdeki teslim durumları (kuyruk, okul listesi rozetleri, menü sayacı)
@@ -150,17 +140,22 @@ export default function DenetimPage() {
     .filter(o => donemDurumlari.durumlar.get(o.id)?.teslim?.durum === 'gonderildi')
     .sort((a, b) => (donemDurumlari.durumlar.get(a.id)?.teslim?.gonderim_tarihi || '').localeCompare(donemDurumlari.durumlar.get(b.id)?.teslim?.gonderim_tarihi || ''))
   const bekleyenSayisi = bekleyenler.length
-  const sonrakiBekleyen = bekleyenler.find(o => o.id !== secilenOkulId)?.id
+  const gezinmeSira = secilenOkulId ? gezinme.indexOf(secilenOkulId) : -1
+  const oncekiOkul = gezinmeSira > 0 ? gezinme[gezinmeSira - 1] : undefined
+  const sonrakiOkul = gezinmeSira >= 0
+    ? (gezinmeSira < gezinme.length - 1 ? gezinme[gezinmeSira + 1] : undefined)
+    : bekleyenler.find(o => o.id !== secilenOkulId)?.id // listeden açılmadıysa kuyrukta bekleyen başka dosya
+  const hesapVeri = useHesapKontrol(secilenOkulId || 0, selYil, selAy)
 
   // Profil sekmesi açılınca mevcut adı doldur
   useEffect(() => {
-    if (sekme === 'profil') {
+    if (ekran === 'ayarlar' && ayarSekme === 'profil') {
       setProfilAd(profil?.ad || '')
       setProfilSoyad(profil?.soyad || '')
       setProfilMesaj(null)
       setSifreMesaj(null)
     }
-  }, [sekme, profil])
+  }, [ekran, ayarSekme, profil])
 
   async function handleProfilGuncelle(e: React.FormEvent) {
     e.preventDefault()
@@ -323,7 +318,7 @@ export default function DenetimPage() {
         setBilVeri(null)
       }
 
-      if (sekme === 'bordro') {
+      if (aktifVeri === 'bordro') {
         const { data } = await supabase.from('bordro')
           .select('*, personel(ad, gorev, tc, sgk_li)')
           .eq('okul_id', secilenOkulId).eq('ay', ay).eq('yil', yil)
@@ -347,7 +342,7 @@ export default function DenetimPage() {
         })
 
         setSatirlar(siraliData)
-      } else if (sekme === 'bilanco') {
+      } else if (aktifVeri === 'bilanco') {
         const startDate = `${yil}-${String(ay).padStart(2, '0')}-01`
         const lastDay = gunSayisi(yil, ay)
         const endDate = `${yil}-${String(ay).padStart(2, '0')}-${lastDay}T23:59:59`
@@ -385,7 +380,7 @@ export default function DenetimPage() {
         } else {
           setBilVeri(null)
         }
-      } else if (sekme === 'ders-programi') {
+      } else if (aktifVeri === 'ders-programi') {
         const [{ data: pr }, { data: sin }, { data: tat }] = await Promise.all([
           supabase.from('ders_programi')
             .select('*, ogretmen:personel(id,ad,gorev)')
@@ -396,7 +391,7 @@ export default function DenetimPage() {
         setDersProgrami(pr || [])
         setSiniflar(sin || [])
         setTatiller(tat || [])
-      } else if (sekme === 'sinif-defteri') {
+      } else if (aktifVeri === 'sinif-defteri') {
         // okul_id olmayan eski kayıtlar için: okul_id filtresi olmadan çek,
         // RLS il yetkisiyle koruma sağlar; ay/yil client'ta filtrele
         const [sdRes, sinRes, tatRes] = await Promise.all([
@@ -420,7 +415,7 @@ export default function DenetimPage() {
     }
 
     veriYukle()
-  }, [secilenOkulId, secilenAyKey, sekme, refreshKey])
+  }, [secilenOkulId, secilenAyKey, aktifVeri, refreshKey])
 
   if (loading) return (
     <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
@@ -430,9 +425,9 @@ export default function DenetimPage() {
 
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: '"DM Sans", system-ui, sans-serif', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: '"DM Sans", system-ui, sans-serif', overflow: 'hidden' }}>
 
-      {!(tamEkran && OKUL_SEKMELERI.includes(sekme)) && <DenetimMenu
+      <DenetimUstBar
         bolum={bolum}
         onBolum={bolumSec}
         donem={secilenAyKey}
@@ -441,13 +436,13 @@ export default function DenetimPage() {
         ilAd={il?.ad}
         kullaniciAd={[profil?.ad, profil?.soyad].filter(Boolean).join(' ')}
         onCikis={signOut}
-      />}
+      />
 
       {/* ── İÇERİK ── */}
-      <main style={{ flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <main style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
         {/* İŞ KUYRUĞU (ana sayfa) */}
-        {sekme === 'ozet' && (
+        {ekran === 'kuyruk' && (
           <DenetimIsKuyrugu
             okullar={okullar}
             yil={selYil}
@@ -461,17 +456,46 @@ export default function DenetimPage() {
             filtreIlceId={filtreIlceId}
             onIlce={setFiltreIlceId}
             onIncele={okulIncele}
-            onTumKayitlar={() => setSekme('loglar')}
+            onTumKayitlar={() => bolumSec('kayitlar')}
             onYenile={() => { okullarGetir(); setDurumYenile(x => x + 1) }}
           />
         )}
 
-        {sekme === 'evrak-listesi' && profil?.il_id && (
+        {ekran === 'okullar' && (
+          <DenetimOkullar
+            okullar={okullar}
+            durumlar={donemDurumlari.durumlar}
+            toplamMadde={donemDurumlari.toplamMadde}
+            yukleniyor={donemDurumlari.yukleniyor || okulYukleniyor}
+            yil={selYil}
+            ay={selAy}
+            ilceler={ilceler}
+            filtreIlceId={filtreIlceId}
+            onIlce={setFiltreIlceId}
+            onIncele={okulIncele}
+            onYenile={() => { okullarGetir(); setDurumYenile(x => x + 1) }}
+          />
+        )}
+
+        {ekran === 'ayarlar' && (
+          <div role="group" aria-label="Ayarlar" style={{ flexShrink: 0, padding: '16px 28px 0', display: 'flex', gap: 2 }}>
+            {([['evrak-listesi', 'Evrak listesi'], ['profil', 'Profilim']] as const).map(([id, ad]) => (
+              <button key={id} type="button" onClick={() => setAyarSekme(id)} aria-pressed={ayarSekme === id}
+                style={{ padding: '8px 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14,
+                  fontWeight: ayarSekme === id ? 700 : 500, color: ayarSekme === id ? 'var(--accent)' : 'var(--text2)',
+                  borderBottom: ayarSekme === id ? '2px solid var(--accent)' : '2px solid transparent' }}>
+                {ad}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {ekran === 'ayarlar' && ayarSekme === 'evrak-listesi' && profil?.il_id && (
           <DenetimMaddeEditor ilId={profil.il_id} />
         )}
 
         {/* TÜM LOGLAR GÖRÜNÜMÜ (TAM SAYFA) */}
-        {sekme === 'loglar' && (
+        {ekran === 'kayitlar' && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
              {/* Sticky Header */}
              <div style={{ 
@@ -480,9 +504,8 @@ export default function DenetimPage() {
                position: 'sticky', top: 0, zIndex: 50, boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
              }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                   <button onClick={() => setSekme('ozet')} style={{ ...actionBtn, padding: '8px 16px', background: 'var(--surface2)', fontWeight: 600 }}>← İş Kuyruğu</button>
                    <div>
-                      <h1 style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)', margin: 0, fontFamily: '"Playfair Display", serif' }}>İl Geneli Aktivite Kayıtları</h1>
+                      <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', margin: 0 }}>İşlem Kayıtları</h1>
                       <p style={{ color: 'var(--text3)', fontSize: 12, margin: 0, fontWeight: 500 }}>Tüm kurumların işlem dökümü (Canlı)</p>
                    </div>
                 </div>
@@ -554,71 +577,42 @@ export default function DenetimPage() {
           </div>
         )}
 
-        {/* OKUL GÖRÜNÜMÜ (ana-detay): okul listesi | okul başlığı + sekmeler + içerik */}
-        {OKUL_SEKMELERI.includes(sekme) && (
-          <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-            {!tamEkran && <DenetimOkulListesi
-              okullar={okullar}
-              secili={secilenOkulId}
-              onSec={id => setSecilenOkulId(id)}
-              durumlar={donemDurumlari.durumlar}
-            />}
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              {!secilenOkulId ? (
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 14, padding: 24, textAlign: 'center' }}>
-                  İncelemek için soldan bir okul seçin.
-                </div>
-              ) : (
-                <>
-                  <div style={{ padding: '18px 24px 0', background: 'var(--surface)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                      <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800 }}>{selectedOkul?.ad}</h1>
-                      <DurumRozeti durum={donemDurumlari.durumlar.get(secilenOkulId)?.teslim?.durum} />
-                      <span style={{ fontSize: 13, color: 'var(--text2)' }}>{AY_ADI[selAy]} {selYil}</span>
-                    </div>
-                    <nav aria-label="Okul sekmeleri" style={{ display: 'flex', gap: 2, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {([
-                        { id: 'belgeler', label: 'Denetim Dosyası', icon: FolderOpen },
-                        { id: 'bordro', label: 'Bordro', icon: FileText },
-                        { id: 'bilanco', label: 'Bilanço', icon: BarChart2 },
-                        { id: 'ders-programi', label: 'Ders Programı', icon: Calendar },
-                        { id: 'sinif-defteri', label: 'Sınıf Defteri', icon: ClipboardList },
-                      ] as const).map(t => (
-                        <button key={t.id} type="button" onClick={() => setSekme(t.id)} aria-current={sekme === t.id ? 'page' : undefined}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', border: 'none', background: 'transparent', cursor: 'pointer',
-                            fontSize: 14, fontWeight: sekme === t.id ? 700 : 500, fontFamily: 'inherit',
-                            color: sekme === t.id ? 'var(--accent)' : 'var(--text2)',
-                            borderBottom: sekme === t.id ? '2px solid var(--accent)' : '2px solid transparent',
-                          }}>
-                          <t.icon size={14} aria-hidden="true" /> {t.label}
-                        </button>
-                      ))}
-                      <button type="button" onClick={tamEkranDegistir} aria-pressed={tamEkran}
-                        title={tamEkran ? 'Tam ekrandan çık (Esc)' : 'Tabloyu tam ekranda görüntüle'}
-                        style={{
-                          marginLeft: 'auto', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 10, cursor: 'pointer',
-                          fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-                          border: tamEkran ? 'none' : '1px solid var(--border)',
-                          background: tamEkran ? 'var(--accent)' : 'var(--surface)', color: tamEkran ? '#ffffff' : 'var(--text)',
-                        }}>
-                        {tamEkran ? <Minimize2 size={14} aria-hidden="true" /> : <Maximize2 size={14} aria-hidden="true" />}
-                        {tamEkran ? 'Tam ekrandan çık' : 'Tam ekran'}
-                      </button>
-                    </nav>
-                  </div>
+        {/* OKUL İNCELEME EKRANI: başlık (karar + özet + sekmeler) ve seçili sekmenin içeriği, tam genişlikte */}
+        {ekran === 'okul' && secilenOkulId && (
+          <>
+            <OkulIncelemeBasligi
+              key={`${secilenOkulId}-${secilenAyKey}`}
+              okulId={secilenOkulId}
+              okulAd={selectedOkul?.ad || ''}
+              yil={selYil}
+              ay={selAy}
+              durum={donemDurumlari.durumlar.get(secilenOkulId)}
+              toplamMadde={donemDurumlari.toplamMadde}
+              hesap={hesapVeri}
+              sekme={okulSekme}
+              onSekme={setOkulSekme}
+              geriAd={geriBolum === 'okullar' ? 'Okullar' : geriBolum === 'kuyruk' ? 'İş Kuyruğu' : 'Geri'}
+              onGeri={() => setEkran(geriBolum)}
+              gezinme={{
+                sira: gezinmeSira + 1,
+                toplam: gezinmeSira >= 0 ? gezinme.length : 0,
+                onOnceki: oncekiOkul ? () => okulIncele(oncekiOkul) : undefined,
+                onSonraki: sonrakiOkul ? () => okulIncele(sonrakiOkul) : undefined,
+              }}
+              onKararVerildi={() => { setDurumYenile(x => x + 1); setKararYenile(x => x + 1) }}
+            />
+
+            {okulSekme === 'veri' && (
+              <div style={{ flexShrink: 0, padding: '12px 24px', borderBottom: '1px solid var(--border-light)' }}>
+                <VeriSecici secili={veriSekme} onSec={setVeriSekme} />
+              </div>
+            )}
 
         {/* BORDRO GÖRÜNÜMÜ */}
-        {secilenOkulId && sekme === 'bordro' && (
+        {aktifVeri === 'bordro' && (
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
-            {/* Alt Bilgi Şeridi */}
-            <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
-               <div style={{ background: 'var(--accent-lighter)', padding: '6px 14px', borderRadius: 8, fontSize: 13, border: '1px solid var(--accent-light)' }}>
-                  <span style={{ fontWeight: 800, color: 'var(--accent)' }}>{selectedOkul?.ad}</span>
-                  <span style={{ margin: '0 10px', color: 'var(--border)' }}>|</span>
-                  <span style={{ color: 'var(--text2)', fontWeight: 600 }}>{selAy ? `${AY_ADI[selAy]} ${selYil}` : 'Ay Seçilmedi'}</span>
-               </div>
-               
+            {/* Toplamlar */}
+            {satirlar.length > 0 && <div style={{ padding: '10px 24px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
                {satirlar.length > 0 && (
                  <div style={{ marginLeft: 'auto', display: 'flex', gap: 12 }}>
                     {[
@@ -633,7 +627,7 @@ export default function DenetimPage() {
                     ))}
                  </div>
                )}
-            </div>
+            </div>}
 
             <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
               {yukleniyor ? (
@@ -768,7 +762,7 @@ export default function DenetimPage() {
         )}
 
         {/* BİLANÇO GÖRÜNÜMÜ */}
-        {secilenOkulId && sekme === 'bilanco' && (
+        {aktifVeri === 'bilanco' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: '28px 48px' }}>
              {yukleniyor ? (
                 <div style={loadingOverlay}><RefreshCw size={24} className="animate-spin" color="#3b82f6" /></div>
@@ -784,7 +778,7 @@ export default function DenetimPage() {
         )}
 
         {/* DERS PROGRAMI GÖRÜNÜMÜ */}
-        {secilenOkulId && sekme === 'ders-programi' && (
+        {aktifVeri === 'ders-programi' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
             {yukleniyor ? (
               <div style={loadingOverlay}><RefreshCw size={24} className="animate-spin" color="var(--accent)" /></div>
@@ -858,7 +852,7 @@ export default function DenetimPage() {
         )}
 
         {/* SINIF DEFTERİ GÖRÜNÜMÜ */}
-        {secilenOkulId && sekme === 'sinif-defteri' && (
+        {aktifVeri === 'sinif-defteri' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
             {yukleniyor ? (
               <div style={loadingOverlay}><RefreshCw size={24} className="animate-spin" color="var(--accent)" /></div>
@@ -963,25 +957,23 @@ export default function DenetimPage() {
           </div>
         )}
 
-        {secilenOkulId && sekme === 'belgeler' && (
+        {okulSekme === 'hesap' && <DenetciHesapKontrol veri={hesapVeri} />}
+
+        {okulSekme === 'evrak' && (
           <DenetciDenetimDosyasi
-            key={`${secilenOkulId}-${secilenAyKey}`}
+            key={`${secilenOkulId}-${secilenAyKey}-${kararYenile}`}
             okulId={secilenOkulId}
             okulAd={selectedOkul?.ad || ''}
             yil={selYil}
             ay={selAy}
             onDegisti={() => setDurumYenile(x => x + 1)}
-            onSonraki={sonrakiBekleyen ? () => okulIncele(sonrakiBekleyen) : undefined}
           />
         )}
-                </>
-              )}
-            </div>
-          </div>
+          </>
         )}
 
         {/* ── PROFİL ── */}
-        {sekme === 'profil' && (
+        {ekran === 'ayarlar' && ayarSekme === 'profil' && (
           <div style={{ flex: 1, overflow: 'auto', padding: 32 }}>
             <div style={{ maxWidth: 560, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
@@ -1138,8 +1130,8 @@ function BilancoIcerik({ veri, ay, yil, okulAd }: { veri: BilancoVerisi; ay: num
   ]
 
   const tavanHesaplari = TAVAN_KATEGORILER.map(kat => {
-    const brut = tavanHesapla(kat.gorev, tavanKatsayi)
-    const yuzde = gorevTavanYuzdesi(kat.gorev)
+    const brut = tavanHesapla(kat.gorev, tavanKatsayi, kat.sgkLi)
+    const yuzde = gorevTavanYuzdesi(kat.gorev, kat.sgkLi)
     
     let net = brut
     if (kat.gorev.toLowerCase().includes('denetim')) {

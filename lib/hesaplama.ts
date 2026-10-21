@@ -155,21 +155,31 @@ export function gelirVergisiHesapla(
 // ============================================================
 // Görev Tavan Yüzdeleri (MEB Yönergesi — En Yüksek Devlet Memuru Brüt Aylığının %'si)
 // ============================================================
-export function gorevTavanYuzdesi(gorev: string): number {
-  const g = (gorev || '').toLowerCase()
+/**
+ * Çocuk Kulüpleri Yönergesi md. 16 — aylık brüt ödeme üst sınırı (en yüksek devlet memuru brüt aylığının yüzdesi):
+ *  resmî görevi bulunan öğretmen / usta öğretici %300, bulunmayan %400;
+ *  denetim yetkilisi, kulüp başkanı, koordinatör öğretmen %275; müdür yardımcısı %250;
+ *  yazışma-muhasebe ve temizlik-bakım-beslenme personeli %200.
+ * sgkLi: personel kulüpten sigortalıysa resmî görevi yoktur (%400), kadroluysa vardır (%300).
+ * Bilinmiyorsa unvandan tahmin edilir (usta öğretici %400, öğretmen %300).
+ */
+export function gorevTavanYuzdesi(gorev: string, sgkLi?: boolean): number {
+  const g = (gorev || '').toLocaleLowerCase('tr-TR')
   if (g.includes('koordinatör') || g.includes('koordinator')) return 275
-  if (g.includes('usta')) return 400
-  if (g.includes('öğretmen') || g.includes('ogretmen')) return 300
+  if (g.includes('denetim')) return 275
   if ((g.includes('başkan') || g.includes('baskan')) && !g.includes('yardımcı') && !g.includes('yardimci')) return 275
   if (g.includes('yardımcı') || g.includes('yardimci')) return 250
-  if (g.includes('muhasebe') || g.includes('memur')) return 80
-  if (g.includes('temizlik') || g.includes('hizmet') || g.includes('bakım')) return 80
-  if (g.includes('denetim')) return 275
+  if (g.includes('muhasebe') || g.includes('memur') || g.includes('yazışma')) return 200
+  if (g.includes('temizlik') || g.includes('hizmet') || g.includes('bakım') || g.includes('beslenme')) return 200
+  if (g.includes('usta') || g.includes('öğretmen') || g.includes('ogretmen') || g.includes('öğretici')) {
+    if (sgkLi !== undefined) return sgkLi ? 400 : 300
+    return g.includes('usta') ? 400 : 300
+  }
   return 300
 }
 
-export function tavanHesapla(gorev: string, tavanKatsayi: number): number {
-  return Math.round(tavanKatsayi * gorevTavanYuzdesi(gorev) / 100 * 100 + 1e-9) / 100
+export function tavanHesapla(gorev: string, tavanKatsayi: number, sgkLi?: boolean): number {
+  return Math.round(tavanKatsayi * gorevTavanYuzdesi(gorev, sgkLi) / 100 * 100 + 1e-9) / 100
 }
 
 // ============================================================
@@ -194,7 +204,7 @@ export function bordroHesapla(
 
   // Tavan uygulaması
   if (gorev && ayarlar.tavan_katsayi) {
-    const tavan = tavanHesapla(gorev, ayarlar.tavan_katsayi)
+    const tavan = tavanHesapla(gorev, ayarlar.tavan_katsayi, sgkLi)
     brut = Math.min(brut, tavan)
   }
 
