@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { ayLabel, fmtTL, AYLAR } from '@/lib/hesaplama'
 import { TahsilatKategori, TahsilatKategoriTip, TahsilatVeriKaynagi, TahsilatKapsam, TahsilatKaydi, TahsilatTaksitPlani, Ogrenci, Ayarlar, kulupOgrencisi } from '@/lib/types'
 import ConfirmModal from '@/components/ConfirmModal'
+import { sayiCoz } from '@/components/SayiInput'
 import { taksitAcilabilir, taksitKey, anaDonem, esitBol, aylikVadeler, fmtVade, MAX_TAKSIT } from '@/lib/taksit'
 import { ClipboardList, Plus, Pencil, Trash2, Users, CalendarRange, CalendarDays, Ticket, RefreshCw, Search, X, Grid3x3, FolderCog, Check, FileWarning, Download, Layers, AlertTriangle } from 'lucide-react'
 
@@ -79,9 +80,45 @@ function turUygun(o: Ogrenci, f: TurFiltre) {
   return f === 'hepsi' || (f === 'kulup') === kulupOgrencisi(o)
 }
 
+/** Ad, soyad (her iki sırada), sınıf veya kimlik no içinde arar — Türkçe büyük/küçük harf duyarsız */
+function aramaUygun(o: Ogrenci, arama: string) {
+  const q = arama.toLocaleLowerCase('tr').trim()
+  if (!q) return true
+  return [`${o.ad} ${o.soyad}`, `${o.soyad} ${o.ad}`, o.sinif || '', o.tc || '']
+    .some(s => s.toLocaleLowerCase('tr').includes(q))
+}
+
+/** Arama kutusu — harf girildikçe liste süzülür */
+function AramaKutusu({ value, onChange, sonuc }: { value: string; onChange: (v: string) => void; sonuc?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
+        <Search size={15} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />
+        <input className="form-input" value={value} onChange={e => onChange(e.target.value)} placeholder="Öğrenci ara (ad, soyad, sınıf, kimlik no)..." style={{ paddingLeft: 34, paddingRight: value ? 32 : undefined, width: '100%' }} />
+        {value && (
+          <button type="button" onClick={() => onChange('')} title="Aramayı temizle" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', display: 'flex', padding: 4 }}>
+            <X size={14} />
+          </button>
+        )}
+      </div>
+      {value && sonuc && <span style={{ fontSize: 12, color: 'var(--text3)' }}>{sonuc}</span>}
+    </div>
+  )
+}
+
 interface Donem { key: string; label: string; kisa: string }
 
+/** Dönem bugüne kadar başladı mı? Aylık: o ayın 1'i · 1. dönem: 1 Eylül · 2. dönem: 1 Şubat · tek seferlik: her zaman */
+function donemGeldi(key: string, bugun: string): boolean {
+  if (key === '-') return true
+  const [y, p] = key.split('-')
+  const baslangic = p === 'D1' ? `${y}-09-01` : p === 'D2' ? `${Number(y) + 1}-02-01` : `${y}-${p}-01`
+  return baslangic <= bugun
+}
+
 const bugunISO = () => new Date().toISOString().split('T')[0]
+/** Sayıyı kutuya Türkçe yazımla koyar (1500.5 → "1500,5") — sayiCoz ile geri okunur */
+const sayiYaz = (n: number | string | null | undefined) => n == null || n === '' ? '' : String(n).replace('.', ',')
 
 export default function TahsilatTakipPage() {
   const { ay, yil } = useAy()
@@ -99,6 +136,7 @@ export default function TahsilatTakipPage() {
   // Takip ızgarası
   const [seciliKategoriId, setSeciliKategoriId] = useState<number | null>(null)
   const [turFiltre, setTurFiltre] = useState<TurFiltre>('hepsi')
+  const [takipArama, setTakipArama] = useState('')
   const varsayilanEgitimYili = new Date().getMonth() + 1 >= 9 ? new Date().getFullYear() : new Date().getFullYear() - 1
   const [egitimYili, setEgitimYili] = useState(varsayilanEgitimYili)
   const [kayitlar, setKayitlar] = useState<TahsilatKaydi[]>([])
@@ -135,7 +173,9 @@ export default function TahsilatTakipPage() {
       supabase.from('ayarlar').select('*').single(),
     ])
     setKategoriler(kat || [])
-    setOgrenciler((ogr || []).filter(o => o.aktif !== false))
+    // Ad Soyad'a göre Türkçe alfabetik sıra (Ç, Ğ, İ, Ö, Ş, Ü doğru yerde)
+    setOgrenciler((ogr || []).filter(o => o.aktif !== false)
+      .sort((a, b) => `${a.ad} ${a.soyad}`.localeCompare(`${b.ad} ${b.soyad}`, 'tr', { sensitivity: 'base' })))
     setUyelikler(uye || [])
     setAyarlar(ayr || null)
     setSeciliKategoriId(prev => prev ?? (kat && kat.length ? kat[0].id : null))
@@ -199,6 +239,7 @@ export default function TahsilatTakipPage() {
   // Kategorinin tüm kapsamı (tür filtresinden bağımsız) ve ekranda görünen kısım
   const kapsamTum = useMemo<Ogrenci[]>(() => seciliKategori ? kapsamOgrencileri(seciliKategori, ogrenciler, uyelikler) : [], [seciliKategori, ogrenciler, uyelikler])
   const uyeOgrenciler = useMemo<Ogrenci[]>(() => kapsamTum.filter(o => turUygun(o, turFiltre)), [kapsamTum, turFiltre])
+  const gorunenOgrenciler = useMemo<Ogrenci[]>(() => uyeOgrenciler.filter(o => aramaUygun(o, takipArama)), [uyeOgrenciler, takipArama])
 
   const kayitMap = useMemo(() => {
     const m = new Map<string, TahsilatKaydi>()
@@ -219,8 +260,8 @@ export default function TahsilatTakipPage() {
 
   function planFormHesapla(f: PlanForm, patch: Partial<PlanForm>): PlanForm {
     const n = { ...f, ...patch }
-    const toplam = parseFloat(n.toplam) || 0
-    return { ...n, vadeler: n.ilkVade ? aylikVadeler(n.ilkVade, n.adet) : n.vadeler, tutarlar: esitBol(toplam, n.adet).map(String) }
+    const toplam = sayiCoz(n.toplam) || 0
+    return { ...n, vadeler: n.ilkVade ? aylikVadeler(n.ilkVade, n.adet) : n.vadeler, tutarlar: esitBol(toplam, n.adet).map(sayiYaz) }
   }
 
   function planAc(o: Ogrenci, d: Donem) {
@@ -231,14 +272,14 @@ export default function TahsilatTakipPage() {
       const pd = planDurum(mevcut)
       setPlanForm({
         o, d, planId: mevcut.id, odenenNo: pd.taksitler.filter(t => t.kayit).map(t => t.no),
-        toplam: String(pd.toplam), adet: pd.adet, ilkVade: mevcut.vadeler[0] || bugun,
-        vadeler: [...mevcut.vadeler], tutarlar: mevcut.tutarlar.map(String), aciklama: mevcut.aciklama || '',
+        toplam: sayiYaz(pd.toplam), adet: pd.adet, ilkVade: mevcut.vadeler[0] || bugun,
+        vadeler: [...mevcut.vadeler], tutarlar: mevcut.tutarlar.map(sayiYaz), aciklama: mevcut.aciklama || '',
       })
       return
     }
     const ucret = ucretBul(seciliKategori, o)
     setPlanForm(planFormHesapla(
-      { o, d, planId: null, odenenNo: [], toplam: ucret != null ? String(ucret) : '', adet: 2, ilkVade: bugun, vadeler: [], tutarlar: [], aciklama: '' },
+      { o, d, planId: null, odenenNo: [], toplam: sayiYaz(ucret), adet: 2, ilkVade: bugun, vadeler: [], tutarlar: [], aciklama: '' },
       {},
     ))
   }
@@ -246,7 +287,7 @@ export default function TahsilatTakipPage() {
   async function planKaydet() {
     if (!planForm || !seciliKategori || !okulId) return
     const f = planForm
-    const tutarlar = f.tutarlar.map(t => parseFloat(t))
+    const tutarlar = f.tutarlar.map(t => sayiCoz(t) ?? NaN)
     if (f.vadeler.some(v => !v)) { setPlanMsg('❌ Tüm taksitlerin vade tarihini girin.'); return }
     if (tutarlar.some(t => isNaN(t) || t <= 0)) { setPlanMsg('❌ Her taksitin tutarı 0\'dan büyük olmalı.'); return }
     const enBuyukOdenen = Math.max(0, ...f.odenenNo)
@@ -318,7 +359,7 @@ export default function TahsilatTakipPage() {
   // ── Dolu hücre → popover ──
   function popoverAc(e: React.MouseEvent, ogrenciId: number, donem: string, mevcut: TahsilatKaydi) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    setPTutar(mevcut.tutar != null ? String(mevcut.tutar) : '')
+    setPTutar(sayiYaz(mevcut.tutar))
     setPTarih(mevcut.tarih || bugunISO())
     setPAciklama(mevcut.aciklama || '')
     setPopover({ ogrenciId, donem, rect, mevcut })
@@ -326,8 +367,9 @@ export default function TahsilatTakipPage() {
 
   async function popoverKaydet() {
     if (!popover?.mevcut) return
+    if (pTutar.trim() && sayiCoz(pTutar) == null) { bilgi('❌ Tutar anlaşılamadı. Örnek: 1500 veya 1.500,50', 4000); return }
     const payload = {
-      tutar: pTutar ? parseFloat(pTutar) : null,
+      tutar: sayiCoz(pTutar),
       tarih: pTarih || null,
       aciklama: pAciklama || null,
     }
@@ -350,7 +392,7 @@ export default function TahsilatTakipPage() {
   function yeniAc() { setEditId(null); setForm(BOS_FORM); setSeciliOgrenci(new Set()); setOgrenciArama(''); setModalAcik(true) }
   function duzenleAc(k: TahsilatKategori) {
     setEditId(k.id)
-    setForm({ ad: k.ad, tip: k.tip, veri_kaynagi: k.veri_kaynagi, kapsam: k.kapsam, varsayilan_tutar: k.varsayilan_tutar != null ? String(k.varsayilan_tutar) : '', varsayilan_tutar_okul: k.varsayilan_tutar_okul != null ? String(k.varsayilan_tutar_okul) : '' })
+    setForm({ ad: k.ad, tip: k.tip, veri_kaynagi: k.veri_kaynagi, kapsam: k.kapsam, varsayilan_tutar: sayiYaz(k.varsayilan_tutar), varsayilan_tutar_okul: sayiYaz(k.varsayilan_tutar_okul) })
     setSeciliOgrenci(new Set(uyelikler.filter(u => u.kategori_id === k.id).map(u => u.ogrenci_id)))
     setOgrenciArama(''); setModalAcik(true)
   }
@@ -361,6 +403,7 @@ export default function TahsilatTakipPage() {
 
   async function kaydet() {
     if (!form.ad.trim()) { bilgi('❌ Kategori adı zorunlu.'); return }
+    if ([form.varsayilan_tutar, form.varsayilan_tutar_okul].some(t => t.trim() && sayiCoz(t) == null)) { bilgi('❌ Ücret anlaşılamadı. Örnek: 1500 veya 1.500,50'); return }
     if (!okulId) { bilgi('❌ Oturum bilgisi eksik, sayfayı yenileyin.'); return }
     if (form.veri_kaynagi === 'otomatik_kulup') {
       const varOlan = kategoriler.find(k => k.veri_kaynagi === 'otomatik_kulup' && k.id !== editId)
@@ -370,8 +413,8 @@ export default function TahsilatTakipPage() {
     const payload = {
       ad: form.ad.trim(), tip: form.tip, veri_kaynagi: form.veri_kaynagi,
       kapsam: form.veri_kaynagi === 'otomatik_kulup' ? 'tumu' : form.kapsam,
-      varsayilan_tutar: form.varsayilan_tutar ? parseFloat(form.varsayilan_tutar) : null,
-      varsayilan_tutar_okul: form.varsayilan_tutar_okul ? parseFloat(form.varsayilan_tutar_okul) : null,
+      varsayilan_tutar: sayiCoz(form.varsayilan_tutar),
+      varsayilan_tutar_okul: sayiCoz(form.varsayilan_tutar_okul),
       okul_id: okulId,
     }
     try {
@@ -421,42 +464,57 @@ export default function TahsilatTakipPage() {
   function toggleOgrenci(id: number) { setSeciliOgrenci(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n }) }
   const otomatikKilit = form.veri_kaynagi === 'otomatik_kulup'
 
-  // Izgara özeti — o dönem(ler)de toplanan tutar
+  // Izgara özeti — Kulüp/Okul filtresindeki öğrenciler (aramadan bağımsız)
   const ozet = useMemo(() => {
     const donemSet = new Set(donemler.map(d => d.key))
-    const turMap = new Map(kapsamTum.map(o => [o.id, kulupOgrencisi(o)]))
+    const turMap = new Map(uyeOgrenciler.map(o => [o.id, kulupOgrencisi(o)]))
     let kulupTutar = 0, okulTutar = 0
     kayitlar.forEach(k => {
       if (!donemSet.has(anaDonem(k.donem)) || !turMap.has(k.ogrenci_id)) return
       const t = Number(k.tutar) || 0
       if (turMap.get(k.ogrenci_id)) kulupTutar += t; else okulTutar += t
     })
-    // Beklenen tutar (plan varsa plan toplamı, yoksa ücret) + vadesi geçmiş taksitler
-    let beklenen = 0, geciken = 0, planli = 0
+    // Beklenen ve kalan yalnız bugüne kadar gelmiş dönemler / vadesi gelmiş taksitler üzerinden,
+    // kalan öğrenci × dönem bazında (birinin fazla ödemesi diğerinin borcunu kapatmaz)
+    let beklenen = 0, kalan = 0, geciken = 0, planli = 0
+    let ucretTanimli = false
     const gecikenOgrenci = new Set<number>()
     if (seciliKategori && !saltOkunur) {
-      kapsamTum.forEach(o => donemler.forEach(d => {
+      uyeOgrenciler.forEach(o => donemler.forEach(d => {
         const plan = planMap.get(`${o.id}|${d.key}`)
         if (plan) {
+          ucretTanimli = true; planli++
           const pd = planDurumu(plan, key => kayitMap.get(`${o.id}|${key}`), bugun)
-          beklenen += pd.toplam; planli++
+          pd.taksitler.forEach(t => {
+            if (t.vade > bugun) return
+            beklenen += t.tutar
+            if (!t.kayit) kalan += t.tutar
+          })
           if (pd.geciken) { geciken += pd.geciken; gecikenOgrenci.add(o.id) }
         } else {
           const u = ucretBul(seciliKategori, o)
-          if (u != null) beklenen += u
+          if (u == null) return
+          ucretTanimli = true
+          if (!donemGeldi(d.key, bugun)) return
+          beklenen += u
+          const kayit = kayitMap.get(`${o.id}|${d.key}`)
+          // tutarı boş bırakılmış kayıt "ödendi" sayılır (ızgarada da öyle görünür)
+          const odenen = kayit ? (kayit.tutar != null ? Number(kayit.tutar) : u) : 0
+          kalan += Math.max(0, u - odenen)
         }
       }))
     }
-    const kulupSayi = kapsamTum.filter(kulupOgrencisi).length
+    const kulupSayi = uyeOgrenciler.filter(kulupOgrencisi).length
     const toplamTutar = kulupTutar + okulTutar
-    return { kulupTutar, okulTutar, toplamTutar, kulupSayi, okulSayi: kapsamTum.length - kulupSayi, beklenen, kalan: Math.max(0, beklenen - toplamTutar), geciken, gecikenOgrenci: gecikenOgrenci.size, planli }
-  }, [kayitlar, donemler, kapsamTum, seciliKategori, saltOkunur, kayitMap, planMap, bugun])
+    return { kulupTutar, okulTutar, toplamTutar, kulupSayi, okulSayi: uyeOgrenciler.length - kulupSayi, beklenen, kalan, ucretTanimli, geciken, gecikenOgrenci: gecikenOgrenci.size, planli }
+  }, [kayitlar, donemler, uyeOgrenciler, seciliKategori, saltOkunur, kayitMap, planMap, bugun])
 
   // ───────── ÖDEME DURUMU RAPORU ─────────
   const [rKategoriId, setRKategoriId] = useState<number | null>(null)
   const [rDonem, setRDonem] = useState<string>('')
   const [rSinif, setRSinif] = useState<string>('')
   const [rDurum, setRDurum] = useState<'hepsi' | 'odeyen' | 'odemeyen' | 'geciken'>('hepsi')
+  const [rArama, setRArama] = useState('')
   // Seçili kategori+dönemin kayıtları (peşin + taksit) ve taksit planları
   const [rKayitlar, setRKayitlar] = useState<TahsilatKaydi[]>([])
   const [rPlanlar, setRPlanlar] = useState<TahsilatTaksitPlani[]>([])
@@ -549,6 +607,8 @@ export default function TahsilatTakipPage() {
     return [...f].sort((a, b) => (DURUM_SIRA[a.durum] - DURUM_SIRA[b.durum]) || `${a.o.ad} ${a.o.soyad}`.localeCompare(`${b.o.ad} ${b.o.soyad}`, 'tr'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rSatirlar, rDurum])
+  // Ekranda aramaya göre süzülmüş liste (PDF aramadan bağımsız, tüm listeyi basar)
+  const rGorunen = useMemo(() => rListe.filter(x => aramaUygun(x.o, rArama)), [rListe, rArama])
 
   async function raporPdf() {
     if (!rKategori) return
@@ -768,6 +828,9 @@ export default function TahsilatTakipPage() {
                   </div>
                   {rPlanVar && <div className="card" style={statBox}><div style={statLabel}>Vadesi Geçen</div><div style={{ ...statVal, color: rGecikenSayisi ? 'var(--danger)' : 'var(--text3)' }}>{rGecikenSayisi}</div><div style={statAlt}>öğrencinin gecikmiş taksiti var</div></div>}
                 </div>
+                <div style={{ marginBottom: 12 }}>
+                  <AramaKutusu value={rArama} onChange={setRArama} sonuc={`${rGorunen.length} / ${rListe.length} öğrenci`} />
+                </div>
                 <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                   <div style={{ overflowX: 'auto' }}>
                     <table className="data-table" style={{ width: '100%' }}>
@@ -781,9 +844,9 @@ export default function TahsilatTakipPage() {
                       <tbody>
                         {rLoading ? (
                           <tr><td colSpan={rPlanVar ? 10 : 7} style={{ padding: 24, textAlign: 'center', color: 'var(--text3)' }}>Yükleniyor...</td></tr>
-                        ) : rListe.length === 0 ? (
-                          <tr><td colSpan={rPlanVar ? 10 : 7} style={{ padding: 28, textAlign: 'center', color: 'var(--text3)' }}>Bu filtrede öğrenci yok.</td></tr>
-                        ) : rListe.map((x, i) => (
+                        ) : rGorunen.length === 0 ? (
+                          <tr><td colSpan={rPlanVar ? 10 : 7} style={{ padding: 28, textAlign: 'center', color: 'var(--text3)' }}>{rArama.trim() && rListe.length ? `"${rArama.trim()}" ile eşleşen öğrenci yok.` : 'Bu filtrede öğrenci yok.'}</td></tr>
+                        ) : rGorunen.map((x, i) => (
                           <tr key={x.o.id}>
                             <td style={{ textAlign: 'center', color: 'var(--text3)' }}>{i + 1}</td>
                             <td style={{ fontSize: 12 }}>{x.o.tc || '-'}</td>
@@ -861,22 +924,25 @@ export default function TahsilatTakipPage() {
                   </div>
                 )}
                 {/* Özet */}
-                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${saltOkunur || !ozet.beklenen ? 2 : 4},1fr)`, gap: 12, marginBottom: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${saltOkunur || !ozet.ucretTanimli ? 2 : 4},1fr)`, gap: 12, marginBottom: 16 }}>
                   <div className="card" style={statBox}>
                     <div style={statLabel}>Öğrenci</div>
-                    <div style={statVal}>{kapsamTum.length}</div>
-                    {!saltOkunur && <div style={statAlt}><TurRozet okul={false} /> {ozet.kulupSayi} &nbsp;·&nbsp; <TurRozet okul /> {ozet.okulSayi}</div>}
+                    <div style={statVal}>{uyeOgrenciler.length}</div>
+                    {!saltOkunur && turFiltre === 'hepsi' && <div style={statAlt}><TurRozet okul={false} /> {ozet.kulupSayi} &nbsp;·&nbsp; <TurRozet okul /> {ozet.okulSayi}</div>}
+                    {!saltOkunur && turFiltre !== 'hepsi' && <div style={statAlt}>Yalnız {turFiltre === 'kulup' ? 'kulüp' : 'okul'} öğrencileri</div>}
                   </div>
                   <div className="card" style={statBox}>
                     <div style={statLabel}>Toplanan Tutar</div>
                     <div style={statVal}>{fmtTL(ozet.toplamTutar)}</div>
                     {!saltOkunur && <div style={statAlt}><TurRozet okul={false} /> {fmtTL(ozet.kulupTutar)} &nbsp;·&nbsp; <TurRozet okul /> {fmtTL(ozet.okulTutar)}</div>}
                   </div>
-                  {!saltOkunur && ozet.beklenen > 0 && <>
+                  {!saltOkunur && ozet.ucretTanimli && <>
                     <div className="card" style={statBox}>
                       <div style={statLabel}>Beklenen Tutar</div>
                       <div style={statVal}>{fmtTL(ozet.beklenen)}</div>
-                      <div style={statAlt}>%{Math.round((ozet.toplamTutar / ozet.beklenen) * 100)} tahsil edildi</div>
+                      <div style={statAlt}>{ozet.beklenen > 0
+                        ? <>Bugüne kadar · %{Math.round(((ozet.beklenen - ozet.kalan) / ozet.beklenen) * 100)} tahsil edildi</>
+                        : 'Henüz vadesi gelen dönem yok'}</div>
                     </div>
                     <div className="card" style={statBox}>
                       <div style={statLabel}>Kalan Borç</div>
@@ -887,6 +953,9 @@ export default function TahsilatTakipPage() {
                   </>}
                 </div>
 
+                <div style={{ marginBottom: 12 }}>
+                  <AramaKutusu value={takipArama} onChange={setTakipArama} sonuc={`${gorunenOgrenciler.length} / ${uyeOgrenciler.length} öğrenci`} />
+                </div>
                 <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                   <div style={{ overflowX: 'auto', maxHeight: '70vh', overflowY: 'auto' }}>
                     <table className="tk-grid" style={{ fontSize: 12, width: '100%', minWidth: donemler.length * 90 + 220 }}>
@@ -901,7 +970,9 @@ export default function TahsilatTakipPage() {
                       <tbody>
                         {kayitLoading ? (
                           <tr><td colSpan={donemler.length + 1} style={{ padding: 30, textAlign: 'center', color: 'var(--text3)' }}>Yükleniyor...</td></tr>
-                        ) : uyeOgrenciler.map(o => (
+                        ) : gorunenOgrenciler.length === 0 ? (
+                          <tr><td colSpan={donemler.length + 1} style={{ padding: 30, textAlign: 'center', color: 'var(--text3)' }}>&quot;{takipArama.trim()}&quot; ile eşleşen öğrenci yok.</td></tr>
+                        ) : gorunenOgrenciler.map(o => (
                           <tr key={o.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                             <td className="tk-namecell" style={{ ...tdStyle, position: 'sticky', left: 0, zIndex: 4, background: 'var(--surface)', textAlign: 'left', paddingLeft: 16, fontWeight: 600, boxShadow: '2px 0 5px rgba(0,0,0,0.05)', borderRight: '1px solid var(--border)' }}>
                               {!saltOkunur && <TurRozet okul={!kulupOgrencisi(o)} />} {o.ad} {o.soyad}
@@ -975,7 +1046,7 @@ export default function TahsilatTakipPage() {
           >
             <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>Ödeme Bilgisi</div>
             <label className="form-label">Tutar (₺)</label>
-            <input className="form-input" type="number" step="0.01" min="0" value={pTutar} onChange={e => setPTutar(e.target.value)} style={{ marginBottom: 8 }} />
+            <input className="form-input" type="text" inputMode="decimal" value={pTutar} onChange={e => setPTutar(e.target.value)} style={{ marginBottom: 8 }} />
             <label className="form-label">Tarih</label>
             <input className="form-input" type="date" value={pTarih} onChange={e => setPTarih(e.target.value)} style={{ marginBottom: 8 }} />
             <label className="form-label">Açıklama</label>
@@ -1041,8 +1112,8 @@ export default function TahsilatTakipPage() {
       {/* Taksit planı oluştur / düzenle */}
       {planForm && (() => {
         const f = planForm
-        const toplamGirilen = f.tutarlar.reduce((s, t) => s + (parseFloat(t) || 0), 0)
-        const toplamHedef = parseFloat(f.toplam) || 0
+        const toplamGirilen = f.tutarlar.reduce((s, t) => s + (sayiCoz(t) || 0), 0)
+        const toplamHedef = sayiCoz(f.toplam) || 0
         const fark = Math.round((toplamGirilen - toplamHedef) * 100) / 100
         return (
           <div style={overlay} onClick={() => !planSaving && setPlanForm(null)}>
@@ -1060,7 +1131,7 @@ export default function TahsilatTakipPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
                 <div>
                   <label className="form-label">Toplam Tutar (₺)</label>
-                  <input className="form-input" type="number" step="0.01" min="0" value={f.toplam} onChange={e => setPlanForm(planFormHesapla(f, { toplam: e.target.value }))} />
+                  <input className="form-input" type="text" inputMode="decimal" value={f.toplam} onChange={e => setPlanForm(planFormHesapla(f, { toplam: e.target.value }))} />
                 </div>
                 <div>
                   <label className="form-label">Taksit Sayısı</label>
@@ -1081,7 +1152,7 @@ export default function TahsilatTakipPage() {
                     <div key={i} style={{ display: 'grid', gridTemplateColumns: '70px 1fr 1fr', gap: 10, alignItems: 'center', padding: '8px 12px', borderBottom: i < f.vadeler.length - 1 ? '1px solid var(--border-light)' : 'none', background: odendi ? 'var(--success-light)' : undefined }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>{i + 1}. taksit{odendi && <div style={{ fontSize: 10, color: 'var(--success)', fontWeight: 600 }}>ödendi</div>}</div>
                       <input className="form-input" type="date" value={v} onChange={e => setPlanForm({ ...f, vadeler: f.vadeler.map((x, j) => j === i ? e.target.value : x) })} />
-                      <input className="form-input" type="number" step="0.01" min="0" value={f.tutarlar[i] ?? ''} onChange={e => setPlanForm({ ...f, tutarlar: f.tutarlar.map((x, j) => j === i ? e.target.value : x) })} />
+                      <input className="form-input" type="text" inputMode="decimal" value={f.tutarlar[i] ?? ''} onChange={e => setPlanForm({ ...f, tutarlar: f.tutarlar.map((x, j) => j === i ? e.target.value : x) })} />
                     </div>
                   )
                 })}
@@ -1145,11 +1216,11 @@ export default function TahsilatTakipPage() {
                   <div style={{ display: 'flex', gap: 12 }}>
                     <div style={{ flex: 1 }}>
                       <label className="form-label">Kulüp Öğrencisi Ücreti (₺)</label>
-                      <input className="form-input" type="number" step="0.01" min="0" value={form.varsayilan_tutar} onChange={e => setForm(f => ({ ...f, varsayilan_tutar: e.target.value }))} placeholder="Opsiyonel" />
+                      <input className="form-input" type="text" inputMode="decimal" value={form.varsayilan_tutar} onChange={e => setForm(f => ({ ...f, varsayilan_tutar: e.target.value }))} placeholder="Opsiyonel" />
                     </div>
                     <div style={{ flex: 1 }}>
                       <label className="form-label">Okul Öğrencisi Ücreti (₺)</label>
-                      <input className="form-input" type="number" step="0.01" min="0" value={form.varsayilan_tutar_okul} onChange={e => setForm(f => ({ ...f, varsayilan_tutar_okul: e.target.value }))} placeholder={form.varsayilan_tutar ? `Boşsa ${form.varsayilan_tutar}` : 'Opsiyonel'} />
+                      <input className="form-input" type="text" inputMode="decimal" value={form.varsayilan_tutar_okul} onChange={e => setForm(f => ({ ...f, varsayilan_tutar_okul: e.target.value }))} placeholder={form.varsayilan_tutar ? `Boşsa ${form.varsayilan_tutar}` : 'Opsiyonel'} />
                     </div>
                   </div>
                   <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
