@@ -5,12 +5,12 @@ import { usePathname } from 'next/navigation'
 import { AYLAR } from '@/lib/hesaplama'
 import { useAy } from '@/lib/AyContext'
 import { useAuth } from '@/lib/AuthContext'
-import { LogOut, User, LayoutDashboard, Users, Calendar, BookOpen, Clock, BarChart3, Wallet, Landmark, TrendingUp, FileText, Settings, GraduationCap, School, ChevronDown, ClipboardList, Activity, Calculator, Globe, BookText, FolderCheck, Search, ChevronsLeft, X } from 'lucide-react'
+import { LogOut, User, LayoutDashboard, Users, Calendar, BookOpen, Clock, BarChart3, Wallet, Landmark, TrendingUp, FileText, Settings, GraduationCap, School, ChevronDown, ClipboardList, Activity, Calculator, Globe, BookText, FolderCheck, Search, ChevronsLeft, X, Handshake } from 'lucide-react'
 import Logo, { BrandMark } from '@/components/brand/Logo'
 
-type Alan = 'kulup' | 'okul'
+type Alan = 'kulup' | 'okul' | 'oab'
 
-// alan: 'kulup' | 'okul' → yalnızca o sekmede görünür; alan yoksa her iki sekmede de görünür
+// alan: 'kulup' | 'okul' | 'oab' → yalnızca o sekmede görünür; alan yoksa tüm sekmelerde görünür
 // altMenu: true → ana menüde değil, alt satırdaki simge düğmelerinde görünür
 const NAV: { baslik: string; id: string; alan?: Alan; adminOnly?: boolean; superAdminOnly?: boolean; altMenu?: boolean; items: any[] }[] = [
   {
@@ -70,6 +70,16 @@ const NAV: { baslik: string; id: string; alan?: Alan; adminOnly?: boolean; super
     ],
   },
   {
+    baslik: 'Okul aile birliği',
+    id: 'oab',
+    alan: 'oab',
+    adminOnly: true,
+    items: [
+      { href: '/oab/tahsilat-takip', label: 'Tahsilat Takip', sub: 'Bağış, aidat ve etkinlik tahsilatları', tags: 'oab, okul aile birliği, bağış, aidat, tahsilat, kategori, borç, ödedi', icon: <ClipboardList size={17} /> },
+      { href: '/oab/isletme-defteri', label: 'İşletme Defteri', sub: 'Birliğin gelir-gider defteri ve banka hareketleri', tags: 'oab, okul aile birliği, işletme, defter, gelir, gider, kapak, banka, ekstre, devir', icon: <BookText size={17} /> },
+    ],
+  },
+  {
     baslik: 'Sistem',
     id: 'sistem',
     adminOnly: true,
@@ -109,14 +119,14 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
   useEffect(() => {
     try {
       const kayitli = localStorage.getItem('sidebar_alan')
-      if (kayitli === 'kulup' || kayitli === 'okul') setAlan(kayitli)
+      if (kayitli === 'kulup' || kayitli === 'okul' || kayitli === 'oab') setAlan(kayitli)
     } catch {}
   }, [])
 
   // Açılan sayfa başka alana aitse o alana geç
   useEffect(() => {
     const bolum = NAV.find(s => s.items.some(i => i.href === pathname))
-    if (bolum && (bolum.alan === 'kulup' || bolum.alan === 'okul')) setAlan(bolum.alan)
+    if (bolum?.alan) setAlan(bolum.alan)
   }, [pathname])
 
   useEffect(() => { if (aramaAcik) aramaRef.current?.focus() }, [aramaAcik])
@@ -277,7 +287,8 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
             {([
               { id: 'kulup', label: 'Kulüp', icon: <Users size={14} /> },
               { id: 'okul', label: 'Okul', icon: <School size={14} /> },
-            ] as { id: Alan; label: string; icon: React.ReactNode }[]).map(t => {
+              { id: 'oab', label: 'OAB', baslik: 'Okul Aile Birliği', icon: <Handshake size={14} /> },
+            ] as { id: Alan; label: string; baslik?: string; icon: React.ReactNode }[]).map(t => {
               const aktif = alan === t.id
               return (
                 <button
@@ -285,10 +296,10 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
                   role="tab"
                   aria-selected={aktif}
                   onClick={() => alanSec(t.id)}
-                  title={t.label}
+                  title={t.baslik || t.label}
                   style={{
                     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                    padding: collapsed ? '8px 0' : '5px 10px', border: aktif ? '1px solid var(--border)' : '1px solid transparent', borderRadius: 7, cursor: 'pointer',
+                    padding: collapsed ? '8px 0' : '5px 6px', border: aktif ? '1px solid var(--border)' : '1px solid transparent', borderRadius: 7, cursor: 'pointer',
                     fontSize: 13, fontWeight: aktif ? 600 : 500,
                     color: aktif ? 'var(--text)' : 'var(--text3)',
                     background: aktif ? '#fff' : 'transparent',

@@ -40,7 +40,17 @@ export interface Profil {
   created_at?: string
 }
 
+/** Tahsilat takibi ve işletme defterinin ait olduğu birim: okul ya da okul aile birliği */
+export type Birim = 'okul' | 'oab'
+
+/** Birimin resmî çıktılarda görünen adı */
+export function birimKurumAdi(birim: Birim, ayarlar: Pick<Ayarlar, 'kurum_adi' | 'oab_adi'> | null, okulAdi?: string | null): string {
+  if (birim === 'oab') return ayarlar?.oab_adi?.trim() || `${okulAdi || ''} Okul Aile Birliği`.trim()
+  return ayarlar?.kurum_adi || okulAdi || ''
+}
+
 export interface Ayarlar {
+  oab_adi?: string | null
   id: number
   kurum_adi: string
   mudur_adi: string
@@ -265,6 +275,7 @@ export type TahsilatVeriKaynagi = 'manuel' | 'otomatik_kulup'
 export type TahsilatKapsam = 'tumu' | 'secili'
 
 export interface TahsilatKategori {
+  birim?: Birim
   id: number
   ad: string
   tip: TahsilatKategoriTip
@@ -319,6 +330,7 @@ export interface TahsilatTaksitPlani {
 export type IsletmeTur = 'gelir' | 'gider'
 
 export interface IsletmeHareket {
+  birim?: Birim
   id: number
   tarih: string
   belge_no?: string | null

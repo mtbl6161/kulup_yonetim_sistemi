@@ -99,7 +99,7 @@ export function useHesapKontrol(okulId: number, yil: number, ay: number): HesapK
         supabase.from('bordro').select('*, personel(*)').eq('okul_id', okulId).eq('ay', ay).eq('yil', yil),
         supabase.from('personel').select('*').eq('okul_id', okulId),
         // Banka gelir hareketleri (kırtasiye vb. de bu hesaba girebilir; yalnızca kulüp aidatıyla eşleştirilir)
-        supabase.from('isletme_defteri').select('tutar, tarih').eq('okul_id', okulId).eq('tur', 'gelir')
+        supabase.from('isletme_defteri').select('tutar, tarih').eq('okul_id', okulId).eq('birim', 'okul').eq('tur', 'gelir')
           .gte('tarih', ilkGun(-BANKA_TARIH_TOLERANSI)).lt('tarih', ilkGun(BANKA_TARIH_TOLERANSI, true)),
       ])
       const err = ayr.error || tahs.error || brd.error || per.error

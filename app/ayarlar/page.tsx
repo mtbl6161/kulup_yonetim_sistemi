@@ -518,6 +518,14 @@ export default function AyarlarPage() {
                       <input id="ay-kurum-adi" className="form-input" style={{ paddingLeft: 34 }} value={form.kurum_adi || ''} onChange={e => setF('kurum_adi', e.target.value)} />
                     </div>
                   </div>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label htmlFor="ay-oab-adi" className="form-label">Okul Aile Birliği Adı</label>
+                    <div style={{ position: 'relative' }}>
+                      <Building2 size={16} style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text3)' }} />
+                      <input id="ay-oab-adi" className="form-input" style={{ paddingLeft: 34 }} value={form.oab_adi || ''} onChange={e => setF('oab_adi', e.target.value)} placeholder={`${okulData?.ad || 'Okul adı'} Okul Aile Birliği`} />
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>OAB tahsilat listesi ve işletme defteri çıktılarının başlığında yazar. Boş bırakılırsa okul adının sonuna "Okul Aile Birliği" eklenir.</div>
+                  </div>
 
                   <div>
                     <label htmlFor="ay-mudur-adi" className="form-label">Müdür Adı / Onaylayan</label>
