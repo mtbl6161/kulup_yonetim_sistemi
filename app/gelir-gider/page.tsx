@@ -8,7 +8,8 @@ import {
 } from '@/lib/hesaplama'
 import { HesapHareketi, Ayarlar } from '@/lib/types'
 import StatCard from '@/components/StatCard'
-import { Printer, Calendar, ArrowUpRight, ArrowDownRight, Percent } from 'lucide-react'
+import { pdfHazirla, pdfBaslik, pdfTablo, pdfAc, PDF_RENK } from '@/lib/pdf'
+import { FileDown, Calendar, ArrowUpRight, ArrowDownRight, Percent } from 'lucide-react'
 
 interface AylikOzet { ay: number; yil: number; gelir: number; gider: number; net: number }
 
@@ -64,6 +65,61 @@ export default function GelirGiderPage() {
   }
   const tahakkuk = ayarlar ? tahakkukDagitimHesapla(toplamGelir, ayarlar, activeCategories) : null
 
+  // Açık sekmedeki tablo, ortak PDF stilinde
+  const handlePdf = async () => {
+    const { pdf, autoTable } = await pdfHazirla('portrait')
+    const SEKME = { aylik: 'Aylık özet', gelirler: 'Gelirler', giderler: 'Giderler', tahakkuk: 'Tahakkuk dağılımı' }
+    const y = pdfBaslik(pdf, {
+      kurum: ayarlar?.kurum_adi,
+      baslik: `Gelir / gider özeti · ${SEKME[aktifTab]}`,
+      alt: `Toplam gelir ${fmtTL(toplamGelir)}  ·  Toplam gider ${fmtTL(toplamGider)}  ·  Net ${fmtTL(toplamGelir - toplamGider)}`,
+    })
+    const sag = (n: number) => ({ halign: 'right' as const, cellWidth: n })
+    const hareketTablosu = (liste: HesapHareketi[], toplam: number) => autoTable(pdf, pdfTablo({
+      head: [['Tarih', 'Açıklama', 'Kaynak', 'Tutar (TL)']],
+      body: liste.map(h => [tarihFmt(h.tarih), h.aciklama || '-', h.kaynak || 'manuel', fmtTL(Number(h.tutar))]),
+      foot: [[{ content: 'Toplam', colSpan: 3 }, { content: fmtTL(toplam), styles: { halign: 'right' } }]],
+      startY: y,
+      columnStyles: { 0: { cellWidth: 22 }, 2: { cellWidth: 28 }, 3: sag(32) },
+    }))
+
+    if (aktifTab === 'aylik') {
+      autoTable(pdf, pdfTablo({
+        head: [['Dönem', 'Gelir (TL)', 'Gider (TL)', 'Net (TL)']],
+        body: aylikOzetler.map(o => [`${AYLAR[o.ay]} ${o.yil}`, fmtTL(o.gelir), fmtTL(o.gider), `${o.net >= 0 ? '+' : ''}${fmtTL(o.net)}`]),
+        foot: [['Genel toplam', fmtTL(toplamGelir), fmtTL(toplamGider), fmtTL(toplamGelir - toplamGider)]],
+        startY: y,
+        columnStyles: { 1: sag(40), 2: sag(40), 3: sag(40) },
+        didParseCell: (d) => {
+          if (d.column.index > 0) d.cell.styles.halign = 'right'
+          if (d.section === 'body' && d.column.index === 3 && aylikOzetler[d.row.index]?.net < 0) d.cell.styles.textColor = PDF_RENK.hata
+        },
+      }))
+    } else if (aktifTab === 'gelirler') {
+      hareketTablosu(gelirler, toplamGelir)
+    } else if (aktifTab === 'giderler') {
+      hareketTablosu(giderler, toplamGider)
+    } else if (tahakkuk) {
+      autoTable(pdf, pdfTablo({
+        head: [['Kategori', 'Oran', 'Tutar (TL)']],
+        body: [
+          ['Temel gider', `%${tahakkuk.pct_temel_gider}`, fmtTL(tahakkuk.temel_gider)],
+          ['Öğretmen havuzu', `%${tahakkuk.pct_ogretmen}`, fmtTL(tahakkuk.ogretmen_havuzu)],
+          ['Başkan', `%${tahakkuk.pct_baskan}`, fmtTL(tahakkuk.baskan)],
+          ['Başkan yardımcısı', `%${tahakkuk.pct_baskan_yrd}`, fmtTL(tahakkuk.baskan_yrd)],
+          ['Muhasebe', `%${tahakkuk.pct_muhasebe}`, fmtTL(tahakkuk.muhasebe)],
+          ['Temizlik', `%${tahakkuk.pct_temizlik}`, fmtTL(tahakkuk.temizlik)],
+          ['Denetim', `%${tahakkuk.pct_denetim}`, fmtTL(tahakkuk.denetim)],
+        ],
+        foot: [['Toplam', '%100', fmtTL(tahakkuk.toplam)]],
+        startY: y,
+        columnStyles: { 1: { halign: 'center', cellWidth: 22 }, 2: sag(40) },
+        didParseCell: (d) => { if (d.column.index > 0) d.cell.styles.halign = d.column.index === 1 ? 'center' : 'right' },
+      }))
+    }
+    pdfAc(pdf, 'Gelir / gider özeti')
+  }
+
   return (
     <div>
       <Topbar
@@ -72,11 +128,12 @@ export default function GelirGiderPage() {
         actions={
           <button 
             className="btn btn-secondary btn-sm no-print" 
-            onClick={() => window.print()}
+            onClick={handlePdf}
+            disabled={loading}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
-            <Printer size={16} />
-            <span>Yazdır</span>
+            <FileDown size={16} />
+            <span>PDF</span>
           </button>
         }
       />

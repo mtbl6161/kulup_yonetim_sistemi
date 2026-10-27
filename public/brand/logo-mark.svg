@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Klüp360">
+  <rect width="64" height="64" rx="14" fill="#0E1116"/>
+  <circle cx="31" cy="31" r="15" fill="none" stroke="#FFFFFF" stroke-width="5"/>
+  <circle cx="46" cy="46" r="6.5" fill="#2347D9" stroke="#0E1116" stroke-width="3"/>
+</svg>

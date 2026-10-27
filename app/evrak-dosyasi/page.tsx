@@ -264,7 +264,7 @@ export default function DenetimDosyasiPage() {
                         <button className="btn btn-secondary btn-sm" title="Aç" onClick={() => belgeAc(b).catch(hata)}><Eye size={13} /></button>
                         <button className="btn btn-secondary btn-sm" title="İndir" onClick={() => belgeIndir(b).catch(hata)}><Download size={13} /></button>
                         {acik && b.kaynak === 'yukleme' && b.durum !== 'onaylandi' && (
-                          <button className="btn btn-danger btn-sm" title="Sil" onClick={() => setSilinecek(b)}><Trash2 size={13} /></button>
+                          <button className="btn btn-outline-danger btn-icon" title="Sil" onClick={() => setSilinecek(b)}><Trash2 size={13} /></button>
                         )}
                       </div>
                     ))}

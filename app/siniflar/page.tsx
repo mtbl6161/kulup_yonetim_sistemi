@@ -207,7 +207,7 @@ export default function SiniflarPage() {
         {/* Liste */}
         <div className="card" style={{ padding: 0 }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontFamily: 'Playfair Display, serif', fontWeight: 600, fontSize: 15 }}>Sınıf Listesi</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15 }}>Sınıf Listesi</span>
             <span style={{ fontSize: 12, color: 'var(--text3)' }}>{siniflar.length} kayıt</span>
           </div>
           <div style={{ overflowX: 'auto' }}>

@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       subject: `İletişim Formu: ${konu || 'Konu Belirtilmemiş'}`,
       html: `
         <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
-          <h2 style="color: #2d5a3d; border-bottom: 2px solid #2d5a3d; padding-bottom: 10px;">Yeni İletişim Formu Mesajı</h2>
+          <h2 style="color: #2347D9; border-bottom: 2px solid #2347D9; padding-bottom: 10px;">Yeni İletişim Formu Mesajı</h2>
           <p><strong>Ad Soyad:</strong> ${ad}</p>
           <p><strong>E-Posta:</strong> ${email}</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;"/>

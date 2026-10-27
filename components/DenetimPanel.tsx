@@ -149,7 +149,7 @@ export function DenetimIsKuyrugu({ okullar, yil, ay, durumlar, toplamMadde, yukl
       <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16 }}>
         <div>
           <div style={{ fontSize: 13, color: 'var(--text2)' }}>{ilAd ? `${ilAd} İl Milli Eğitim Müdürlüğü` : 'İl Milli Eğitim Müdürlüğü'} · {AYLAR[ay]} {yil}</div>
-          <h1 style={{ margin: '4px 0 0', fontFamily: '"Playfair Display", Georgia, serif', fontSize: 30, fontWeight: 800, color: 'var(--text)' }}>
+          <h1 style={{ margin: '4px 0 0', fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: 'var(--text)' }}>
             {say('gonderildi') > 0 ? `${say('gonderildi')} dosya incelemenizi bekliyor` : 'İnceleme bekleyen dosya yok'}
           </h1>
         </div>
@@ -172,7 +172,7 @@ export function DenetimIsKuyrugu({ okullar, yil, ay, durumlar, toplamMadde, yukl
         {kart('İnceleme bekleyen', say('gonderildi'), enEski !== undefined ? `en eskisi ${enEski <= 0 ? 'bugün' : `${enEski} gündür`} bekliyor` : 'kuyruk boş', '#1f5f8b', 'gonderildi')}
         {kart('Göndermeyen okul', say('yok'), `${okullar.length} okuldan`, '#a3531f', 'yok')}
         {kart('İade edilen', say('iade'), 'okul düzeltmesi bekleniyor', '#7a4a1a', 'iade')}
-        {kart('Onaylanan', say('onaylandi'), 'bu dönem', '#2d5a3d', 'onaylandi')}
+        {kart('Onaylanan', say('onaylandi'), 'bu dönem', '#2347D9', 'onaylandi')}
       </section>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 22, alignItems: 'flex-start' }}>
@@ -215,7 +215,7 @@ export function DenetimIsKuyrugu({ okullar, yil, ay, durumlar, toplamMadde, yukl
                       <td style={{ padding: '14px 8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <div style={{ width: 90, height: 6, borderRadius: 6, background: 'var(--surface2)' }} aria-hidden="true">
-                            <div style={{ width: `${oran * 100}%`, height: 6, borderRadius: 6, background: oran >= 1 ? '#2d5a3d' : '#c98a2e' }} />
+                            <div style={{ width: `${oran * 100}%`, height: 6, borderRadius: 6, background: oran >= 1 ? '#2347D9' : '#c98a2e' }} />
                           </div>
                           <span style={{ fontSize: 12 }}>{s.d?.doluMadde || 0}/{toplamMadde}</span>
                         </div>

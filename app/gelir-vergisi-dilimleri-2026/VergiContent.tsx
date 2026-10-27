@@ -87,12 +87,12 @@ const CSS = `
 .vd-field>span{font-size:13.5px;font-weight:600;color:var(--tx2)}
 .vd-field input{font:inherit;font-size:16px;font-weight:600;padding:12px 15px;border:1px solid var(--line-2);
   border-radius:11px;background:var(--bg);color:var(--tx);outline:none}
-.vd-field input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(45,90,61,.13);background:#fff}
+.vd-field input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(35,71,217,.13);background:#fff}
 .vd-out{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
 .vd-out-item{background:linear-gradient(135deg,#f0f7f2,#f7f3e9);border:1px solid #dcebe0;border-radius:12px;padding:14px 16px;
   display:flex;flex-direction:column;gap:4px}
 .vd-out-item span{font-size:12.5px;color:var(--tx2);font-weight:600}
-.vd-out-item strong{font-family:'Playfair Display',serif;font-size:22px;font-weight:800;color:var(--g);line-height:1.1}
+.vd-out-item strong{font-family:var(--font-display);font-size:22px;font-weight:800;color:var(--g);line-height:1.1}
 .vd-cta{display:block;text-align:center;margin:24px auto 0;max-width:460px;padding:14px;border-radius:12px;
   background:var(--g);color:#fff!important;font-weight:700;font-size:14.5px;transition:background .2s,transform .2s}
 .vd-cta:hover{background:var(--g-d);transform:translateY(-2px)}

@@ -180,7 +180,7 @@ export function DenetimOkullar({ okullar, durumlar, toplamMadde, yukleniyor, yil
                   <td style={{ padding: '12px 8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 80, height: 6, borderRadius: 6, background: 'var(--surface2)' }} aria-hidden="true">
-                        <div style={{ width: `${oran * 100}%`, height: 6, borderRadius: 6, background: oran >= 1 ? '#2d5a3d' : '#c98a2e' }} />
+                        <div style={{ width: `${oran * 100}%`, height: 6, borderRadius: 6, background: oran >= 1 ? '#2347D9' : '#c98a2e' }} />
                       </div>
                       <span style={{ fontSize: 12 }}>{s.d?.doluMadde || 0}/{toplamMadde}</span>
                     </div>

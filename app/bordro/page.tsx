@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
+import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAc, PDF_RENK } from '@/lib/pdf'
 import {
   ayLabel, fmtTL, fmt, bordroHesapla, isGunuSayisi, tavanHesapla, gunSayisi,
   AYLAR, gvDilimiBul, tatilMi, gelirVergisiHesapla,
@@ -13,7 +14,7 @@ import {
 import { Personel, SinifDefteri, Ayarlar, Bordro, BordroSonuc, Tahakkuk, Puantaj, BordroSatir } from '@/lib/types'
 import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
-import { Users, Layers, Calendar, Clock, TrendingUp, Wallet, CheckCircle2, FileText, Printer, Download, Mail, Info, RotateCw, AlertTriangle, XCircle, X } from 'lucide-react'
+import { Users, Layers, Calendar, Clock, TrendingUp, Wallet, CheckCircle2, FileText, Download, Mail, Info, RotateCw, AlertTriangle, XCircle, X } from 'lucide-react'
 import { useRef } from 'react'
 import BordroZarfi from '@/components/BordroZarfi'
 import ConfirmModal from '@/components/ConfirmModal'
@@ -37,7 +38,6 @@ export default function BordroPage() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
   const [selectedRow, setSelectedRow] = useState<BordroSatir | null>(null)
-  const [bulkMode, setBulkMode] = useState(false)
   const [mailProgress, setMailProgress] = useState<{ current: number, total: number, name: string } | null>(null)
   const cancelMailRef = useRef(false)
   const [mailing, setMailing] = useState(false)
@@ -241,61 +241,31 @@ export default function BordroPage() {
   useEffect(() => { load() }, [load])
 
 
-  const handleBulkPrint = useCallback(() => {
-    setBulkMode(true)
-    setTimeout(() => {
-      window.print()
-      setBulkMode(false)
-    }, 100)
-  }, [])
+  const zarfPdfAc = async (satirlar: BordroSatir[]) => {
+    if (!ayarlar || satirlar.length === 0) return
+    const { zarfPdfUret } = await import('@/lib/bordroZarfPdf')
+    pdfAc(await zarfPdfUret(satirlar, ayarlar, ay, yil), 'Ücret bordro zarfı')
+  }
 
   const handlePdfDownload = async () => {
-    const { default: jsPDF } = await import('jspdf')
-    const { default: autoTable } = await import('jspdf-autotable')
+    const { pdf, autoTable } = await pdfHazirla('landscape')
+    const M = 5 // geniş tablo (287 mm) için dar kenar
 
-    // ── Türkçe karakter desteği için NotoSans regular + bold yükle ─────────
-    async function loadFontB64(path: string) {
-      const res = await fetch(path)
-      const buf = await res.arrayBuffer()
-      const bytes = new Uint8Array(buf)
-      let binary = ''
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-      return btoa(binary)
-    }
-    const [regularB64, boldB64] = await Promise.all([
-      loadFontB64('/fonts/NotoSans-Regular.ttf'),
-      loadFontB64('/fonts/NotoSans-Bold.ttf'),
-    ])
+    const baslangicY = pdfBaslik(pdf, {
+      kurum: ayarlar?.kurum_adi,
+      baslik: 'Bordro özeti',
+      alt: `01 ${AYLAR[ay]} ${yil} – ${sonGun} ${AYLAR[ay]} ${yil} tarihleri arası`,
+    })
 
-    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-    pdf.addFileToVFS('NotoSans-Regular.ttf', regularB64)
-    pdf.addFileToVFS('NotoSans-Bold.ttf',    boldB64)
-    pdf.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal', 'Identity-H')
-    pdf.addFont('NotoSans-Bold.ttf',    'NotoSans', 'bold',   'Identity-H')
-    pdf.setFont('NotoSans')
-
-    const PW = pdf.internal.pageSize.getWidth()   // 297mm
-    const M  = 5  // margin mm
-
-    // ── Başlık ─────────────────────────────────────────────────────────────
-    pdf.setFontSize(10)
-    pdf.setFont('NotoSans')
-    pdf.setTextColor(0, 0, 0)
-    pdf.text(ayarlar?.kurum_adi || 'KULÜP', PW / 2, 10, { align: 'center' })
-    pdf.setTextColor(0, 0, 0)
-    pdf.setFontSize(7.5)
-    pdf.setFont('NotoSans')
-    pdf.text(`01 ${AYLAR[ay]} ${yil} - ${sonGun} ${AYLAR[ay]} ${yil} Tarihleri Arası Bordro Özeti`, PW / 2, 15, { align: 'center' })
-
-    // PDF-safe renkler (Siyah Beyaz Baskı İçin Sadeleştirildi)
+    // Siyah-beyaz baskıya uygun ortak tonlar
     const C = {
-      personel:  [255, 255, 255] as [number,number,number],
-      vergi:     [255, 255, 255] as [number,number,number],
-      sgkKes:    [255, 255, 255] as [number,number,number],
-      kurumSgk:  [255, 255, 255] as [number,number,number],
-      totRow:    [245, 245, 245] as [number,number,number], // Hafif gri toplu alanlar için
-      net:       [255, 255, 255] as [number,number,number],
-      header:    [255, 255, 255] as [number,number,number],
+      personel:  PDF_RENK.baslikZemin,
+      vergi:     PDF_RENK.baslikZemin,
+      sgkKes:    PDF_RENK.baslikZemin,
+      kurumSgk:  PDF_RENK.baslikZemin,
+      totRow:    PDF_RENK.toplamZemin,
+      net:       [255, 255, 255] as [number, number, number],
+      header:    PDF_RENK.baslikZemin,
     }
 
     // ── Tablo başlıkları (2 satır) ─────────────────────────────────────────
@@ -314,7 +284,7 @@ export default function BordroPage() {
       'TC KİMLİK',
       'Ders\nSaati',
       'Saat\nÜcreti',
-      'Brüt Üret',
+      'Brüt Ücret',
       'GV Matrah',
       'Oran',
       'Hes.GV',
@@ -392,41 +362,16 @@ export default function BordroPage() {
     ] as any[]]
 
     // ── autoTable ──────────────────────────────────────────────────────────
-    autoTable(pdf, {
+    autoTable(pdf, pdfTablo({
       head: [ROW1, ROW2],
       body,
       foot,
-      startY: 19,
-      margin: { top: M, right: M, bottom: M, left: M },
+      startY: baslangicY,
+      margin: { top: 14, right: M, bottom: 14, left: M },
       tableWidth: 'wrap',
-      styles: {
-        fontSize: 5.0,
-        cellPadding: 0.8,
-        lineWidth: 0.1,
-        lineColor: [40, 40, 40] as [number, number, number],
-        font: 'NotoSans',
-        overflow: 'linebreak',
-        halign: 'right',
-        textColor: [0, 0, 0],
-      },
-      headStyles: {
-        fillColor: [255, 255, 255],
-        textColor: [0,0,0],
-        fontStyle: 'bold',
-        fontSize: 5.5,
-        cellPadding: 1.2,
-        halign: 'center',
-        valign: 'middle',
-      },
-      footStyles: {
-        fillColor: C.totRow,
-        fontStyle: 'bold',
-        fontSize: 4.8,
-        textColor: [0,0,0],
-        cellPadding: { top: 2, right: 0.5, bottom: 2, left: 0.5 },
-        minCellHeight: 6,
-        lineWidth: 0.1,
-      },
+      styles: { fontSize: 5.0, cellPadding: 0.8, halign: 'right' },
+      headStyles: { fontSize: 5.5, cellPadding: 1.2 },
+      footStyles: { fontSize: 4.8, cellPadding: { top: 2, right: 0.5, bottom: 2, left: 0.5 }, minCellHeight: 6 },
       columnStyles: {
         // Toplam = 287mm = 297mm A4 landscape - (5+5)mm kenar boşluğu
         0:  { cellWidth:  5, halign: 'center' },          // S.N.
@@ -456,112 +401,23 @@ export default function BordroPage() {
         24: { cellWidth: 21, halign: 'center' },           // İmza
         // Kontrol: 5+20+32+17+8+9+13+12+7+9+9+9+9+9+9+10+9+11+12+9+9+9+9+11+21 = 287
       },
-      theme: 'grid',
-    })
+    }))
 
     // ── Düzenleyen / Onaylayan imza blokları ───────────────────────────────
-    // autoTable'ın bittiği Y koordinatını al
-    const finalY: number = (pdf as any).lastAutoTable?.finalY ?? 190
-    const signY = finalY + 8   // tablonun 8mm altından başla
+    pdfImza(pdf, {
+      duzenleyen_adi: ayarlar?.duzenleyen_adi,
+      duzenleyen_unvani: ayarlar?.duzenleyen_unvani || 'Büro Personeli',
+      mudur_adi: ayarlar?.mudur_adi,
+      mudur_unvani: ayarlar?.mudur_unvani || 'Okul Müdürü / Kulüp Başkanı',
+    }, pdfSonY(pdf, 190))
 
-    // Sayfa sınırını aş mıyoruz kontrol et (A4 landscape yüksekliği 210mm)
-    const pageH = pdf.internal.pageSize.getHeight()
-    if (signY + 30 > pageH - M) {
-      pdf.addPage()
-    }
-    const useY = signY + 30 > pageH - M ? M + 10 : signY
-
-    const duzenleyenAdi   = ayarlar?.duzenleyen_adi   ?? '___________________'
-    const duzenleyenUnvan = ayarlar?.duzenleyen_unvani ?? 'Büro Personeli'
-    const onaylayanAdi    = ayarlar?.mudur_adi         ?? '___________________'
-    const onaylayanUnvan  = 'Okul Müdürü / Kulüp Başkanı'
-
-    // İki blok: sol = Düzenleyen, sağ = Onaylayan
-    const leftX    = M                   // 5mm — sol kenar
-    const rightX   = PW - M - 80        // sağ kenar: 297-5-80 = 212mm
-
-    pdf.setFont('NotoSans', 'bold')
-    pdf.setFontSize(7)
-    pdf.setTextColor(0, 0, 0)
-
-    // — Sol blok: Düzenleyen —
-    pdf.text('DÜZENLEYEN', leftX + 40, useY, { align: 'center' })
-    pdf.setFont('NotoSans', 'bold')
-    pdf.setFontSize(6.5)
-    pdf.text(duzenleyenAdi,   leftX + 40, useY + 5,  { align: 'center' })
-    pdf.setFont('NotoSans', 'normal')
-    pdf.setFontSize(6)
-    pdf.text(duzenleyenUnvan, leftX + 40, useY + 9,  { align: 'center' })
-    pdf.setDrawColor(80, 80, 80)
-    pdf.setLineWidth(0.3)
-    pdf.line(leftX, useY + 18, leftX + 80, useY + 18)
-    pdf.setFontSize(5.5)
-    pdf.text('(İmza)', leftX + 40, useY + 22, { align: 'center' })
-
-    // — Sağ blok: Onaylayan —
-    pdf.setFont('NotoSans', 'bold')
-    pdf.setFontSize(7)
-    pdf.text('ONAYLAYAN', rightX + 40, useY, { align: 'center' })
-    pdf.setFont('NotoSans', 'bold')
-    pdf.setFontSize(6.5)
-    pdf.text(onaylayanAdi,    rightX + 40, useY + 5,  { align: 'center' })
-    pdf.setFont('NotoSans', 'normal')
-    pdf.setFontSize(6)
-    pdf.text(onaylayanUnvan,  rightX + 40, useY + 9,  { align: 'center' })
-    pdf.setDrawColor(80, 80, 80)
-    pdf.setLineWidth(0.3)
-    pdf.line(rightX, useY + 18, rightX + 80, useY + 18)
-    pdf.setFontSize(5.5)
-    pdf.text('(İmza)', rightX + 40, useY + 22, { align: 'center' })
-
-    // ── Tarayıcı PDF viewer'ında önizle ────────────────────────────────────
-    const blob = pdf.output('blob')
-    const url  = URL.createObjectURL(blob)
-    window.open(url, '_blank')
-    // Not: blob URL'yi temizlemek için kullanıcı pencereyi kapattıktan sonra revoke edilir
-    setTimeout(() => URL.revokeObjectURL(url), 60000)
+    pdfAc(pdf, 'Bordro özeti')
   }
 
   const generateSlipPdfBase64 = async (row: BordroSatir) => {
-    const [{ default: html2canvas }, { default: jsPDF }, { createRoot }] = await Promise.all([
-      import('html2canvas'),
-      import('jspdf'),
-      import('react-dom/client')
-    ])
-
-    const container = document.getElementById('hidden-slip-container')
-    if (!container) return null
-
-    const div = document.createElement('div')
-    container.appendChild(div)
-    const root = createRoot(div)
-    root.render(<BordroZarfi row={row} ayarlar={ayarlar} ay={ay} yil={yil} />)
-
-    // Render için kısa bir bekleme
-    await new Promise(r => setTimeout(r, 400))
-
-    try {
-      const canvas = await html2canvas(div, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      })
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.9)
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'px',
-        format: [canvas.width, canvas.height]
-      })
-
-      pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height)
-      const b64 = pdf.output('datauristring').split(',')[1]
-      return b64
-    } finally {
-      root.unmount()
-      container.removeChild(div)
-    }
+    if (!ayarlar) return null
+    const { zarfBase64 } = await import('@/lib/bordroZarfPdf')
+    return zarfBase64(row, ayarlar, ay, yil)
   }
 
   const tekMailGonder = async (row: BordroSatir) => {
@@ -1020,7 +876,7 @@ export default function BordroPage() {
   const tdStyle: React.CSSProperties = { fontSize: 9, padding: '3px 4px', textAlign: 'right', borderRight: '1px solid #ddd', borderBottom: '1px solid #eee', whiteSpace: 'nowrap' }
   const tdLeftStyle: React.CSSProperties = { ...tdStyle, textAlign: 'left' }
 return (
-    <div className={(selectedRow || bulkMode) ? 'printing-slip' : ''}>
+    <div>
       <Topbar
         title="Bordro"
         sub={`${ayLabel(ay, yil)} — Ücret hesaplama`}
@@ -1035,8 +891,8 @@ return (
               <RotateCw size={14} className={loading ? 'animate-spin' : ''} />
               <span>Hesapla & Kaydet</span>
             </button>
-            <button className="btn btn-secondary btn-sm no-print" onClick={handleBulkPrint} disabled={!hesaplandi || mailing}>
-              <Printer size={14} style={{ marginRight: 4 }} /> Toplu Zarf
+            <button className="btn btn-secondary btn-sm no-print" onClick={() => zarfPdfAc(sortedSatirlar)} disabled={!hesaplandi || mailing}>
+              <Download size={14} style={{ marginRight: 4 }} /> Toplu Zarf
             </button>
             <button className="btn btn-pdf btn-sm no-print" onClick={handlePdfDownload} disabled={mailing}>
               <Download size={14} style={{ marginRight: 4 }} /> PDF İndir
@@ -1057,7 +913,7 @@ return (
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 15, width: '100%' }}>
               <div className="prog-bar" style={{ flex: 1, height: 10, marginTop: 0, background: 'rgba(0,0,0,0.08)' }}>
-                <div className="prog-fill" style={{ width: `${(mailProgress.current / mailProgress.total) * 100}%`, boxShadow: '0 0 10px rgba(45,90,61,0.3)' }}></div>
+                <div className="prog-fill" style={{ width: `${(mailProgress.current / mailProgress.total) * 100}%`, boxShadow: '0 0 10px rgba(35,71,217,0.3)' }}></div>
               </div>
               <button 
                 className="btn" 
@@ -1094,7 +950,7 @@ return (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 8 }}>
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: 'rgba(45,90,61,0.1)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: 'rgba(35,71,217,0.1)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Users size={18} />
                   </div>
                   <div className="stat-label">Öğrenci Sayısı</div>
@@ -1127,7 +983,7 @@ return (
 
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: 'rgba(45,90,61,0.1)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: 'rgba(35,71,217,0.1)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Clock size={18} />
                   </div>
                   <div className="stat-label">Günlük Saat</div>
@@ -1482,11 +1338,11 @@ return (
               <div className="no-print" style={{ position: 'absolute', top: 10, right: 10, display: 'flex', gap: 8 }}>
                 <button 
                   className="btn btn-primary btn-sm" 
-                  onClick={() => window.print()}
+                  onClick={() => zarfPdfAc([selectedRow])}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
-                  <Printer size={14} />
-                  <span>Yazdır</span>
+                  <Download size={14} />
+                  <span>PDF</span>
                 </button>
                 <button className="btn btn-secondary btn-sm" onClick={() => setSelectedRow(null)}><X size={14} /> Kapat</button>
               </div>
@@ -1495,14 +1351,7 @@ return (
           </div>
         )}
 
-        {bulkMode && (
-          <div className="only-print">
-            {sortedSatirlar.map(s => <BordroZarfi key={s.personel.id} row={s} ayarlar={ayarlar} ay={ay} yil={yil} />)}
-          </div>
-        )}
 
-        {/* PDF üretimi için gizli konteyner */}
-        <div id="hidden-slip-container" style={{ position: 'absolute', left: '-9999px', top: 0, width: '210mm' }}></div>
 
         {confirmModal?.isOpen && (
           <ConfirmModal

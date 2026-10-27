@@ -96,19 +96,19 @@ const CSS = `
   box-shadow:0 4px 15px rgba(0,0,0,.03);margin:0 auto 40px;position:relative;left:50%;transform:translateX(-50%)}
 .fp-toggle button{padding:12px 26px;border-radius:999px;font:inherit;font-size:14.5px;font-weight:700;border:none;cursor:pointer;
   background:transparent;color:var(--tx2);transition:all .25s;display:inline-flex;align-items:center;gap:9px}
-.fp-toggle button.on{background:var(--g);color:#fff;box-shadow:0 8px 20px rgba(45,90,61,.22)}
-.fp-save{background:#eafaf1;color:var(--g);border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:800}
+.fp-toggle button.on{background:var(--g);color:#fff;box-shadow:0 8px 20px rgba(35,71,217,.22)}
+.fp-save{background:#EEF2FE;color:var(--g);border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:800}
 .fp-toggle button.on .fp-save{background:rgba(255,255,255,.2);color:#fff}
 
 .fp-card{background:var(--surf);border:1px solid var(--line-2);border-radius:28px;overflow:hidden;
-  display:grid;grid-template-columns:minmax(320px,1fr) 1.5fr;box-shadow:0 40px 80px -50px rgba(45,90,61,.4)}
+  display:grid;grid-template-columns:minmax(320px,1fr) 1.5fr;box-shadow:0 40px 80px -50px rgba(35,71,217,.4)}
 .fp-price{background:linear-gradient(150deg,var(--g-d),var(--g-dd));color:#fff;padding:clamp(32px,4vw,48px)}
 .fp-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
   border-radius:999px;padding:6px 15px;font-size:12.5px;font-weight:700;margin-bottom:28px}
 .fp-badge svg{color:#7ddba0}
 .fp-amount{display:flex;align-items:flex-start;gap:6px}
 .fp-cur{font-size:30px;font-weight:600;color:rgba(255,255,255,.8);margin-top:10px}
-.fp-num{font-family:'Playfair Display',serif;font-size:clamp(56px,8vw,72px);font-weight:800;line-height:1}
+.fp-num{font-family:var(--font-display);font-size:clamp(56px,8vw,72px);font-weight:800;line-height:1}
 .fp-per{font-size:15px;color:rgba(255,255,255,.6);padding-bottom:22px;margin-bottom:22px;border-bottom:1px solid rgba(255,255,255,.12)}
 .fp-note{background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px 18px;
   font-size:14px;color:rgba(255,255,255,.82);margin-bottom:28px}
@@ -124,13 +124,13 @@ const CSS = `
   margin:0 0 22px;padding-bottom:16px;border-bottom:1px solid var(--line)}
 .fp-feats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:18px 16px}
 .fp-feat{display:flex;align-items:flex-start;gap:11px;font-size:14px;color:#3a3a2e;font-weight:600;line-height:1.4}
-.fp-check{width:23px;height:23px;border-radius:50%;background:#eafaf1;color:var(--g);flex-shrink:0;
+.fp-check{width:23px;height:23px;border-radius:50%;background:#EEF2FE;color:var(--g);flex-shrink:0;
   display:flex;align-items:center;justify-content:center;margin-top:1px}
 
 .fp-faq{margin-top:64px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
 .fp-faq-card{background:var(--surf);border:1px solid var(--line);border-radius:20px;padding:28px 24px;
   box-shadow:0 14px 34px -26px rgba(30,66,41,.35)}
-.fp-faq-num{width:42px;height:42px;border-radius:12px;background:#eafaf1;color:var(--g);font-weight:800;font-size:15px;
+.fp-faq-num{width:42px;height:42px;border-radius:12px;background:#EEF2FE;color:var(--g);font-weight:800;font-size:15px;
   display:flex;align-items:center;justify-content:center;margin-bottom:18px}
 .fp-faq-q{font-size:16px;font-weight:700;color:var(--tx);margin:0 0 10px}
 .fp-faq-a{font-size:14px;color:var(--tx2);margin:0;line-height:1.65}

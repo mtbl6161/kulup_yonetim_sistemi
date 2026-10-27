@@ -125,17 +125,17 @@ export default function Page() {
 }
 
 const CSS = `
-.hub-title{font-family:'Playfair Display',serif;font-size:24px;font-weight:800;color:var(--tx);margin:0 0 22px;text-align:center}
+.hub-title{font-family:var(--font-display);font-size:24px;font-weight:800;color:var(--tx);margin:0 0 22px;text-align:center}
 .hub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
 .hub-card{display:flex;flex-direction:column;gap:8px;background:var(--surf);border:1px solid var(--line);
   border-radius:18px;padding:24px;box-shadow:0 16px 36px -28px rgba(30,66,41,.35);
   transition:transform .2s,box-shadow .2s,border-color .2s}
 .hub-card:hover{transform:translateY(-4px);border-color:var(--g);box-shadow:0 24px 48px -28px rgba(30,66,41,.5)}
-.hub-card-t{font-family:'Playfair Display',serif;font-size:19px;font-weight:800;color:var(--tx)}
+.hub-card-t{font-family:var(--font-display);font-size:19px;font-weight:800;color:var(--tx)}
 .hub-card-d{font-size:14px;color:var(--tx2);line-height:1.55;flex:1}
 .hub-card-go{font-size:14px;font-weight:700;color:var(--g)}
 .hub-cta{margin-top:56px;text-align:center;background:linear-gradient(135deg,var(--g),var(--g-d));border-radius:24px;
   padding:clamp(36px,5vw,56px);color:#fff}
-.hub-cta h2{font-family:'Playfair Display',serif;font-size:clamp(22px,3vw,30px);font-weight:800;margin:0 0 12px}
+.hub-cta h2{font-family:var(--font-display);font-size:clamp(22px,3vw,30px);font-weight:800;margin:0 0 12px}
 .hub-cta p{font-size:16px;color:rgba(255,255,255,.85);margin:0 auto 24px;max-width:480px}
 `

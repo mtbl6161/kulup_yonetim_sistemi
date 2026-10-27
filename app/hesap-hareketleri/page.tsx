@@ -2,15 +2,17 @@
 import { useEffect, useState, useCallback } from 'react'
 import Topbar from '@/components/Topbar'
 import StatCard from '@/components/StatCard'
-import { useAy } from '@/lib/AyContext'
+import { useAuth } from '@/lib/AuthContext'
+import { pdfHazirla, pdfBaslik, pdfTablo, pdfAc, PDF_RENK } from '@/lib/pdf'
 import { supabase } from '@/lib/supabase'
-import { fmtTL, ayLabel, tarihFmt } from '@/lib/hesaplama'
+import { fmtTL, tarihFmt } from '@/lib/hesaplama'
 import { HesapHareketi } from '@/lib/types'
 import ConfirmModal from '@/components/ConfirmModal'
-import { Printer, TrendingUp, Landmark, Trash2 } from 'lucide-react'
+import { FileDown, TrendingUp, Landmark, Trash2 } from 'lucide-react'
+import { EmptyPayments } from '@/components/brand/Illustrations'
 
 export default function HesapHareketleriPage() {
-  const { ay, yil } = useAy()
+  const { okul } = useAuth()
   const [hareketler, setHareketler] = useState<HesapHareketi[]>([])
   const [loading, setLoading] = useState(true)
   const [filtre, setFiltre] = useState('hepsi')
@@ -68,6 +70,36 @@ export default function HesapHareketleriPage() {
     'Temel Gider', 'Kırtasiye', 'Temizlik Malzemesi', 'Yemek', 'Ulaşım', 'Teknik Donanım', 'Diğer',
   ]
 
+  // Ekrandaki (filtrelenmiş) liste, ortak PDF stilinde
+  const handlePdf = async () => {
+    const { pdf, autoTable } = await pdfHazirla('portrait')
+    const filtreAdi = filtre === 'gelir' ? 'Yalnız gelirler' : filtre === 'gider' ? 'Yalnız giderler' : 'Tüm işlemler'
+    const y = pdfBaslik(pdf, {
+      kurum: okul?.ad,
+      baslik: 'Hesap hareketleri',
+      alt: `${filtreAdi}${searchTerm ? ` · "${searchTerm}" araması` : ''} · Gelir ${fmtTL(toplamGelir)} · Gider ${fmtTL(toplamGider)} · Bakiye ${fmtTL(netBakiye)}`,
+    })
+    const KAYNAK: Record<string, string> = { tahsilat: 'Tahsilat', bordro: 'Maaş' }
+    autoTable(pdf, pdfTablo({
+      head: [['#', 'Tarih', 'Açıklama', 'Kaynak', 'Dekont', 'Tür', 'Tutar (TL)', 'Bakiye (TL)']],
+      body: filtrelenmis.map((h, i) => [
+        i + 1, tarihFmt(h.tarih), h.aciklama || '-', KAYNAK[h.kaynak || ''] || 'Manuel', h.dekont_no || '-',
+        h.tur === 'gelir' ? 'Gelir' : 'Gider',
+        `${h.tur === 'gelir' ? '+' : '-'}${fmtTL(Number(h.tutar))}`,
+        fmtTL(bakiyeMap[h.id] || 0),
+      ]),
+      startY: y,
+      styles: { fontSize: 7 },
+      columnStyles: { 0: { cellWidth: 8, halign: 'center' }, 1: { cellWidth: 18 }, 3: { cellWidth: 17 }, 4: { cellWidth: 20 }, 5: { cellWidth: 13 }, 6: { cellWidth: 26, halign: 'right' }, 7: { cellWidth: 26, halign: 'right' } },
+      didParseCell: (d) => {
+        if (d.section === 'head' && d.column.index >= 6) d.cell.styles.halign = 'right'
+        const h = filtrelenmis[d.row.index]
+        if (d.section === 'body' && h && ((d.column.index === 6 && h.tur === 'gider') || (d.column.index === 7 && (bakiyeMap[h.id] || 0) < 0))) d.cell.styles.textColor = PDF_RENK.hata
+      },
+    }))
+    pdfAc(pdf, 'Hesap hareketleri')
+  }
+
   return (
     <div>
       <Topbar
@@ -76,11 +108,12 @@ export default function HesapHareketleriPage() {
         actions={
           <button 
             className="btn btn-secondary btn-sm no-print" 
-            onClick={() => window.print()}
+            onClick={handlePdf}
+            disabled={loading}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
-            <Printer size={16} />
-            <span>Yazdır</span>
+            <FileDown size={16} />
+            <span>PDF</span>
           </button>
         }
       />
@@ -130,9 +163,7 @@ export default function HesapHareketleriPage() {
                 ) : filtrelenmis.length === 0 ? (
                   <tr><td colSpan={9}>
                     <div className="empty-state">
-                      <div className="empty-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}>
-                        <Landmark size={48} />
-                      </div>
+                      <EmptyPayments width={200} />
                       <p>İşlem bulunamadı</p>
                     </div>
                   </td></tr>

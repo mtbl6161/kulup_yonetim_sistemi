@@ -425,7 +425,7 @@ export default function DenetimPage() {
 
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: '"DM Sans", system-ui, sans-serif', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-sans)', overflow: 'hidden' }}>
 
       <DenetimUstBar
         bolum={bolum}
@@ -802,7 +802,7 @@ export default function DenetimPage() {
                       <div style={{ overflowX: 'auto' }}>
                         <table style={{ borderCollapse: 'collapse', fontSize: 10, minWidth: '100%' }}>
                           <thead>
-                            <tr style={{ background: 'var(--accent)' }}>
+                            <tr style={{ background: 'var(--th-bg)' }}>
                               <th style={dpTh(80)}>Ders</th>
                               {gunler.map(g => {
                                 const hg = new Date(selYil, selAy - 1, g, 12).getDay()
@@ -810,7 +810,7 @@ export default function DenetimPage() {
                                 const isTatil = tatilMi(selAy, g, selYil, tatiller)
                                 const ad = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
                                 return (
-                                  <th key={g} style={{ ...dpTh(52), background: (isHS || isTatil) ? '#888' : 'var(--accent)' }}>
+                                  <th key={g} style={{ ...dpTh(52), background: (isHS || isTatil) ? 'var(--th-off-bg)' : 'var(--th-bg)', color: (isHS || isTatil) ? 'var(--th-off-fg)' : 'var(--th-fg)' }}>
                                     {ad}<br /><span style={{ fontSize: 11, fontWeight: 800 }}>{g}</span>
                                   </th>
                                 )
@@ -979,7 +979,7 @@ export default function DenetimPage() {
 
               {/* Başlık */}
               <div>
-                <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 24, fontWeight: 800, color: 'var(--text)', margin: 0 }}>Profilim</h2>
+                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 800, color: 'var(--text)', margin: 0 }}>Profilim</h2>
                 <p style={{ fontSize: 13, color: 'var(--text3)', marginTop: 4 }}>{il?.ad} İli Denetçisi</p>
               </div>
 
@@ -1162,7 +1162,7 @@ function BilancoIcerik({ veri, ay, yil, okulAd }: { veri: BilancoVerisi; ay: num
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
       {/* Başlık */}
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
-        <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', letterSpacing: -0.5, fontFamily: '"Playfair Display", serif' }}>
+        <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', letterSpacing: -0.5, fontFamily: 'var(--font-display)' }}>
           {ayarlar.kurum_adi || okulAd}
         </div>
         <div style={{ fontSize: 15, color: 'var(--text3)', marginTop: 8, fontWeight: 500 }}>
@@ -1212,7 +1212,7 @@ function BilancoIcerik({ veri, ay, yil, okulAd }: { veri: BilancoVerisi; ay: num
 
       {/* Tahakkuk dağılım tablosu */}
       <div style={{ marginBottom: 40, borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-        <div style={{ fontSize: 13, fontWeight: 800, background: 'var(--accent)', color: '#fff', padding: '14px 20px', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, background: 'var(--th-bg)', color: 'var(--th-fg)', padding: '14px 20px', textTransform: 'uppercase', letterSpacing: 0.5 }}>
           Aylık Tahakkuk Dağılımı
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -1319,8 +1319,8 @@ const td: React.CSSProperties = {
 
 function dpTh(w: number): React.CSSProperties {
   return {
-    padding: '6px 2px', color: '#fff', fontWeight: 700, fontSize: 9,
-    border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center',
+    padding: '6px 2px', color: 'var(--th-fg)', fontWeight: 700, fontSize: 9,
+    border: '1px solid var(--th-border)', textAlign: 'center',
     width: w, minWidth: w, boxSizing: 'border-box', verticalAlign: 'middle', lineHeight: 1.2,
   }
 }

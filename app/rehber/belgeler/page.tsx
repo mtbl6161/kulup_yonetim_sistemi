@@ -81,9 +81,9 @@ const CSS = `
 .dl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px}
 .dl-card{display:flex;flex-direction:column;gap:10px;background:var(--surf);border:1px solid var(--line);
   border-radius:18px;padding:26px;box-shadow:0 16px 36px -28px rgba(30,66,41,.35)}
-.dl-badge{align-self:flex-start;font-size:11.5px;font-weight:700;color:var(--g);background:#eafaf1;
+.dl-badge{align-self:flex-start;font-size:11.5px;font-weight:700;color:var(--g);background:#EEF2FE;
   border:1px solid #cdeeda;border-radius:100px;padding:3px 11px}
-.dl-title{font-family:'Playfair Display',serif;font-size:20px;font-weight:800;color:var(--tx);margin:2px 0 0}
+.dl-title{font-family:var(--font-display);font-size:20px;font-weight:800;color:var(--tx);margin:2px 0 0}
 .dl-desc{font-size:14px;color:var(--tx2);line-height:1.55;flex:1;margin:0}
 .dl-btn{display:inline-block;text-align:center;margin-top:6px;padding:12px 16px;border-radius:11px;
   background:var(--g);color:#fff!important;font-weight:700;font-size:14.5px;transition:background .2s,transform .2s}

@@ -141,12 +141,12 @@ const CSS = `
 .bd-grid{display:grid;grid-template-columns:1fr 1.1fr;gap:24px;align-items:start}
 .bd-card{background:var(--surf);border:1px solid var(--line);border-radius:20px;padding:26px;
   box-shadow:0 20px 44px -30px rgba(30,66,41,.35)}
-.bd-h2{font-family:'Playfair Display',serif;font-size:21px;font-weight:800;margin:0 0 20px;color:var(--tx)}
+.bd-h2{font-family:var(--font-display);font-size:21px;font-weight:800;margin:0 0 20px;color:var(--tx)}
 .bd-field{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
 .bd-field>span{font-size:13.5px;font-weight:600;color:var(--tx2)}
 .bd-field input{font:inherit;font-size:15px;padding:12px 14px;border:1px solid var(--line-2);border-radius:11px;
   background:var(--bg);color:var(--tx);outline:none;transition:border-color .15s,box-shadow .15s}
-.bd-field input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(45,90,61,.13);background:#fff}
+.bd-field input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(35,71,217,.13);background:#fff}
 .bd-field small{font-size:11.5px;color:var(--tx3)}
 .bd-checks{display:flex;flex-direction:column;gap:12px;margin-top:4px}
 .bd-check{display:flex;align-items:center;gap:10px;font-size:14.5px;font-weight:600;color:var(--tx);cursor:pointer}
@@ -157,7 +157,7 @@ const CSS = `
 .bd-net{display:flex;flex-direction:column;gap:4px;background:linear-gradient(135deg,var(--g),var(--g-d));
   color:#fff;border-radius:14px;padding:18px 22px;margin-bottom:20px}
 .bd-net span{font-size:13.5px;color:rgba(255,255,255,.8);font-weight:600}
-.bd-net strong{font-family:'Playfair Display',serif;font-size:clamp(28px,4vw,38px);font-weight:800;line-height:1}
+.bd-net strong{font-family:var(--font-display);font-size:clamp(28px,4vw,38px);font-weight:800;line-height:1}
 .bd-table{width:100%;border-collapse:collapse;font-size:14px}
 .bd-table td{padding:9px 0;border-bottom:1px solid var(--line);color:var(--tx2)}
 .bd-table td:last-child{text-align:right;font-weight:600;color:var(--tx);white-space:nowrap}

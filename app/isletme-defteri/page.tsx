@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
+import { pdfHazirla, pdfBaslik, pdfTablo, pdfAc, PDF_RENK, PDF_KENAR } from '@/lib/pdf'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { ayLabel, fmtTL, tarihFmt, AYLAR } from '@/lib/hesaplama'
@@ -255,21 +256,10 @@ export default function IsletmeDefteriPage() {
     if (!hareketler.length) { bilgi('⚠️ Bu yıl için defter hareketi yok.'); return }
     bilgi('⌛ Defter PDF hazırlanıyor...', 0)
     try {
-      const { default: jsPDF } = await import('jspdf')
-      const { default: autoTable } = await import('jspdf-autotable')
-      async function loadFontB64(path: string) {
-        const r = await fetch(path); const b = await r.arrayBuffer(); const u = new Uint8Array(b)
-        let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s)
-      }
-      const [reg, bold] = await Promise.all([loadFontB64('/fonts/NotoSans-Regular.ttf'), loadFontB64('/fonts/NotoSans-Bold.ttf')])
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-      pdf.addFileToVFS('NotoSans-Regular.ttf', reg); pdf.addFileToVFS('NotoSans-Bold.ttf', bold)
-      pdf.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal', 'Identity-H')
-      pdf.addFont('NotoSans-Bold.ttf', 'NotoSans', 'bold', 'Identity-H')
-      pdf.setFont('NotoSans')
+      const { pdf, autoTable } = await pdfHazirla('portrait')
 
       const PW = pdf.internal.pageSize.getWidth()
-      const M = 10
+      const M = PDF_KENAR
       const usable = PW - 2 * M
       const RPP = 26
 
@@ -313,37 +303,24 @@ export default function IsletmeDefteriPage() {
         for (let p = 0; p < nPages; p++) {
           if (!firstPage) pdf.addPage()
           firstPage = false
-          let y0 = 13
-          if (ayarlar?.kurum_adi) {
-            pdf.setFont('NotoSans', 'bold'); pdf.setFontSize(9)
-            pdf.text(ayarlar.kurum_adi.toLocaleUpperCase('tr'), PW / 2, 9, { align: 'center' })
-            y0 = 15.5
-          }
-          pdf.setFont('NotoSans', 'bold'); pdf.setFontSize(12)
-          pdf.text('İŞLETME HESABI DEFTERİ', PW / 2, y0, { align: 'center' })
-          pdf.setFontSize(11)
-          pdf.text(title, PW / 2, y0 + 6, { align: 'center' })
-          pdf.setFont('NotoSans', 'normal'); pdf.setFontSize(9)
-          pdf.text(`Sayfa ${p + 1} / ${nPages}`, PW - M, 9, { align: 'right' })
+          const y0 = pdfBaslik(pdf, { kurum: ayarlar?.kurum_adi, baslik: 'İşletme hesabı defteri', alt: title, sag: `${title} sayfası ${p + 1} / ${nPages}` })
 
           const slice = rows.slice(p * RPP, (p + 1) * RPP)
           const nakli = run
           const body: any[] = []
           body.push([{ content: 'Nakli Toplam', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold' } }, { content: fmtTL(nakli), styles: { halign: 'right', fontStyle: 'bold' } }])
           for (const r of slice) { sira++; run += Number(r.tutar || 0); body.push([sira, tarihFmt(r.tarih), r.belge_no || '-', r.aciklama || '', fmtTL(Number(r.tutar))]) }
-          body.push([{ content: 'Toplam', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [235, 235, 235] } }, { content: fmtTL(run), styles: { halign: 'right', fontStyle: 'bold', fillColor: [235, 235, 235] } }])
+          body.push([{ content: 'Toplam', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: PDF_RENK.toplamZemin } }, { content: fmtTL(run), styles: { halign: 'right', fontStyle: 'bold', fillColor: PDF_RENK.toplamZemin } }])
 
-          autoTable(pdf, {
+          autoTable(pdf, pdfTablo({
             head: headFor(title),
             body,
-            startY: 25.5,
-            margin: { left: M, right: M },
+            startY: y0,
+            margin: { left: M, right: M, top: 14, bottom: 14 },
             tableWidth: usable,
-            styles: { font: 'NotoSans', fontSize: 8, cellPadding: 1.6, lineColor: [140, 140, 140], lineWidth: 0.1, overflow: 'linebreak', valign: 'middle', textColor: [20, 20, 20] },
-            headStyles: { font: 'NotoSans', fontStyle: 'bold', fillColor: [245, 245, 245], textColor: [20, 20, 20], halign: 'center', valign: 'middle', lineColor: [120, 120, 120], lineWidth: 0.2 },
+            styles: { fontSize: 8, cellPadding: 1.6 },
             columnStyles: colStyles,
-            theme: 'grid',
-          })
+          }))
         }
       }
 
@@ -351,8 +328,7 @@ export default function IsletmeDefteriPage() {
       if (giderler.length) renderSection('GİDER', giderler, 0)
       if (gelirler.length) renderSection('GELİR', gelirler, devreden)
 
-      const blob = pdf.output('blob'); const url = URL.createObjectURL(blob)
-      window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000)
+      pdfAc(pdf, 'İşletme hesabı defteri')
       bilgi('✅ Defter PDF hazırlandı.')
     } catch (err: any) {
       bilgi('❌ PDF hatası: ' + (err.message || 'Bilinmiyor'), 5000)
@@ -693,7 +669,7 @@ export default function IsletmeDefteriPage() {
         ) : view === 'defter' ? (
           <>
             <div className="card" style={{ padding: '14px 18px', marginBottom: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 17, fontWeight: 700 }}>{ayLabel(ay, yil)} Defteri</div>
+              <div style={{ fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 700 }}>{ayLabel(ay, yil)} Defteri</div>
               <span style={{ fontSize: 12, color: 'var(--text3)' }}>Ayı değiştirmek için sol menüdeki ay/yıl seçicisini kullanın.</span>
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 18, fontSize: 12.5 }}>
                 <span>Ay Geliri: <strong style={{ color: 'var(--success)' }}>{fmtTL(defterData.gelirToplam - defterData.gelirNakli)}</strong></span>
@@ -828,8 +804,8 @@ export default function IsletmeDefteriPage() {
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ display: 'inline-flex', gap: 6 }}>
-                        <button className="btn btn-secondary btn-sm" title="Düzenle" onClick={() => duzenle(h)} style={{ width: 30, height: 30, justifyContent: 'center', padding: 0 }}><Pencil size={13} /></button>
-                        <button className="btn btn-sm" title="Sil" onClick={() => setConf({ id: h.id, aciklama: h.aciklama || tarihFmt(h.tarih) })} style={{ width: 30, height: 30, justifyContent: 'center', padding: 0, background: 'var(--danger-light)', color: 'var(--danger)', border: '1px solid var(--danger-border)' }}><Trash2 size={13} /></button>
+                        <button className="btn btn-secondary btn-icon" title="Düzenle" onClick={() => duzenle(h)}><Pencil size={13} /></button>
+                        <button className="btn btn-outline-danger btn-icon" title="Sil" onClick={() => setConf({ id: h.id, aciklama: h.aciklama || tarihFmt(h.tarih) })}><Trash2 size={13} /></button>
                       </div>
                     </td>
                   </tr>
@@ -854,7 +830,7 @@ export default function IsletmeDefteriPage() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(26,26,20,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} onClick={() => !importSaving && setImportOpen(false)}>
           <div className="card" style={{ width: '100%', maxWidth: 960, maxHeight: '92vh', overflowY: 'auto', padding: '22px 24px', marginBottom: 0 }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <h2 style={{ margin: 0, fontFamily: "'Playfair Display', serif", fontSize: 19, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <FileSpreadsheet size={20} style={{ color: 'var(--accent)' }} /> Banka Ekstresi Aktar
               </h2>
               <button onClick={() => setImportOpen(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)' }}><X size={20} /></button>

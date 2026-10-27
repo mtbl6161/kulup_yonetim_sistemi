@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, LogOut, Sparkles } from 'lucide-react'
+import { Loader2, LogOut, School } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { DENEME_GUN } from '@/lib/deneme'
@@ -80,7 +80,7 @@ export default function KurulumPage() {
     <div style={wrap}>
       <form onSubmit={handleSubmit} style={card}>
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <div style={iconBox}><Sparkles size={24} color="var(--accent)" /></div>
+          <div style={iconBox}><School size={24} color="var(--accent)" /></div>
           <h1 style={{ margin: '0 0 6px', fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>Kurulumu Tamamlayın</h1>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text2)' }}>
             Kurum bilgilerinizi girin, <strong>{DENEME_GUN} gün ücretsiz deneme</strong> hemen başlasın.
@@ -144,7 +144,7 @@ export default function KurulumPage() {
 
 const wrap: React.CSSProperties = {
   minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'var(--bg)', padding: '20px 16px', fontFamily: '"DM Sans", sans-serif',
+  background: 'var(--bg)', padding: '20px 16px', fontFamily: 'var(--font-sans)',
 }
 const card: React.CSSProperties = {
   width: '100%', maxWidth: 440, background: 'var(--surface)', borderRadius: 20, padding: 24,

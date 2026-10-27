@@ -7,6 +7,7 @@
 import { supabase } from './supabase'
 import { AYLAR, fmt, gunSayisi, tahakkukDagitimHesapla, detectActiveCategories, isDenetim } from './hesaplama'
 import { Ayarlar } from './types'
+import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAltBilgi, type Pdf as PdfBelgesi } from './pdf'
 
 export const DENETIM_BUCKET = 'denetim'
 export const MAKS_DOSYA_BOYUTU = 10 * 1024 * 1024
@@ -119,61 +120,26 @@ export function boyutFmt(b?: number | null): string {
 // ------------------------------------------------------------
 // PDF altyapısı (NotoSans ile Türkçe karakter desteği — bordro PDF'iyle aynı yöntem)
 // ------------------------------------------------------------
-let fontCache: Promise<[string, string]> | null = null
-function fontlariYukle(): Promise<[string, string]> {
-  async function b64(path: string) {
-    const buf = new Uint8Array(await (await fetch(path)).arrayBuffer())
-    let s = ''
-    for (let i = 0; i < buf.length; i++) s += String.fromCharCode(buf[i])
-    return btoa(s)
-  }
-  if (!fontCache) fontCache = Promise.all([b64('/fonts/NotoSans-Regular.ttf'), b64('/fonts/NotoSans-Bold.ttf')])
-  return fontCache
-}
-
-async function yeniPdf(yon: 'portrait' | 'landscape') {
-  const [{ default: jsPDF }, { default: autoTable }, [reg, bold]] = await Promise.all([
-    import('jspdf'), import('jspdf-autotable'), fontlariYukle(),
-  ])
-  const pdf = new jsPDF({ orientation: yon, unit: 'mm', format: 'a4' })
-  pdf.addFileToVFS('NotoSans-Regular.ttf', reg)
-  pdf.addFileToVFS('NotoSans-Bold.ttf', bold)
-  pdf.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal', 'Identity-H')
-  pdf.addFont('NotoSans-Bold.ttf', 'NotoSans', 'bold', 'Identity-H')
-  pdf.setFont('NotoSans')
-  return { pdf, autoTable }
-}
-
-type Pdf = Awaited<ReturnType<typeof yeniPdf>>['pdf']
+// Ortak PDF altyapısı (lib/pdf.ts): tüm Klüp360 çıktılarıyla aynı yazı tipi, başlık, tablo ve imza
+const yeniPdf = pdfHazirla
+type Pdf = PdfBelgesi
 
 function baslikYaz(pdf: Pdf, kurum: string, baslik: string, alt: string) {
-  const W = pdf.internal.pageSize.getWidth()
-  pdf.setFont('NotoSans', 'bold'); pdf.setFontSize(11)
-  pdf.text(kurum.toLocaleUpperCase('tr-TR'), W / 2, 12, { align: 'center' })
-  pdf.setFontSize(10)
-  pdf.text(baslik, W / 2, 18, { align: 'center' })
-  pdf.setFont('NotoSans', 'normal'); pdf.setFontSize(8)
-  pdf.text(alt, W / 2, 23, { align: 'center' })
+  pdfBaslik(pdf, { kurum, baslik, alt })
 }
 
 function sonY(pdf: Pdf): number {
-  return (pdf as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 30
+  return pdfSonY(pdf)
 }
 
 function imzaYaz(pdf: Pdf, ayarlar: Partial<Ayarlar> | null, y: number) {
-  const W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight()
-  if (y + 25 > H - 8) { pdf.addPage(); y = 20 }
-  pdf.setFontSize(8)
-  const bloklar = [
-    { x: W * 0.25, baslik: 'Düzenleyen', ad: ayarlar?.duzenleyen_adi || '', unvan: ayarlar?.duzenleyen_unvani || '' },
-    { x: W * 0.75, baslik: 'Onaylayan', ad: ayarlar?.mudur_adi || '', unvan: ayarlar?.mudur_unvani || 'Okul Müdürü' },
-  ]
-  for (const b of bloklar) {
-    pdf.setFont('NotoSans', 'bold'); pdf.text(b.baslik, b.x, y + 6, { align: 'center' })
-    pdf.setFont('NotoSans', 'normal')
-    pdf.text(b.ad, b.x, y + 18, { align: 'center' })
-    pdf.text(b.unvan, b.x, y + 22, { align: 'center' })
-  }
+  pdfImza(pdf, ayarlar, y)
+}
+
+/** Alt bilgi (sayfa no) ekleyip PDF'i blob olarak döner. */
+function pdfCikti(pdf: Pdf): Blob {
+  pdfAltBilgi(pdf, 'Denetim dosyası')
+  return pdf.output('blob')
 }
 
 function bosNotYaz(pdf: Pdf, metin: string) {
@@ -181,12 +147,7 @@ function bosNotYaz(pdf: Pdf, metin: string) {
   pdf.text(metin, pdf.internal.pageSize.getWidth() / 2, 45, { align: 'center' })
 }
 
-const TABLO_STIL = {
-  theme: 'grid' as const,
-  styles: { font: 'NotoSans', fontSize: 7, cellPadding: 1, textColor: [0, 0, 0] as [number, number, number], lineColor: [60, 60, 60] as [number, number, number], lineWidth: 0.1 },
-  headStyles: { fillColor: [235, 235, 235] as [number, number, number], textColor: [0, 0, 0] as [number, number, number], fontStyle: 'bold' as const, halign: 'center' as const },
-  footStyles: { fillColor: [245, 245, 245] as [number, number, number], textColor: [0, 0, 0] as [number, number, number], fontStyle: 'bold' as const },
-}
+const TABLO_STIL = pdfTablo()
 
 // ------------------------------------------------------------
 // Otomatik belge üretimi
@@ -256,7 +217,7 @@ export async function otomatikBelgeUret(kod: OtomatikKod, okulId: number, yil: n
       columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 2: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center', cellWidth: 14 } },
     })
     imzaYaz(pdf, v.ayarlar, sonY(pdf) + 6)
-    return { blob: pdf.output('blob'), ad: `Personel_Listesi_${AYLAR[ay]}_${yil}.pdf` }
+    return { blob: pdfCikti(pdf), ad: `Personel_Listesi_${AYLAR[ay]}_${yil}.pdf` }
   }
 
   if (kod === 'puantaj_sgk' || kod === 'puantaj_kadrolu') {
@@ -289,7 +250,7 @@ export async function otomatikBelgeUret(kod: OtomatikKod, okulId: number, yil: n
       })
     }
     imzaYaz(pdf, v.ayarlar, sonY(pdf) + 6)
-    return { blob: pdf.output('blob'), ad: `Puantaj_${turAd}_${AYLAR[ay]}_${yil}.pdf` }
+    return { blob: pdfCikti(pdf), ad: `Puantaj_${turAd}_${AYLAR[ay]}_${yil}.pdf` }
   }
 
   if (kod === 'bordro_sgk' || kod === 'bordro_kadrolu') {
@@ -315,7 +276,7 @@ export async function otomatikBelgeUret(kod: OtomatikKod, okulId: number, yil: n
       })
     }
     imzaYaz(pdf, v.ayarlar, sonY(pdf) + 6)
-    return { blob: pdf.output('blob'), ad: `Bordro_${turAd}_${AYLAR[ay]}_${yil}.pdf` }
+    return { blob: pdfCikti(pdf), ad: `Bordro_${turAd}_${AYLAR[ay]}_${yil}.pdf` }
   }
 
   // bilanco — gelirin dağılımı ve kişi bazında ödenen ücretler
@@ -359,7 +320,7 @@ export async function otomatikBelgeUret(kod: OtomatikKod, okulId: number, yil: n
     }
   }
   imzaYaz(pdf, v.ayarlar, sonY(pdf) + 8)
-  return { blob: pdf.output('blob'), ad: `Bilanco_${AYLAR[ay]}_${yil}.pdf` }
+  return { blob: pdfCikti(pdf), ad: `Bilanco_${AYLAR[ay]}_${yil}.pdf` }
 }
 
 // ------------------------------------------------------------
@@ -386,7 +347,7 @@ export async function kontrolListesiUret(kurum: string, yil: number, ay: number,
     y += 5
     pdf.text(`Denetime gönderim: ${new Date(teslim.gonderim_tarihi).toLocaleString('tr-TR')}   Durum: ${TESLIM_DURUM_ETIKET[teslim.durum]}`, 14, y)
   }
-  return pdf.output('blob')
+  return pdfCikti(pdf)
 }
 
 // ------------------------------------------------------------

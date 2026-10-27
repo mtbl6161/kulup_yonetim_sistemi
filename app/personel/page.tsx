@@ -12,6 +12,7 @@ import PersonelModal from '@/components/PersonelModal'
 import { Plus, Pencil, Trash2, Users, RotateCcw } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import { EmptyStudents } from '@/components/brand/Illustrations'
 
 function PersonelIc() {
   const { profil } = useAuth()
@@ -169,7 +170,7 @@ function PersonelIc() {
                 {sorted.length === 0 ? (
                   <tr><td colSpan={10}>
                     <div className="empty-state">
-                      <div className="empty-icon"><Users size={48} style={{ color: 'var(--text3)' }} /></div>
+                      <EmptyStudents width={200} />
                       <p>{loading ? 'Yükleniyor...' : 'Personel bulunamadı'}</p>
                     </div>
                   </td></tr>
@@ -224,8 +225,8 @@ function PersonelIc() {
                       <td style={{ textAlign: 'right' }}>
                         {listeTuru === 'aktif' ? (
                           <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                            <button className="btn btn-secondary btn-sm" onClick={() => duzenle(p)} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28 }} title="Düzenle"><Pencil size={14} /></button>
-                            <button className="btn btn-danger btn-sm" onClick={() => setSilOnayId(p.id)} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28 }} title="Sil ve Arşivle"><Trash2 size={14} /></button>
+                            <button className="btn btn-secondary btn-icon" onClick={() => duzenle(p)} title="Düzenle"><Pencil size={14} /></button>
+                            <button className="btn btn-outline-danger btn-icon" onClick={() => setSilOnayId(p.id)} title="Sil ve Arşivle"><Trash2 size={14} /></button>
                           </div>
                         ) : (
                           <button className="btn btn-success btn-sm" onClick={() => geriYukle(p.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 8px' }} title="Arşivden Geri Yükle">

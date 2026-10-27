@@ -60,7 +60,7 @@ export default function ResetPasswordPage() {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'linear-gradient(135deg, #2d5a3d 0%, #1e4229 100%)',
+    background: 'linear-gradient(135deg, #2347D9 0%, #1B38B8 100%)',
     padding: 20
   }
 
@@ -85,7 +85,7 @@ export default function ResetPasswordPage() {
             }}>
               <CheckCircle size={32} />
             </div>
-            <h1 style={{ fontFamily: 'Playfair Display, serif', fontSize: 24, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
               Şifre Güncellendi
             </h1>
             <p style={{ color: '#666', fontSize: 14 }}>
@@ -109,7 +109,7 @@ export default function ResetPasswordPage() {
             }}>
               <KeyRound size={32} />
             </div>
-            <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
               Bağlantı Doğrulanıyor...
             </h2>
             <p style={{ fontSize: 14 }}>
@@ -143,7 +143,7 @@ export default function ResetPasswordPage() {
           }}>
             <KeyRound size={32} />
           </div>
-          <h1 style={{ fontFamily: 'Playfair Display, serif', fontSize: 24, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
             Yeni Şifre Belirle
           </h1>
           <p style={{ color: '#666', fontSize: 14 }}>Hesabınız için yeni bir şifre girin.</p>

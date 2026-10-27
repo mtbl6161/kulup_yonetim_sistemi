@@ -2,11 +2,26 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { BrandMark } from '@/components/brand/Logo'
 import { createBrowserClient } from '@supabase/ssr'
 import {
-  Eye, EyeOff, CheckCircle, Loader2,
-  School, User, Phone, MapPin, Clock, DollarSign, ChevronRight, ChevronLeft,
-  Navigation2, ShieldCheck, Zap, BarChart3, Home,
+  Eye,
+  EyeOff,
+  CheckCircle,
+  Loader2,
+  School,
+  User,
+  Phone,
+  MapPin,
+  Clock,
+  DollarSign,
+  ChevronRight,
+  ChevronLeft,
+  Navigation2,
+  ShieldCheck,
+  BarChart3,
+  Home,
+  Calculator
 } from 'lucide-react'
 
 const sb = createBrowserClient(
@@ -315,13 +330,13 @@ function AuthBrand() {
     <aside className="su-brand">
       <div className="su-brand-inner">
         <Link href="/tanitim" className="su-logo">
-          <img src="/logo.png" alt="Klüp360" />
+          <BrandMark size={40} tone="light" />
           <span>Klüp<i>360</i></span>
         </Link>
         <div className="su-brand-mid">
           <h2>Kurumunuzu dakikalar içinde dijitale taşıyın.</h2>
           <ul>
-            <li><span className="su-bico"><Zap size={15} /></span> Otomatik bordro ve puantaj</li>
+            <li><span className="su-bico"><Calculator size={15} /></span> Otomatik bordro ve puantaj</li>
             <li><span className="su-bico"><BarChart3 size={15} /></span> Anlık tahsilat ve raporlar</li>
             <li><span className="su-bico"><ShieldCheck size={15} /></span> MEB yönergesine %100 uyum</li>
           </ul>
@@ -346,24 +361,24 @@ function Field({ icon, label, children }: { icon: React.ReactNode; label: string
 }
 
 const CSS = `
-.su{--g:#2d5a3d;--g-d:#1e4229;--g-dd:#163620;--gold:#c8832a;--bg:#f5f2ec;--surf:#fffef9;
-  --tx:#1a1a14;--tx2:#5a5748;--tx3:#8a8070;--line:#e6dfd0;--line-2:#d8d0be;--danger:#c0392b;
-  font-family:'DM Sans',system-ui,sans-serif;color:var(--tx);min-height:100vh;
+.su{--g:#2347D9;--g-d:#1B38B8;--g-dd:#0E1116;--gold:#8EA3EE;--bg:#F5F6F8;--surf:#FFFFFF;
+  --tx:#0E1116;--tx2:#3F4753;--tx3:#5F6876;--line:#E3E6EB;--line-2:#E3E6EB;--danger:#c0392b;
+  font-family:var(--font-sans);color:var(--tx);min-height:100vh;
   display:grid;grid-template-columns:1fr 1.05fr;-webkit-font-smoothing:antialiased}
 .su *{box-sizing:border-box}
 .su :where(a){text-decoration:none;color:inherit}
 
 /* marka paneli */
-.su-brand{position:relative;overflow:hidden;background:linear-gradient(150deg,var(--g),var(--g-dd));color:#fff;padding:48px}
+.su-brand{position:relative;overflow:hidden;background:var(--g-dd);color:#fff;padding:48px}
 .su-brand::before{content:'';position:absolute;top:-15%;left:-10%;width:80%;height:70%;
   background:radial-gradient(closest-side,rgba(255,255,255,.1),transparent);pointer-events:none}
 .su-brand-inner{position:relative;z-index:2;height:100%;display:flex;flex-direction:column}
 .su-logo{display:flex;align-items:center;gap:10px}
 .su-logo img{width:40px;height:40px;object-fit:contain}
-.su-logo span{font-family:'Playfair Display',serif;font-weight:800;font-size:24px}
+.su-logo span{font-family:var(--font-display);font-weight:800;font-size:24px}
 .su-logo i{color:var(--gold);font-style:normal}
 .su-brand-mid{margin:auto 0;padding:40px 0}
-.su-brand-mid h2{font-family:'Playfair Display',serif;font-weight:800;font-size:clamp(26px,3vw,36px);
+.su-brand-mid h2{font-family:var(--font-display);font-weight:800;font-size:clamp(26px,3vw,36px);
   line-height:1.2;letter-spacing:-.02em;margin:0 0 28px;max-width:420px}
 .su-brand-mid ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:16px}
 .su-brand-mid li{display:flex;align-items:center;gap:12px;font-size:15.5px;color:rgba(255,255,255,.9)}
@@ -381,7 +396,7 @@ const CSS = `
 .su-home:hover{color:var(--g)}
 .su-head{margin-bottom:24px}
 .su-card-logo{width:52px;height:52px;object-fit:contain;margin-bottom:14px}
-.su-h1{font-family:'Playfair Display',serif;font-size:26px;font-weight:800;color:var(--tx);margin:0 0 6px}
+.su-h1{font-family:var(--font-display);font-size:26px;font-weight:800;color:var(--tx);margin:0 0 6px}
 .su-sub{font-size:13px;color:var(--tx3);margin:0}
 
 /* adım göstergesi */
@@ -403,26 +418,26 @@ const CSS = `
 .su-label-ico{color:var(--g);display:inline-flex}
 .su-input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line-2);font:inherit;font-size:14.5px;
   outline:none;background:#fff;color:var(--tx);transition:border-color .15s,box-shadow .15s}
-.su-input:focus,.su-input:focus-within{border-color:var(--g);box-shadow:0 0 0 3px rgba(45,90,61,.13)}
+.su-input:focus,.su-input:focus-within{border-color:var(--g);box-shadow:0 0 0 3px rgba(35,71,217,.13)}
 select.su-input{cursor:pointer}
 .su-input-row{display:flex;align-items:center;gap:8px;padding:0 14px}
 .su-input-row input{flex:1;border:none;outline:none;padding:12px 0;font:inherit;font-size:14.5px;background:transparent;color:var(--tx)}
 .su-eye{background:none;border:none;cursor:pointer;padding:0;display:flex;color:var(--tx3)}
 .su-hint{font-size:13px;color:var(--tx2);line-height:1.5}
-.su-tip{background:#f0ede4;border-radius:12px;padding:12px 15px;font-size:12.5px;color:var(--tx2);line-height:1.5}
+.su-tip{background:#F4F5F8;border-radius:8px;padding:12px 15px;font-size:12.5px;color:var(--tx2);line-height:1.5}
 
 .su-hours{display:flex;gap:8px}
 .su-hour{flex:1;padding:11px 0;border-radius:10px;border:1px solid var(--line-2);font:inherit;font-size:14px;font-weight:700;
   cursor:pointer;background:#fff;color:var(--tx2);transition:all .15s}
 .su-hour.on{border-color:var(--g);background:var(--g);color:#fff}
 
-.su-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px 0;border-radius:12px;
+.su-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px 0;border-radius:8px;
   background:var(--g);color:#fff;font:inherit;font-weight:700;font-size:15px;border:none;cursor:pointer;
-  box-shadow:0 10px 24px -10px rgba(45,90,61,.6);transition:transform .2s,background .2s}
+  box-shadow:0 10px 24px -10px rgba(35,71,217,.6);transition:transform .2s,background .2s}
 .su-btn:hover{background:var(--g-d);transform:translateY(-2px)}
 .su-btn:disabled{opacity:.75;cursor:default;transform:none}
 .su-nav{display:flex;gap:10px;margin-top:20px}
-.su-geri{display:flex;align-items:center;gap:6px;padding:14px 20px;border-radius:12px;border:1px solid var(--line-2);
+.su-geri{display:flex;align-items:center;gap:6px;padding:14px 20px;border-radius:8px;border:1px solid var(--line-2);
   background:#fff;color:var(--tx2);font:inherit;font-weight:600;font-size:14px;cursor:pointer}
 .su-geri:hover{border-color:var(--g);color:var(--g)}
 .su-error{background:#fdf0ee;border:1px solid #f3c4bd;border-radius:11px;padding:12px 14px;font-size:13px;color:var(--danger);margin-top:14px;line-height:1.5}

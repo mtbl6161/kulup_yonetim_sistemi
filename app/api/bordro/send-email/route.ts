@@ -39,14 +39,14 @@ export async function POST(request: NextRequest) {
 
     const html = `
       <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
-        <h2 style="color: #2d5a3d; border-bottom: 2px solid #2d5a3d; padding-bottom: 10px;">Maaş Bordrosu Bilgilendirmesi</h2>
+        <h2 style="color: #2347D9; border-bottom: 2px solid #2347D9; padding-bottom: 10px;">Maaş Bordrosu Bilgilendirmesi</h2>
         <p>Sayın <strong>${safePersonelAd}</strong>,</p>
         <p><strong>${safeAy}/${safeYil}</strong> dönemine ait maaş bordronuz ekte ilginize sunulmuştur.</p>
         <p>Kurumumuza kattığınız değer, gösterdiğiniz özveri ve emekleriniz için yürekten teşekkür ederiz.</p>
         <br/>
         <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
           <p style="margin: 0; font-weight: bold;">Saygılarımızla,</p>
-          <p style="margin: 0; color: #2d5a3d; font-size: 1.1em; font-weight: bold;">${safeKurumAdi}</p>
+          <p style="margin: 0; color: #2347D9; font-size: 1.1em; font-weight: bold;">${safeKurumAdi}</p>
         </div>
       </div>
     `

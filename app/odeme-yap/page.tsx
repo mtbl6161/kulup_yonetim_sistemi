@@ -3,8 +3,14 @@ import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/AuthContext'
 import {
-  CreditCard, CheckCircle2, ShieldCheck, Zap, 
-  ArrowRight, Globe, Lock, LogOut, Loader2
+  CreditCard,
+  CheckCircle2,
+  ShieldCheck,
+  ArrowRight,
+  Globe,
+  Lock,
+  LogOut,
+  Loader2
 } from 'lucide-react'
 
 const AYLIK = 750
@@ -82,7 +88,7 @@ function OdemeYapIc() {
               ...toggleBtnStyle,
               background: secDonem === d ? 'var(--accent)' : 'transparent',
               color: secDonem === d ? '#fff' : 'var(--text2)',
-              boxShadow: secDonem === d ? '0 4px 10px rgba(45, 90, 61, 0.2)' : 'none',
+              boxShadow: secDonem === d ? '0 4px 10px rgba(35,71,217, 0.2)' : 'none',
             }}>
               {d === 'month' ? 'Aylık' : 'Yıllık'}
               {d === 'year' && <span style={badgeStyle}>%20 İndirim</span>}
@@ -122,7 +128,7 @@ function OdemeYapIc() {
             disabled={loading}
             style={payBtnStyle}
           >
-            {loading ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
+            {loading ? <Loader2 size={18} className="animate-spin" /> : <CreditCard size={18} />}
             <span style={{ flex: 1, textAlign: 'center' }}>{loading ? 'Yönlendiriliyor...' : 'Online Ödeme Yap'}</span>
             <ArrowRight size={18} />
           </button>
@@ -147,7 +153,7 @@ function OdemeYapIc() {
 // STYLES - COMPACT VERSION
 const wrapStyle: React.CSSProperties = {
   minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'var(--bg)', padding: '20px 16px', fontFamily: '"DM Sans", sans-serif',
+  background: 'var(--bg)', padding: '20px 16px', fontFamily: 'var(--font-sans)',
   overflowY: 'auto'
 }
 
@@ -165,7 +171,7 @@ const iconBoxStyle: React.CSSProperties = {
 }
 
 const h1Style: React.CSSProperties = {
-  fontFamily: '"Playfair Display", serif',
+  fontFamily: 'var(--font-display)',
   fontSize: 22, fontWeight: 700, color: 'var(--text)', marginBottom: 4, marginTop: 0
 }
 
@@ -210,7 +216,7 @@ const payBtnStyle: React.CSSProperties = {
   width: '100%', minHeight: 52, borderRadius: 14, background: 'var(--accent)',
   color: '#fff', fontSize: 14, fontWeight: 700, border: 'none',
   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
-  padding: '0 20px', boxShadow: '0 8px 20px rgba(45, 90, 61, 0.15)'
+  padding: '0 20px', boxShadow: '0 8px 20px rgba(35,71,217, 0.15)'
 }
 
 const secureInfoStyle: React.CSSProperties = {

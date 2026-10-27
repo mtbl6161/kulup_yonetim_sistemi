@@ -30,11 +30,21 @@ import {
   GraduationCap,
   ArrowUpRight,
   Activity,
-  Zap,
   Target,
   ShieldCheck,
-  Sparkles
+  Search,
+  Info
 } from 'lucide-react'
+
+// Saat kendi bileşeninde güncellenir: tüm panel her saniye yeniden çizilmesin
+function Saat() {
+  const [t, setT] = useState(() => new Date())
+  useEffect(() => {
+    const timer = setInterval(() => setT(new Date()), 15000)
+    return () => clearInterval(timer)
+  }, [])
+  return <>{t.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</>
+}
 
 export default function DashboardPage() {
   const { ay, yil } = useAy()
@@ -52,7 +62,6 @@ export default function DashboardPage() {
   const [puantajlar, setPuantajlar] = useState<any[]>([])
   const [tatiller, setTatiller] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [currentTime, setCurrentTime] = useState(new Date())
 
   // Denetçi Durumu State
   const [denetciDurumu, setDenetciDurumu] = useState<'yukleniyor' | 'aktif' | 'yok' | 'beklemede'>('yukleniyor')
@@ -60,12 +69,6 @@ export default function DashboardPage() {
   const [talepForm, setTalepForm] = useState({ ad_soyad: '', email: '', telefon: '', notlar: '', il_id: 0 })
   const [talepGonderiliyor, setTalepGonderiliyor] = useState(false)
   const [iller, setIller] = useState<{ id: number; ad: string }[]>([])
-
-  // Canlı Saat Güncelleme
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
-    return () => clearInterval(timer)
-  }, [])
 
   const filteredResults = searchQuery.length > 1
     ? [
@@ -95,21 +98,21 @@ export default function DashboardPage() {
       { data: sin },
       { data: brd }
     ] = await Promise.all([
-      supabase.from('ogrenciler').select('*').eq('okul_id', okul?.id),
-      supabase.from('tahsilat').select('*').eq('ay', ay).eq('yil', yil).eq('okul_id', okul?.id),
-      supabase.from('tahsilat').select('*').eq('ay', prevMonth).eq('yil', prevYear).eq('okul_id', okul?.id),
-      supabase.from('hesap_hareketleri').select('*').eq('okul_id', okul?.id).order('tarih', { ascending: false }),
+      supabase.from('ogrenciler').select('id,ad,soyad,aktif,ucretsiz_mi,kardes_indirimi,gunluk_saat,ogrenci_turu').eq('okul_id', okul?.id),
+      supabase.from('tahsilat').select('ogrenci_id,tutar').eq('ay', ay).eq('yil', yil).eq('okul_id', okul?.id),
+      supabase.from('tahsilat').select('ogrenci_id,tutar').eq('ay', prevMonth).eq('yil', prevYear).eq('okul_id', okul?.id),
+      supabase.from('hesap_hareketleri').select('tur,tutar,ay,yil').eq('okul_id', okul?.id),
       supabase.from('ayarlar').select('*').eq('okul_id', okul?.id).single(),
       supabase.from('tatiller').select('*').or(`okul_id.eq.${okul?.id ?? 0},okul_id.is.null`),
-      supabase.from('personel').select('*').eq('okul_id', okul?.id),
-      supabase.from('siniflar').select('*').eq('aktif', true).eq('okul_id', okul?.id),
-      supabase.from('bordro').select('*').eq('ay', ay).eq('yil', yil).eq('okul_id', okul?.id)
+      supabase.from('personel').select('id,ad,aktif,iban,tc').eq('okul_id', okul?.id),
+      supabase.from('siniflar').select('kapasite').eq('aktif', true).eq('okul_id', okul?.id),
+      supabase.from('bordro').select('personel_id,odendi').eq('ay', ay).eq('yil', yil).eq('okul_id', okul?.id)
     ])
 
     let pua: any[] = []
     if (per && per.length > 0) {
       const { data } = await supabase.from('puantaj')
-        .select('*')
+        .select('personel_id,tarih,saat')
         .in('personel_id', per.map(p => p.id))
         .gte('tarih', startDate).lte('tarih', endDate)
       pua = data || []
@@ -130,12 +133,12 @@ export default function DashboardPage() {
     })
 
     setOgrenciler(filteredOgr.filter(kulupOgrencisi))
-    setTahsilatlar(tah || [])
-    setPrevTahsilatlar(prevTah || [])
-    setHareketler(hh || [])
+    setTahsilatlar((tah || []) as unknown as Tahsilat[])
+    setPrevTahsilatlar((prevTah || []) as unknown as Tahsilat[])
+    setHareketler((hh || []) as unknown as HesapHareketi[])
     setAyarlar(ayr)
     setTatiller(tat || [])
-    setPersonel(filteredPer)
+    setPersonel(filteredPer as unknown as Personel[])
     setSiniflar(sin || [])
     setBordrolar(brd || [])
     setPuantajlar(pua || [])
@@ -293,73 +296,129 @@ export default function DashboardPage() {
      return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', color: 'var(--text3)' }}>Yükleniyor...</div>
   }
 
+  // ---- Atlas genel bakış: görünüm için türetilen değerler ----
+  const son6 = (() => {
+    const liste: { ay: number; yil: number }[] = []
+    let tAy = ay, tYil = yil
+    for (let i = 0; i < 6; i++) { liste.push({ ay: tAy, yil: tYil }); tAy--; if (tAy === 0) { tAy = 12; tYil-- } }
+    return liste.reverse().map(m => ({
+      ...m,
+      gelir: hareketler.filter(h => h.tur === 'gelir' && h.ay === m.ay && h.yil === m.yil).reduce((s, h) => s + Number(h.tutar), 0),
+      gider: hareketler.filter(h => h.tur === 'gider' && h.ay === m.ay && h.yil === m.yil).reduce((s, h) => s + Number(h.tutar), 0),
+    }))
+  })()
+  const buAy = son6[son6.length - 1]
+  const buAyNet = buAy.gelir - buAy.gider
+  const grafikMax = (() => {
+    const m = Math.max(...son6.flatMap(d => [d.gelir, d.gider]), 1)
+    const us = Math.pow(10, Math.floor(Math.log10(m)))
+    return Math.ceil(m / us * 2) / 2 * us || 1
+  })()
+  const kisalt = (v: number) => v >= 1e6 ? `${(v / 1e6).toFixed(1).replace('.', ',')} Mn` : v >= 1e3 ? `${Math.round(v / 1e3)} B` : `${Math.round(v)}`
+  const GRAFIK_H = 200
+  const tlTam = (v: number) => `₺${Math.round(v).toLocaleString('tr-TR')}`
+
+  const tatilListesi = (() => {
+    const dbTatiller = tatiller.filter(t => new Date(t.baslangic_tarihi).getMonth() + 1 === ay && new Date(t.baslangic_tarihi).getFullYear() === yil).map(t => ({ ad: t.ad, gun: new Date(t.baslangic_tarihi).getDate(), tip: 'Tatil / etkinlik' }))
+    const rtNames: Record<string, string> = { '01-01': 'Yılbaşı', '04-23': '23 Nisan Çocuk B.', '05-01': '1 Mayıs', '05-19': '19 Mayıs', '07-15': '15 Temmuz', '08-30': '30 Ağustos', '10-29': '29 Ekim' }
+    const rtList = RESMI_TATILLER.filter(rt => Number(rt.split('-')[0]) === ay).map(rt => ({ ad: rtNames[rt] || 'Resmi tatil', gun: Number(rt.split('-')[1]), tip: 'Resmi tatil' }))
+    return [...dbTatiller, ...rtList].sort((a, b) => a.gun - b.gun).slice(0, 4)
+  })()
+  const ayKisa = ayLabel(ay, yil).split(' ')[0].slice(0, 3).toLocaleUpperCase('tr-TR')
+
+  const personelKarnesi = personel.map(p => ({
+    ...p,
+    pSaat: puantajlar.filter(x => x.personel_id === p.id && !tatilMi(ay, new Date(x.tarih).getDate(), yil, tatiller)).reduce((s, x) => s + (Number(x.saat) || 0), 0),
+  })).filter(p => p.pSaat > 0).sort((a, b) => b.pSaat - a.pSaat).slice(0, 5)
+  const maxSaat = Math.max(...personelKarnesi.map(p => p.pSaat), 1)
+
+  const kpis = [
+    {
+      label: 'Tahsilat verimi', value: `%${tahsilatYuzdesi}`,
+      chip: `${tahsilatTrendi >= 0 ? '+' : '−'}%${Math.abs(tahsilatTrendi)}`, chipOk: tahsilatTrendi >= 0,
+      bar: tahsilatYuzdesi, barColor: 'var(--accent)',
+      sub: `${tlTam(toplamTahsilat)} / ${tlTam(toplamBeklenen)}`,
+    },
+    {
+      label: 'Kapasite doluluğu', value: `%${kapasiteYuzdesi}`,
+      chip: `${aktifOgrenci} / ${toplamKapasite}`, chipOk: null as boolean | null,
+      bar: kapasiteYuzdesi, barColor: 'var(--accent)',
+      sub: toplamKapasite > aktifOgrenci ? `${toplamKapasite - aktifOgrenci} boş kontenjan` : 'Kontenjan dolu',
+    },
+    {
+      label: 'Bordro döngüsü', value: bordroDurumu === 2 ? 'Ödendi' : bordroDurumu === 1 ? 'Tahakkuk edildi' : 'Bekleniyor',
+      chip: `${bordrolar.length} kayıt`, chipOk: bordroDurumu > 0 ? true : null,
+      bar: bordroDurumu === 2 ? 100 : bordroDurumu === 1 ? 60 : 8, barColor: bordroDurumu > 0 ? 'var(--success)' : 'var(--warn)',
+      sub: bordroDurumu > 0 ? `${ayLabel(ay, yil)} dönemi` : 'Veri girişi bekleniyor',
+    },
+    {
+      label: 'Net bakiye', value: tlTam(netBakiye),
+      chip: `${buAyNet >= 0 ? '+' : '−'}${tlTam(Math.abs(buAyNet))}`, chipOk: buAyNet >= 0,
+      bar: -1, barColor: '',
+      sub: 'Tüm hareketlerin toplamı',
+    },
+  ]
+
+  const chipStyle = (ok: boolean | null): React.CSSProperties => ({
+    fontSize: 11.5, fontWeight: 600, padding: '2px 7px', borderRadius: 5, whiteSpace: 'nowrap',
+    background: ok === null ? '#eef0f4' : ok ? 'var(--success-light)' : 'var(--danger-light)',
+    color: ok === null ? 'var(--text2)' : ok ? '#0b6b42' : '#a91f26',
+  })
+  const panel: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }
+  const panelTitle: React.CSSProperties = { fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, letterSpacing: '-0.02em', margin: 0, color: 'var(--text)' }
+  const tone = (t: string) => t === 'danger' || t === 'alert' ? 'var(--danger)' : t === 'warning' || t === 'warn' ? 'var(--warn)' : 'var(--accent)'
+
+  // Üst şerit bildirimleri: tek satır, sakin
+  const Banner = ({ color, bg, border, icon, title, children, action }: { color: string; bg: string; border: string; icon: React.ReactNode; title: string; children?: React.ReactNode; action?: React.ReactNode }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px', borderRadius: 8, background: bg, border: `1px solid ${border}`, flexWrap: 'wrap' }}>
+      <span style={{ color, display: 'flex', flexShrink: 0 }}>{icon}</span>
+      <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: 'var(--text2)', lineHeight: 1.45 }}>
+        <strong style={{ color: 'var(--text)', fontWeight: 600 }}>{title}</strong>{children ? <> {children}</> : null}
+      </div>
+      {action}
+    </div>
+  )
+
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100vh', padding: '40px', fontFamily: '"DM Sans", sans-serif' }}>
-      
-      <div style={{ maxWidth: 1600, margin: '0 auto' }}>
-        
-        {/* HEADER */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 40 }}>
+    <div style={{ background: 'var(--bg)', minHeight: '100vh', padding: '24px 32px 40px' }}>
+      <div style={{ maxWidth: 1440, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* BAŞLIK */}
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 12px var(--success-border)', animation: 'pulse 2s infinite' }} />
-              {currentTime.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            <div style={{ fontSize: 12.5, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)', animation: 'pulse 2s infinite' }} />
+              {new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </div>
-            <h1 style={{ fontFamily: '"Playfair Display", serif', fontSize: 32, fontWeight: 800, color: 'var(--text)', margin: 0, letterSpacing: '-0.02em' }}>
-              Hoş Geldiniz, <span style={{ color: 'var(--accent)' }}>{profil?.ad?.split(' ')[0] || 'Yönetici'}</span>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 600, margin: 0, letterSpacing: '-0.03em', color: 'var(--text)' }}>
+              Hoş geldiniz, {profil?.ad?.split(' ')[0] || 'Yönetici'}
             </h1>
-            <p style={{ color: 'var(--text2)', fontSize: 15, marginTop: 6, margin: 0 }}>
-              Kurumunuzdaki anlık durum ve güncel veriler aşağıdadır.
-            </p>
+            <div style={{ color: 'var(--text3)', marginTop: 3, fontSize: 13.5 }}>{ayLabel(ay, yil)} · tahsilat, kapasite ve bordro durumunuzun özeti</div>
           </div>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-            {/* Search */}
-            <div style={{ position: 'relative', width: 340 }}>
-              <div style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }}>
-                <Users size={18} />
-              </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', width: 280 }}>
+              <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', display: 'flex' }}><Search size={15} /></span>
               <input
                 type="text"
-                placeholder="Öğrenci veya personel ara..."
+                aria-label="Öğrenci veya personel ara"
+                placeholder="Öğrenci veya personel ara"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%', height: 48, background: 'var(--surface)', border: '1px solid var(--border)',
-                  borderRadius: 16, padding: '0 48px', fontSize: 14, outline: 'none',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)', transition: 'all 0.2s',
-                  color: 'var(--text)'
-                }}
-                onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(45,90,61,0.08)' }}
-                onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)' }}
+                className="form-input"
+                style={{ paddingLeft: 34, height: 36 }}
               />
               {filteredResults.length > 0 && (
-                <div style={{
-                  position: 'absolute', top: '110%', left: 0, right: 0, background: 'var(--surface)',
-                  borderRadius: 16, border: '1px solid var(--border)', boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
-                  padding: 8, zIndex: 1000
-                }}>
+                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', boxShadow: 'var(--shadow-float)', padding: 6, zIndex: 1000 }}>
                   {filteredResults.map(item => (
                     <Link key={`${item.type}-${item.id}`} href={item.type === 'ogrenci' ? `/ogrenciler?id=${item.id}` : `/personel?id=${item.id}`} style={{ textDecoration: 'none' }}>
-                      <div style={{
-                        padding: '10px 12px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12,
-                        cursor: 'pointer', transition: 'all 0.2s', background: 'transparent'
-                      }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                      >
-                        <div style={{
-                          width: 32, height: 32, background: item.type === 'ogrenci' ? 'var(--accent-lighter)' : 'var(--warn-light)',
-                          borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: item.type === 'ogrenci' ? 'var(--accent)' : 'var(--warn)'
-                        }}>
-                          {item.type === 'ogrenci' ? <GraduationCap size={16} /> : <UserCheck size={16} />}
+                      <div className="sidebar-link" style={{ padding: '8px 10px', borderRadius: 7, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                        <div style={{ width: 28, height: 28, background: item.type === 'ogrenci' ? 'var(--accent-lighter)' : 'var(--warn-light)', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.type === 'ogrenci' ? 'var(--accent)' : 'var(--warn)' }}>
+                          {item.type === 'ogrenci' ? <GraduationCap size={15} /> : <UserCheck size={15} />}
                         </div>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{item.ad}</div>
-                          <div style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', fontWeight: 800 }}>
-                            {item.type === 'ogrenci' ? 'Öğrenci' : 'Personel'}
-                          </div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{item.ad}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text3)' }}>{item.type === 'ogrenci' ? 'Öğrenci' : 'Personel'}</div>
                         </div>
                       </div>
                     </Link>
@@ -367,464 +426,256 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface)', padding: '10px 20px', borderRadius: 16, border: '1px solid var(--border)', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-              <Clock size={18} color="var(--accent)" />
-              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
-                {currentTime.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-              </div>
+            <div className="tabular" style={{ ...panel, height: 36, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, borderRadius: 8, fontSize: 14, fontWeight: 500 }}>
+              <Clock size={15} color="var(--text3)" />
+              <Saat />
             </div>
+            <Link href="/odeme" className="btn btn-secondary" style={{ textDecoration: 'none' }}>Tahsilat al</Link>
+            <Link href="/ogrenciler" className="btn btn-primary" style={{ textDecoration: 'none' }}><PlusCircle size={15} />Yeni öğrenci</Link>
           </div>
         </header>
 
-        {/* BANNERS */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 32 }}>
-          {duyuru && (
-            <div style={{
-              background: duyuru.tur === 'danger' ? 'var(--danger-light)' : duyuru.tur === 'warning' ? 'var(--warn-light)' : 'var(--info-light)',
-              border: `1px solid ${duyuru.tur === 'danger' ? 'var(--danger-border)' : duyuru.tur === 'warning' ? 'var(--warn-border)' : 'var(--info-border)'}`,
-              padding: '16px 24px', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 16
-            }}>
-              <Megaphone size={20} color={duyuru.tur === 'danger' ? 'var(--danger)' : duyuru.tur === 'warning' ? 'var(--warn)' : 'var(--info)'} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{duyuru.baslik}</div>
-                <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>{duyuru.icerik}</div>
-              </div>
-            </div>
-          )}
-          {lisansBitisBanner?.seviye === 'deneme' && (
-            <div style={{
-              background: 'var(--accent-lighter)',
-              border: '1px solid var(--accent-light)',
-              padding: '14px 24px', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap'
-            }}>
-              <Sparkles size={20} color="var(--accent)" />
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Ücretsiz deneme sürümündesiniz</div>
-                <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>Tüm özellikleri <strong>{lisansBitisBanner.kalanGun} gün</strong> boyunca ücretsiz kullanabilirsiniz. Dilediğiniz zaman abone olabilirsiniz.</div>
-              </div>
-              <Link href="/odeme-yap" style={{ padding: '8px 16px', background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Planları Gör</Link>
-            </div>
-          )}
-          {lisansBitisBanner && lisansBitisBanner.seviye !== 'deneme' && (
-            <div style={{
-              background: lisansBitisBanner.seviye === 'kritik' ? 'var(--danger-light)' : 'var(--warn-light)',
-              border: `1px solid ${lisansBitisBanner.seviye === 'kritik' ? 'var(--danger-border)' : 'var(--warn-border)'}`,
-              padding: '16px 24px', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 16
-            }}>
-              <AlertTriangle size={20} color={lisansBitisBanner.seviye === 'kritik' ? 'var(--danger)' : 'var(--warn)'} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Lisans Süresi Uyarısı</div>
-                <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>Sistemi kesintisiz kullanmaya devam etmek için <strong>{lisansBitisBanner.kalanGun} gün</strong> içinde yenileme yapmalısınız.</div>
-              </div>
-              <Link href="/odeme-yap" style={{ padding: '8px 16px', background: lisansBitisBanner.seviye === 'kritik' ? 'var(--danger)' : 'var(--warn)', color: 'white', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Yenile</Link>
-            </div>
-          )}
+        {/* BİLDİRİMLER */}
+        {(duyuru || lisansBitisBanner || denetciDurumu === 'yok' || denetciDurumu === 'beklemede') && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {duyuru && (
+              <Banner
+                color={tone(duyuru.tur)}
+                bg={duyuru.tur === 'danger' ? 'var(--danger-light)' : duyuru.tur === 'warning' ? 'var(--warn-light)' : 'var(--info-light)'}
+                border={duyuru.tur === 'danger' ? 'var(--danger-border)' : duyuru.tur === 'warning' ? 'var(--warn-border)' : 'var(--info-border)'}
+                icon={<Megaphone size={16} />} title={duyuru.baslik}
+              >{duyuru.icerik}</Banner>
+            )}
+            {lisansBitisBanner?.seviye === 'deneme' && (
+              <Banner color="var(--accent)" bg="var(--accent-lighter)" border="#c9d4fa" icon={<Info size={16} />} title="Ücretsiz deneme sürümündesiniz."
+                action={<Link href="/odeme-yap" style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-dark)', textDecoration: 'underline' }}>Planları gör</Link>}
+              >Tüm özellikleri <strong>{lisansBitisBanner.kalanGun} gün</strong> boyunca ücretsiz kullanabilirsiniz.</Banner>
+            )}
+            {lisansBitisBanner && lisansBitisBanner.seviye !== 'deneme' && (
+              <Banner
+                color={lisansBitisBanner.seviye === 'kritik' ? 'var(--danger)' : 'var(--warn)'}
+                bg={lisansBitisBanner.seviye === 'kritik' ? 'var(--danger-light)' : 'var(--warn-light)'}
+                border={lisansBitisBanner.seviye === 'kritik' ? 'var(--danger-border)' : 'var(--warn-border)'}
+                icon={<AlertTriangle size={16} />} title="Lisans süresi uyarısı."
+                action={<Link href="/odeme-yap" className={`btn btn-sm ${lisansBitisBanner.seviye === 'kritik' ? 'btn-danger' : 'btn-warn'}`} style={{ textDecoration: 'none' }}>Yenile</Link>}
+              >Kesintisiz kullanım için <strong>{lisansBitisBanner.kalanGun} gün</strong> içinde yenileme yapmalısınız.</Banner>
+            )}
+            {denetciDurumu === 'yok' && (
+              <Banner color="var(--accent)" bg="var(--accent-lighter)" border="#c9d4fa" icon={<ShieldCheck size={16} />} title="Denetçi paneliniz henüz aktif değil."
+                action={<button onClick={openDenetciModal} className="btn btn-primary btn-sm">Talep oluştur</button>}
+              >İlinize ait denetim mekanizmasını başlatmak için talep oluşturabilirsiniz.</Banner>
+            )}
+            {denetciDurumu === 'beklemede' && (
+              <Banner color="var(--info)" bg="var(--info-light)" border="var(--info-border)" icon={<ShieldCheck size={16} />} title="Denetçi paneli talebi beklemede.">
+                Talebiniz inceleniyor, onaylandığında paneliniz aktif olacak.
+              </Banner>
+            )}
+          </div>
+        )}
 
-          {/* Denetçi Paneli — sadece aktif denetçi YOKSA göster */}
-          {denetciDurumu === 'yok' && (
-            <div style={{
-              background: 'var(--accent-lighter)',
-              border: '1px solid var(--accent-border)',
-              padding: '16px 24px', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 16
-            }}>
-              <ShieldCheck size={20} color="var(--accent)" />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Denetçi Paneliniz Henüz Aktif Değil</div>
-                <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>
-                  İlinize ait denetim mekanizmasını başlatmak ve denetçi panelini ücretsiz aktif etmek için talep oluşturabilirsiniz.
+        {/* KPI ŞERİDİ */}
+        <section style={{ ...panel, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+          {kpis.map((k, i) => (
+            <div key={k.label} style={{ padding: '16px 20px', borderLeft: i === 0 ? 'none' : '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12.5, color: 'var(--text3)', fontWeight: 500 }}>{k.label}</span>
+                <span className="tabular" style={chipStyle(k.chipOk)}>{k.chip}</span>
+              </div>
+              <div className="tabular" style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1.1, marginTop: 8, color: 'var(--text)' }}>{k.value}</div>
+              {k.bar >= 0 ? (
+                <div style={{ height: 4, borderRadius: 2, background: '#eef0f4', marginTop: 12, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(k.bar, 100)}%`, height: '100%', background: k.barColor, borderRadius: 2 }} />
                 </div>
-              </div>
-              <button
-                onClick={openDenetciModal}
-                style={{ padding: '8px 16px', background: 'var(--accent)', color: 'white', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
-              >
-                Talep Oluştur
-              </button>
+              ) : <div style={{ height: 4, marginTop: 12 }} />}
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text3)' }}>{k.sub}</div>
             </div>
-          )}
-          {denetciDurumu === 'beklemede' && (
-            <div style={{
-              background: 'var(--info-light)',
-              border: '1px solid var(--info-border)',
-              padding: '16px 24px', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 16
-            }}>
-              <ShieldCheck size={20} color="var(--info)" />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Denetçi Paneli Talebi Beklemede</div>
-                <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>
-                  Talebiniz yöneticilerimiz tarafından incelenmektedir. Onaylandığında paneliniz aktif olacaktır.
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+          ))}
+        </section>
 
-        {/* TOP STATS */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24, marginBottom: 32 }}>
-          {/* Tahsilat */}
-          <div style={{ background: 'var(--surface)', borderRadius: 24, padding: 28, border: '1px solid var(--border)', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 16, background: 'var(--success-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <TrendingUp size={24} color="var(--success)" />
-              </div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: tahsilatTrendi >= 0 ? 'var(--success)' : 'var(--danger)', background: tahsilatTrendi >= 0 ? 'var(--success-light)' : 'var(--danger-light)', padding: '4px 10px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
-                {tahsilatTrendi >= 0 ? <ArrowUpRight size={14} /> : <ArrowUpRight size={14} style={{ transform: 'rotate(90deg)' }} />}
-                {Math.abs(tahsilatTrendi)}%
-              </div>
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 1 }}>Tahsilat Verimi</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-              <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 32, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em' }}>%{tahsilatYuzdesi}</div>
-            </div>
-            <div style={{ marginTop: 16, height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{ width: `${tahsilatYuzdesi}%`, height: '100%', background: 'var(--success)', borderRadius: 3 }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, fontSize: 13, fontWeight: 600 }}>
-              <span style={{ color: 'var(--text)' }}>{fmtTL(toplamTahsilat)}</span>
-              <span style={{ color: 'var(--text3)' }}>Hedef: {fmtTL(toplamBeklenen)}</span>
-            </div>
-          </div>
-
-          {/* Kapasite */}
-          <div style={{ background: 'var(--surface)', borderRadius: 24, padding: 28, border: '1px solid var(--border)', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 16, background: 'var(--info-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Target size={24} color="var(--info)" />
-              </div>
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 1 }}>Kapasite Doluluğu</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-              <div style={{ fontFamily: '"Playfair Display", serif', fontSize: 32, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em' }}>%{kapasiteYuzdesi}</div>
-            </div>
-            <div style={{ marginTop: 16, height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{ width: `${kapasiteYuzdesi}%`, height: '100%', background: 'var(--info)', borderRadius: 3 }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, fontSize: 13, fontWeight: 600 }}>
-              <span style={{ color: 'var(--text)' }}>{aktifOgrenci} Öğrenci</span>
-              <span style={{ color: 'var(--text3)' }}>Max: {toplamKapasite}</span>
-            </div>
-          </div>
-
-          {/* Bordro */}
-          <div style={{ background: 'var(--surface)', borderRadius: 24, padding: 28, border: '1px solid var(--border)', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 16, background: bordroDurumu > 0 ? 'var(--success-light)' : 'var(--warn-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <FileText size={24} color={bordroDurumu > 0 ? 'var(--success)' : 'var(--warn)'} />
-              </div>
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 1 }}>Bordro Döngüsü</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', marginTop: 4, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-              {bordroDurumu > 0 ? 'Tahakkuk Edildi' : 'Hesaplama Bekleniyor'}
-            </div>
-            <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: bordroDurumu > 0 ? 'var(--success-light)' : 'var(--warn-light)', borderRadius: 12, border: `1px solid ${bordroDurumu > 0 ? 'var(--success-border)' : 'var(--warn-border)'}` }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: bordroDurumu > 0 ? 'var(--success)' : 'var(--warn)', animation: bordroDurumu === 0 ? 'pulse 2s infinite' : 'none' }} />
-              <div style={{ fontSize: 12, fontWeight: 700, color: bordroDurumu > 0 ? 'var(--success)' : 'var(--warn)' }}>
-                {bordroDurumu > 0 ? `${ayLabel(ay, yil)} Dönemi Onaylandı` : 'Veri girişi bekleniyor'}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* MAIN GRID: FINANCIAL & AGENDA */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 32, marginBottom: 32 }}>
-          
-          {/* FİNANSAL GRAFİK */}
-          <div style={{ background: 'var(--surface)', borderRadius: 28, padding: 32, border: '1px solid var(--border)', boxShadow: '0 4px 15px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
+        {/* GRAFİK + AKILLI TAKİP */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
+          <section style={{ ...panel, padding: '18px 20px', gridColumn: 'span 2', minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
               <div>
-                <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', margin: 0 }}>Finansal Akış Analizi</h3>
-                <p style={{ fontSize: 13, color: 'var(--text3)', marginTop: 4, margin: 0 }}>Son 6 aylık gelir-gider trendi</p>
+                <h3 style={panelTitle}>Finansal akış</h3>
+                <div style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 2 }}>Son 6 aylık gelir ve gider</div>
               </div>
-              <div style={{ display: 'flex', gap: 24 }}>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase' }}>Cari Net Bakiye</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: netBakiye >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmtTL(netBakiye)}</div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: 12, paddingBottom: 16 }}>
-              {(() => {
-                const last6Months = []
-                let tAy = ay, tYil = yil
-                for (let i = 0; i < 6; i++) { last6Months.push({ ay: tAy, yil: tYil }); tAy--; if (tAy === 0) { tAy = 12; tYil-- } }
-                const chartData = last6Months.reverse().map(m => {
-                  const mGelir = hareketler.filter(h => h.tur === 'gelir' && h.ay === m.ay && h.yil === m.yil).reduce((s, h) => s + Number(h.tutar), 0)
-                  const mGider = hareketler.filter(h => h.tur === 'gider' && h.ay === m.ay && h.yil === m.yil).reduce((s, h) => s + Number(h.tutar), 0)
-                  return { ...m, gelir: mGelir, gider: mGider }
-                })
-
-                let visibleBars: any[] = []
-                chartData.forEach(d => {
-                  visibleBars.push({ tutar: d.gelir, tur: 'gelir', label: ayLabel(d.ay, d.yil) })
-                  visibleBars.push({ tutar: d.gider, tur: 'gider', label: ayLabel(d.ay, d.yil) })
-                })
-
-                const maxVal = Math.max(...visibleBars.map(h => Number(h.tutar)), 1)
-
-                return visibleBars.map((h, i) => {
-                  const isGap = i > 0 && i % 2 === 0
-                  return (
-                    <div key={i} style={{
-                      flex: 1, height: `${Math.max((Number(h.tutar) / maxVal) * 100, 5)}%`,
-                      background: h.tur === 'gelir' ? 'linear-gradient(180deg, var(--accent-light) 0%, var(--accent) 100%)' : 'linear-gradient(180deg, var(--danger-border) 0%, var(--danger) 100%)',
-                      borderRadius: '8px 8px 4px 4px', position: 'relative', marginLeft: isGap ? 24 : 0, transition: 'all 0.2s', opacity: 0.9
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scaleY(1.02)' }}
-                    onMouseLeave={e => { e.currentTarget.style.opacity = '0.9'; e.currentTarget.style.transform = 'scaleY(1)' }}
-                    title={`${h.label} - ${h.tur === 'gelir' ? 'Gelir' : 'Gider'}: ${fmtTL(Number(h.tutar))}`}
-                    />
-                  )
-                })
-              })()}
-            </div>
-            
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 16, borderTop: '1px solid var(--surface2)', paddingTop: 16 }}>
-               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--text2)' }}>
-                 <div style={{ width: 12, height: 12, borderRadius: 4, background: 'var(--accent)' }} /> Gelirler
-               </div>
-               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--text2)' }}>
-                 <div style={{ width: 12, height: 12, borderRadius: 4, background: 'var(--danger)' }} /> Giderler
-               </div>
-            </div>
-          </div>
-
-          {/* SAĞ PANEL: UYARILAR & AJANDA */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            
-            {/* Akıllı Uyarılar */}
-            <div style={{ background: 'var(--surface)', borderRadius: 28, padding: 28, border: '1px solid var(--border)', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                <div style={{ width: 36, height: 36, background: 'var(--danger-light)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Bell size={18} color="var(--danger)" />
-                </div>
-                <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', margin: 0 }}>Akıllı Takip</h3>
-              </div>
-              
-              {uyarilar.length === 0 ? (
-                <div style={{ background: 'var(--surface2)', borderRadius: 16, padding: '24px', textAlign: 'center', border: '1px dashed var(--border)' }}>
-                  <CheckCircle2 size={28} color="var(--success)" style={{ margin: '0 auto 12px' }} />
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text2)' }}>Her Şey Yolunda</div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {uyarilar.map((u, i) => (
-                    <div key={i} style={{ padding: '16px', background: u.type === 'alert' ? 'var(--danger-light)' : u.type === 'warn' ? 'var(--warn-light)' : 'var(--info-light)', borderRadius: 16, borderLeft: `4px solid ${u.type === 'alert' ? 'var(--danger)' : u.type === 'warn' ? 'var(--warn)' : 'var(--info)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{u.text}</div>
-                      {u.link && <Link href={u.link} style={{ fontSize: 11, fontWeight: 800, color: u.type === 'alert' ? 'var(--danger)' : u.type === 'warn' ? 'var(--warn)' : 'var(--info)', textDecoration: 'none' }}>YÖNET →</Link>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Ajanda */}
-            <div style={{ background: 'var(--surface)', borderRadius: 28, padding: 28, border: '1px solid var(--border)', boxShadow: '0 4px 15px rgba(0,0,0,0.03)', flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                <div style={{ width: 36, height: 36, background: 'var(--info-light)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Calendar size={18} color="var(--info)" />
-                </div>
-                <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', margin: 0 }}>Tatiller</h3>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {(() => {
-                  const dbTatiller = tatiller.filter(t => new Date(t.bas).getMonth() + 1 === ay && new Date(t.bas).getFullYear() === yil).map(t => ({ ad: t.ad, gun: new Date(t.bas).getDate(), tip: 'Tatil / Etkinlik' }))
-                  const rtNames: Record<string, string> = { '01-01': 'Yılbaşı', '04-23': '23 Nisan Çocuk B.', '05-01': '1 Mayıs', '05-19': '19 Mayıs', '07-15': '15 Temmuz', '08-30': '30 Ağustos', '10-29': '29 Ekim' }
-                  const rtList = RESMI_TATILLER.filter(rt => Number(rt.split('-')[0]) === ay).map(rt => ({ ad: rtNames[rt] || 'Resmi Tatil', gun: Number(rt.split('-')[1]), tip: 'Resmi Tatil' }))
-                  const combined = [...dbTatiller, ...rtList].sort((a,b) => a.gun - b.gun).slice(0, 4)
-
-                  if (combined.length === 0) return <div style={{ fontSize: 13, color: 'var(--text3)' }}>Bu ay için kayıtlı tatil yok.</div>
-
-                  return combined.map((t, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', background: 'var(--bg)', borderRadius: 16, border: '1px solid var(--border-light)' }}>
-                      <div style={{ width: 40, height: 40, background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--accent)' }}>{t.gun}</span>
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.ad}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600 }}>{t.tip}</div>
-                      </div>
-                    </div>
-                  ))
-                })()}
+              <div style={{ display: 'flex', gap: 22, textAlign: 'right' }}>
+                <div><div style={{ fontSize: 11, color: 'var(--text3)' }}>Gelir</div><div className="tabular" style={{ fontSize: 15, fontWeight: 500, color: 'var(--accent)' }}>{tlTam(buAy.gelir)}</div></div>
+                <div><div style={{ fontSize: 11, color: 'var(--text3)' }}>Gider</div><div className="tabular" style={{ fontSize: 15, fontWeight: 500 }}>{tlTam(buAy.gider)}</div></div>
+                <div><div style={{ fontSize: 11, color: 'var(--text3)' }}>Net</div><div className="tabular" style={{ fontSize: 15, fontWeight: 500, color: buAyNet >= 0 ? 'var(--success)' : 'var(--danger)' }}>{buAyNet >= 0 ? '+' : '−'}{tlTam(Math.abs(buAyNet))}</div></div>
               </div>
             </div>
 
-          </div>
-        </div>
-
-        {/* BOTTOM SECTION: QUICK ACTIONS & PERSONNEL */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 32 }}>
-          
-          {/* Quick Actions (Grid 2x2) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-            {[
-              { label: 'Öğrenci Kaydı', icon: <PlusCircle size={22} />, color: 'var(--success)', bg: 'var(--success-light)', link: '/ogrenciler', desc: 'Yeni kayıt' },
-              { label: 'Tahsilat', icon: <TrendingUp size={22} />, color: 'var(--accent)', bg: 'var(--accent-lighter)', link: '/odeme', desc: 'Aidat alımı' },
-              { label: 'Bordro', icon: <FileText size={22} />, color: 'var(--warn)', bg: 'var(--warn-light)', link: '/bordro', desc: 'Maaş işlemleri' },
-              { label: 'Ayarlar', icon: <Settings size={22} />, color: 'var(--text2)', bg: 'var(--surface2)', link: '/ayarlar', desc: 'Parametreler' }
-            ].map((action, idx) => (
-              <Link key={idx} href={action.link} style={{ textDecoration: 'none' }}>
-                <div style={{
-                  background: 'var(--surface)', padding: '24px', borderRadius: 24, border: '1px solid var(--border)',
-                  display: 'flex', flexDirection: 'column', gap: 16, transition: 'all 0.2s',
-                  boxShadow: '0 4px 15px rgba(0,0,0,0.03)'
-                }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 10px 25px rgba(0,0,0,0.06)'; e.currentTarget.style.borderColor = 'var(--accent-light)' }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.03)'; e.currentTarget.style.borderColor = 'var(--border)' }}
-                >
-                  <div style={{ width: 48, height: 48, background: action.bg, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', color: action.color }}>
-                    {action.icon}
+            <div style={{ display: 'flex', marginTop: 18 }}>
+              <div className="tabular" style={{ width: 46, height: GRAFIK_H, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end', paddingRight: 10, fontSize: 10.5, color: 'var(--text3)' }}>
+                {[1, 0.75, 0.5, 0.25, 0].map(f => <span key={f}>{f === 0 ? '0' : kisalt(grafikMax * f)}</span>)}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ position: 'relative', height: GRAFIK_H }}>
+                  <div aria-hidden style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    {[0, 1, 2, 3].map(i => <div key={i} style={{ borderTop: '1px dashed var(--border)' }} />)}
+                    <div style={{ borderTop: '1px solid var(--border-strong)' }} />
                   </div>
-                  <div>
-                    <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)' }}>{action.label}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>{action.desc}</div>
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around' }}>
+                    {son6.map((d, i) => (
+                      <div key={`${d.ay}-${d.yil}`} style={{ display: 'flex', alignItems: 'flex-end', gap: 4 }} title={`${ayLabel(d.ay, d.yil)} · Gelir ${tlTam(d.gelir)} · Gider ${tlTam(d.gider)}`}>
+                        <div style={{ width: 24, height: Math.max((d.gelir / grafikMax) * GRAFIK_H, d.gelir > 0 ? 3 : 0), background: i === son6.length - 1 ? 'var(--accent)' : '#8ea3ee', borderRadius: '3px 3px 0 0' }} />
+                        <div style={{ width: 24, height: Math.max((d.gider / grafikMax) * GRAFIK_H, d.gider > 0 ? 3 : 0), background: '#c5cad3', borderRadius: '3px 3px 0 0' }} />
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </Link>
+                <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 8, fontSize: 11.5, color: 'var(--text3)' }}>
+                  {son6.map((d, i) => <span key={`l-${d.ay}-${d.yil}`} style={{ width: 52, textAlign: 'center', fontWeight: i === son6.length - 1 ? 600 : 400, color: i === son6.length - 1 ? 'var(--text)' : undefined }}>{ayLabel(d.ay, d.yil).split(' ')[0].slice(0, 3)}</span>)}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border-light)', fontSize: 12.5, color: 'var(--text2)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent)' }} />Gelirler</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#c5cad3' }} />Giderler</span>
+            </div>
+          </section>
+
+          <section style={{ ...panel, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={panelTitle}>Akıllı takip</h3>
+              {uyarilar.length > 0 && <span style={{ ...chipStyle(false) }}>{uyarilar.length} açık madde</span>}
+            </div>
+            {uyarilar.length === 0 ? (
+              <div style={{ padding: '28px 20px', textAlign: 'center', color: 'var(--text3)' }}>
+                <CheckCircle2 size={26} color="var(--success)" style={{ margin: '0 auto 8px' }} />
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Her şey yolunda</div>
+                <div style={{ fontSize: 12.5, marginTop: 2 }}>Şu an dikkat gerektiren bir madde yok.</div>
+              </div>
+            ) : uyarilar.map((u, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, padding: '14px 20px', borderBottom: '1px solid var(--border-light)', alignItems: 'center' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: tone(u.type), flexShrink: 0 }} />
+                <div style={{ flex: 1, fontWeight: 500, lineHeight: 1.4 }}>{u.text}</div>
+                {u.link && <Link href={u.link} style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>Yönet →</Link>}
+              </div>
             ))}
-          </div>
-
-          {/* Personnel Performance */}
-          <div style={{ background: 'var(--surface)', borderRadius: 28, padding: 32, border: '1px solid var(--border)', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 36, height: 36, background: 'var(--info-light)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Zap size={18} color="var(--info)" />
-                </div>
-                <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', margin: 0 }}>Aktif Personel Karnesi</h3>
-              </div>
-              <Link href="/bordro" style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)', textDecoration: 'none', padding: '8px 16px', background: 'var(--accent-lighter)', borderRadius: 10 }}>TÜMÜNÜ GÖR</Link>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {(() => {
-                const mapped = personel.map(p => ({
-                  ...p,
-                  pSaat: puantajlar.filter(x => x.personel_id === p.id && !tatilMi(ay, new Date(x.tarih).getDate(), yil, tatiller)).reduce((s, x) => s + (Number(x.saat) || 0), 0)
-                })).filter(p => p.pSaat > 0).sort((a, b) => b.pSaat - a.pSaat)
-
-                const maxSaat = Math.max(...mapped.map(p => p.pSaat), 1)
-
-                return mapped.slice(0, 4).map((p, idx) => (
-                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 8, background: idx === 0 ? 'var(--warn-light)' : 'var(--surface2)', color: idx === 0 ? 'var(--warn)' : 'var(--text3)', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {idx + 1}
-                    </div>
-                    <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}>
-                      <User size={18} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{p.ad}</div>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)' }}>{p.pSaat} <span style={{ fontSize: 10, color: 'var(--text3)' }}>SAAT</span></div>
-                      </div>
-                      <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
-                        <div style={{ width: `${(p.pSaat / maxSaat) * 100}%`, height: '100%', background: idx === 0 ? 'var(--warn)' : 'var(--accent)', borderRadius: 3 }} />
-                      </div>
-                    </div>
-                  </div>
-                ))
-              })()}
-            </div>
-          </div>
+          </section>
         </div>
 
+        {/* PERSONEL + HIZLI İŞLEMLER + TATİLLER */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16, alignItems: 'start' }}>
+          <section style={{ ...panel, gridColumn: 'span 2', overflow: 'hidden', minWidth: 0 }}>
+            <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
+              <h3 style={panelTitle}>Aktif personel karnesi</h3>
+              <Link href="/bordro" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>Tümünü gör →</Link>
+            </div>
+            {personelKarnesi.length === 0 ? (
+              <div style={{ padding: '28px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text3)' }}>Bu ay için puantaj girişi yok.</div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '32px 2fr 3fr 70px', gap: 12, padding: '8px 20px', background: '#f8f9fb', fontSize: 11, fontWeight: 600, letterSpacing: '0.7px', textTransform: 'uppercase', color: 'var(--text3)' }}>
+                  <span>#</span><span>Personel</span><span>Aylık ders saati</span><span style={{ textAlign: 'right' }}>Saat</span>
+                </div>
+                {personelKarnesi.map((p, idx) => (
+                  <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '32px 2fr 3fr 70px', gap: 12, padding: '11px 20px', borderTop: '1px solid var(--border-light)', alignItems: 'center' }}>
+                    <span className="tabular" style={{ fontSize: 12, color: 'var(--text3)' }}>{String(idx + 1).padStart(2, '0')}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                      <span style={{ width: 30, height: 30, borderRadius: '50%', background: '#eef0f4', color: 'var(--text2)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {String(p.ad || '?').split(' ').map((w: string) => w[0]).filter(Boolean).slice(0, 2).join('').toLocaleUpperCase('tr-TR')}
+                      </span>
+                      <span style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.ad}</span>
+                    </span>
+                    <span style={{ height: 6, background: '#eef0f4', borderRadius: 3, overflow: 'hidden' }}>
+                      <span style={{ display: 'block', height: '100%', width: `${(p.pSaat / maxSaat) * 100}%`, background: 'var(--accent)', borderRadius: 3 }} />
+                    </span>
+                    <span className="tabular" style={{ textAlign: 'right', fontWeight: 500 }}>{p.pSaat}</span>
+                  </div>
+                ))}
+              </>
+            )}
+          </section>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+            <section style={{ ...panel, padding: '16px 18px' }}>
+              <h3 style={{ ...panelTitle, marginBottom: 12 }}>Hızlı işlemler</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {[
+                  { label: 'Öğrenci kaydı', icon: <PlusCircle size={16} />, link: '/ogrenciler', desc: 'Yeni kayıt' },
+                  { label: 'Tahsilat', icon: <TrendingUp size={16} />, link: '/odeme', desc: 'Aidat alımı' },
+                  { label: 'Bordro', icon: <FileText size={16} />, link: '/bordro', desc: 'Maaş işlemleri' },
+                  { label: 'Ayarlar', icon: <Settings size={16} />, link: '/ayarlar', desc: 'Parametreler' },
+                ].map(a => (
+                  <Link key={a.link} href={a.link} className="sidebar-link" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 11px', border: '1px solid var(--border)', borderRadius: 8, background: '#fbfbfc', color: 'var(--text)' }}>
+                    <span style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--accent-lighter)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{a.icon}</span>
+                    <span style={{ minWidth: 0 }}><span style={{ display: 'block', fontWeight: 600, fontSize: 13 }}>{a.label}</span><span style={{ fontSize: 11.5, color: 'var(--text3)' }}>{a.desc}</span></span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+
+            <section style={{ ...panel, padding: '16px 18px' }}>
+              <h3 style={{ ...panelTitle, marginBottom: 6 }}>Bu ayın tatilleri</h3>
+              {tatilListesi.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--text3)', padding: '8px 0' }}>Bu ay için kayıtlı tatil yok.</div>
+              ) : tatilListesi.map((t, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderTop: i === 0 ? 'none' : '1px solid var(--border-light)' }}>
+                  <div style={{ width: 40, height: 44, border: '1px solid var(--border)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1.1, flexShrink: 0 }}>
+                    <span className="tabular" style={{ fontSize: 15, fontWeight: 500 }}>{t.gun}</span>
+                    <span style={{ fontSize: 9.5, letterSpacing: '0.6px', color: 'var(--text3)' }}>{ayKisa}</span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.ad}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text3)' }}>{t.tip}</div>
+                  </div>
+                </div>
+              ))}
+            </section>
+          </div>
+        </div>
       </div>
 
-      {/* Denetçi Talep Modalı */}
+      {/* Denetçi talep penceresi */}
       {showDenetciModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: 'var(--surface)', borderRadius: 24, padding: 32, width: '100%', maxWidth: 500, boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid var(--border)' }}>
-            <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 24, marginBottom: 8, color: 'var(--text)' }}>Denetçi Paneli Talebi</h2>
-            <p style={{ color: 'var(--text3)', fontSize: 14, marginBottom: 24 }}>İlinizdeki yetkili denetçinin (MEB/İl-İlçe Milli Eğitim) bilgilerini girerek panelin açılmasını talep edebilirsiniz.</p>
-            
-            <form onSubmit={handleTalepGonder} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* İl bilgisi */}
+        <div className="modal-overlay" style={{ zIndex: 1000 }}>
+          <div className="modal-box" style={{ padding: 24, maxWidth: 480 }}>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 600, margin: '0 0 4px', color: 'var(--text)' }}>Denetçi paneli talebi</h2>
+            <p style={{ color: 'var(--text3)', fontSize: 13, margin: '0 0 18px', lineHeight: 1.5 }}>İlinizdeki yetkili denetçinin (MEB / İl-İlçe Milli Eğitim) bilgilerini girerek panelin açılmasını talep edebilirsiniz.</p>
+
+            <form onSubmit={handleTalepGonder} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {okul?.il_id ? (
-                <div style={{ padding: '10px 14px', background: 'var(--success-light)', border: '1px solid var(--success-border)', borderRadius: 10, fontSize: 13, color: 'var(--text2)' }}>
-                  <span style={{ fontWeight: 700, color: 'var(--text)' }}>İl:</span> Sistem tarafından otomatik algılandı ✓
-                </div>
+                <div className="alert alert-success" style={{ marginBottom: 0 }}>İl sistem tarafından otomatik algılandı.</div>
               ) : (
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase' }}>İl <span style={{ color: 'var(--danger)' }}>*</span></label>
-                  <select
-                    required
-                    value={talepForm.il_id || ''}
-                    onChange={e => setTalepForm({ ...talepForm, il_id: Number(e.target.value) })}
-                    style={{ width: '100%', height: 44, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', padding: '0 12px' }}
-                  >
-                    <option value="">İl seçiniz...</option>
+                  <label className="form-label">İl <span style={{ color: 'var(--danger)' }}>*</span></label>
+                  <select required className="form-select" value={talepForm.il_id || ''} onChange={e => setTalepForm({ ...talepForm, il_id: Number(e.target.value) })}>
+                    <option value="">İl seçiniz…</option>
                     {iller.map(il => <option key={il.id} value={il.id}>{il.ad}</option>)}
                   </select>
                 </div>
               )}
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase' }}>Denetçi Ad Soyad</label>
-                <input 
-                  type="text" required
-                  value={talepForm.ad_soyad}
-                  onChange={e => setTalepForm({...talepForm, ad_soyad: e.target.value})}
-                  style={{ width: '100%', height: 44, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', padding: '0 12px' }}
-                />
+                <label className="form-label">Denetçi ad soyad</label>
+                <input type="text" required className="form-input" value={talepForm.ad_soyad} onChange={e => setTalepForm({ ...talepForm, ad_soyad: e.target.value })} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase' }}>E-Posta</label>
-                  <input 
-                    type="email" required
-                    value={talepForm.email}
-                    onChange={e => setTalepForm({...talepForm, email: e.target.value})}
-                    style={{ width: '100%', height: 44, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', padding: '0 12px' }}
-                  />
+                  <label className="form-label">E-posta</label>
+                  <input type="email" required className="form-input" value={talepForm.email} onChange={e => setTalepForm({ ...talepForm, email: e.target.value })} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase' }}>Telefon</label>
-                  <input 
-                    type="tel"
-                    value={talepForm.telefon}
-                    onChange={e => setTalepForm({...talepForm, telefon: e.target.value})}
-                    style={{ width: '100%', height: 44, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', padding: '0 12px' }}
-                  />
+                  <label className="form-label">Telefon</label>
+                  <input type="tel" className="form-input" value={talepForm.telefon} onChange={e => setTalepForm({ ...talepForm, telefon: e.target.value })} />
                 </div>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase' }}>Notlar (Opsiyonel)</label>
-                <textarea 
-                  rows={3}
-                  value={talepForm.notlar}
-                  onChange={e => setTalepForm({...talepForm, notlar: e.target.value})}
-                  style={{ width: '100%', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', padding: '12px' }}
-                  placeholder="Eklemek istediğiniz bilgiler..."
-                />
+                <label className="form-label">Notlar (isteğe bağlı)</label>
+                <textarea rows={3} className="form-input" value={talepForm.notlar} onChange={e => setTalepForm({ ...talepForm, notlar: e.target.value })} placeholder="Eklemek istediğiniz bilgiler…" />
               </div>
-              
-              <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
-                <button 
-                  type="button" 
-                  onClick={() => setShowDenetciModal(false)}
-                  style={{ flex: 1, height: 48, borderRadius: 12, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  Vazgeç
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={talepGonderiliyor}
-                  style={{ flex: 1, height: 48, borderRadius: 12, border: 'none', background: 'var(--accent)', color: 'white', fontWeight: 700, cursor: 'pointer', opacity: talepGonderiliyor ? 0.7 : 1 }}
-                >
-                  {talepGonderiliyor ? 'Gönderiliyor...' : 'Talebi Gönder'}
-                </button>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowDenetciModal(false)}>Vazgeç</button>
+                <button type="submit" className="btn btn-primary" disabled={talepGonderiliyor}>{talepGonderiliyor ? 'Gönderiliyor…' : 'Talebi gönder'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-      `}</style>
     </div>
   )
 }

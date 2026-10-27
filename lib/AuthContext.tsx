@@ -1,5 +1,5 @@
 'use client'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase'
 import { User, Session } from '@supabase/supabase-js'
 import { useRouter, usePathname } from 'next/navigation'
@@ -25,11 +25,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [okul, setOkul] = useState<Okul | null>(null)
   const [il, setIl] = useState<Il | null>(null)
   const [loading, setLoading] = useState(true)
+  // Aynı kullanıcı için profil/okul sorgularını tekrarlamamak için (getSession + onAuthStateChange + token yenileme)
+  const yuklenenUid = useRef<string | null>(null)
   const router = useRouter()
   const pathname = usePathname()
 
   const refresh = async () => {
-    if (user) await loadProfile(user.id)
+    if (user) await loadProfile(user.id, true)
   }
 
   // Realtime listener for school updates
@@ -62,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
       if (session?.user) loadProfile(session.user.id)
       else {
+        yuklenenUid.current = null
         setProfil(null)
         setOkul(null)
         setIl(null)
@@ -112,7 +115,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, profil, okul, loading, pathname, router])
 
-  async function loadProfile(uid: string) {
+  async function loadProfile(uid: string, zorla = false) {
+    if (!zorla && yuklenenUid.current === uid) return
+    yuklenenUid.current = uid
     try {
       const { data: pData, error: pErr } = await supabase
         .from('profiller')
@@ -121,18 +126,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single()
 
       if (pErr) {
+        yuklenenUid.current = null
         setLoading(false)
         return
       }
       setProfil(pData)
 
-      supabase
-        .from('profiller')
-        .update({ son_giris: new Date().toISOString() })
-        .eq('id', uid)
-        .then(({ error }) => {
-          if (error) console.error('Son giriş güncelleme hatası:', error)
-        })
+      // Son giriş yalnızca ilk yüklemede yazılır (yenilemede ve token tazelemede değil)
+      if (!zorla) {
+        supabase
+          .from('profiller')
+          .update({ son_giris: new Date().toISOString() })
+          .eq('id', uid)
+          .then(({ error }) => {
+            if (error) console.error('Son giriş güncelleme hatası:', error)
+          })
+      }
 
       if (pData?.rol === 'denetim_yetkilisi' && pData?.il_id) {
         // Denetim yetkilisi: il bilgisini yükle

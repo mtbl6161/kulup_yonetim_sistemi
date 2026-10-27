@@ -5,9 +5,10 @@ import { useAy } from '@/lib/AyContext'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { ayLabel, gunSayisi, haftaIciMi, tatilMi, fmtTL, AYLAR, fmt } from '@/lib/hesaplama'
+import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAc, PDF_RENK, PDF_KENAR } from '@/lib/pdf'
 import { Personel, Puantaj, Ayarlar, SinifDefteri, Tatil } from '@/lib/types'
 import ConfirmModal from '@/components/ConfirmModal'
-import { Printer, Download } from 'lucide-react'
+import { Download } from 'lucide-react'
 
 export default function PuantajPage() {
   const { ay, yil } = useAy()
@@ -49,59 +50,15 @@ export default function PuantajPage() {
 
   useEffect(() => { load() }, [load])
 
-  const handlePrint = useCallback(() => {
-    const printArea = document.querySelector('.print-area') as HTMLElement | null
-    if (!printArea) { window.print(); return }
-    printArea.style.removeProperty('zoom')
-    const table = printArea.querySelector('table') as HTMLElement | null
-    const naturalWidth = table ? table.scrollWidth : printArea.scrollWidth
-    const a4PrintWidth = 1075
-    const scale = Math.min(1, a4PrintWidth / naturalWidth)
-    if (scale < 1) printArea.style.zoom = scale.toFixed(4)
-    const cleanup = () => {
-      printArea.style.removeProperty('zoom')
-      window.removeEventListener('afterprint', cleanup)
-    }
-    window.addEventListener('afterprint', cleanup)
-    window.print()
-  }, [])
-
   const handlePdfDownload = async () => {
-    const { default: jsPDF } = await import('jspdf')
-    const { default: autoTable } = await import('jspdf-autotable')
-
-    async function loadFontB64(path: string) {
-      const res = await fetch(path)
-      const buf = await res.arrayBuffer()
-      const bytes = new Uint8Array(buf)
-      let binary = ''
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-      return btoa(binary)
-    }
-    const [regularB64, boldB64] = await Promise.all([
-      loadFontB64('/fonts/NotoSans-Regular.ttf'),
-      loadFontB64('/fonts/NotoSans-Bold.ttf'),
-    ])
-
-    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-    pdf.addFileToVFS('NotoSans-Regular.ttf', regularB64)
-    pdf.addFileToVFS('NotoSans-Bold.ttf',    boldB64)
-    pdf.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal', 'Identity-H')
-    pdf.addFont('NotoSans-Bold.ttf',        'NotoSans', 'bold',   'Identity-H')
-    pdf.setFont('NotoSans')
-
+    const { pdf, autoTable } = await pdfHazirla('landscape')
     const PW = pdf.internal.pageSize.getWidth()
-    const M  = 10
-
-    // Başlık
-    pdf.setFontSize(11)
-    pdf.setFont('NotoSans', 'bold')
-    pdf.setTextColor(0, 0, 0)
-    pdf.text(ayarlar?.kurum_adi?.toUpperCase() || 'ÇOCUK KULÜBÜ', PW / 2, 12, { align: 'center' })
-    
-    pdf.setFontSize(9)
-    pdf.setTextColor(0, 0, 0)
-    pdf.text(`${ayLabel(ay, yil).toUpperCase()} AYI RESMİ PUANTAJ CETVELİ (${activeType === 'kadrolu' ? 'KADROLU' : 'SGK\'LI'})`, PW / 2, 18, { align: 'center' })
+    const M = PDF_KENAR
+    const baslangicY = pdfBaslik(pdf, {
+      kurum: ayarlar?.kurum_adi,
+      baslik: `Resmî puantaj cetveli · ${activeType === 'kadrolu' ? 'Kadrolu' : "SGK'lı"}`,
+      alt: ayLabel(ay, yil),
+    })
 
     const daysInMonth = gunSayisi(yil, ay)
     const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1)
@@ -139,8 +96,8 @@ export default function PuantajPage() {
       content: d.toString(), 
       styles: { 
         halign: 'center', 
-        textColor: [0, 0, 0],
-        fillColor: !haftaIciMi(yil, ay, d) ? [245, 245, 245] : [255, 255, 255] 
+        textColor: !haftaIciMi(yil, ay, d) ? PDF_RENK.kapaliMetin : PDF_RENK.metin,
+        fillColor: !haftaIciMi(yil, ay, d) ? PDF_RENK.kapaliZemin : PDF_RENK.baslikZemin 
       } 
     }))
 
@@ -182,20 +139,17 @@ export default function PuantajPage() {
     }, 0)
 
     const foot: any[] = [[
-      { content: `OKUTULAN TOPLAM DERS SAATİ ( ${activeType.toUpperCase()} )`, colSpan: daysInMonth + 3, styles: { halign: 'right', fontStyle: 'bold', textColor: [0, 0, 0] } },
-      { content: totalAggregate.toString(), styles: { halign: 'center', fontStyle: 'bold', fillColor: [255, 255, 255], textColor: [0, 0, 0] } },
+      { content: `OKUTULAN TOPLAM DERS SAATİ ( ${activeType.toUpperCase()} )`, colSpan: daysInMonth + 3, styles: { halign: 'right', fontStyle: 'bold' } },
+      { content: totalAggregate.toString(), styles: { halign: 'center', fontStyle: 'bold' } },
       { content: '' }
     ]]
 
-    autoTable(pdf, {
+    autoTable(pdf, pdfTablo({
       head: [ROW1, ROW2],
       body,
       foot,
-      startY: 24,
-      margin: { top: M, left: M, right: M, bottom: M },
-      styles: { font: 'NotoSans', fontSize: 6.5, lineWidth: 0.1, lineColor: [40, 40, 40], cellPadding: 0.8, valign: 'middle', textColor: [0, 0, 0] },
-      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
-      footStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold' },
+      startY: baslangicY,
+      styles: { fontSize: 6.5, cellPadding: 0.8 },
       columnStyles: {
         0: { cellWidth: 6, halign: 'center' },
         1: { cellWidth: 30 },
@@ -213,62 +167,20 @@ export default function PuantajPage() {
           const dayIndex = data.column.index - 3
           const day = daysArray[dayIndex]
           if (day && !haftaIciMi(yil, ay, day)) {
-            data.cell.styles.fillColor = [245, 245, 245]
+            data.cell.styles.fillColor = PDF_RENK.kapaliZemin
           }
         }
       }
-    })
+    }))
 
-    const finalY = (pdf as any).lastAutoTable?.finalY || 150
-    const signY = finalY + 15
-    
-    const duzenleyenAdi   = ayarlar?.duzenleyen_adi   ?? '___________________'
-    const duzenleyenUnvan = ayarlar?.duzenleyen_unvani ?? 'Büro Personeli'
-    const onaylayanAdi    = ayarlar?.mudur_adi         ?? '___________________'
-    const onaylayanUnvan  = 'Okul Müdürü / Kulüp Başkanı'
+    pdfImza(pdf, {
+      duzenleyen_adi: ayarlar?.duzenleyen_adi,
+      duzenleyen_unvani: ayarlar?.duzenleyen_unvani || 'Büro Personeli',
+      mudur_adi: ayarlar?.mudur_adi,
+      mudur_unvani: ayarlar?.mudur_unvani || 'Okul Müdürü / Kulüp Başkanı',
+    }, pdfSonY(pdf, 150))
 
-    pdf.setFontSize(9)
-    pdf.setFont('NotoSans', 'bold')
-    pdf.setTextColor(0, 0, 0)
-    
-    // Blok Pozisyonları
-    const leftX = M + 40
-    const rightX = PW - M - 40
-
-    // — Sol blok: Düzenleyen —
-    pdf.text('DÜZENLEYEN', leftX, signY, { align: 'center' })
-    pdf.setFont('NotoSans', 'bold')
-    pdf.setFontSize(8.5)
-    pdf.text(duzenleyenAdi, leftX, signY + 7, { align: 'center' })
-    pdf.setFont('NotoSans', 'normal')
-    pdf.setFontSize(8)
-    pdf.text(duzenleyenUnvan, leftX, signY + 12, { align: 'center' })
-    pdf.setDrawColor(80, 80, 80)
-    pdf.setLineWidth(0.3)
-    pdf.line(M + 5, signY + 22, M + 75, signY + 22)
-    pdf.setFontSize(7)
-    pdf.text('(İmza)', leftX, signY + 27, { align: 'center' })
-
-    // — Sağ blok: Onaylayan —
-    pdf.setFont('NotoSans', 'bold')
-    pdf.setFontSize(9)
-    pdf.text('ONAYLAYAN', rightX, signY, { align: 'center' })
-    pdf.setFont('NotoSans', 'bold')
-    pdf.setFontSize(8.5)
-    pdf.text(onaylayanAdi, rightX, signY + 7, { align: 'center' })
-    pdf.setFont('NotoSans', 'normal')
-    pdf.setFontSize(8)
-    pdf.text(onaylayanUnvan, rightX, signY + 12, { align: 'center' })
-    pdf.setDrawColor(80, 80, 80)
-    pdf.setLineWidth(0.3)
-    pdf.line(PW - M - 75, signY + 22, PW - M - 5, signY + 22)
-    pdf.setFontSize(7)
-    pdf.text('(İmza)', rightX, signY + 27, { align: 'center' })
-
-    const blob = pdf.output('blob')
-    const url = URL.createObjectURL(blob)
-    window.open(url, '_blank')
-    setTimeout(() => URL.revokeObjectURL(url), 60000)
+    pdfAc(pdf, 'Puantaj cetveli')
   }
 
   const daysInMonth = gunSayisi(yil, ay)
@@ -370,7 +282,6 @@ export default function PuantajPage() {
             <button className="btn btn-secondary btn-sm no-print" onClick={syncFromClassNotebook} disabled={saving}>
               🔄 Sınıf Defterinden Getir
             </button>
-            <button className="btn btn-secondary btn-sm no-print" onClick={handlePrint}><Printer size={14} style={{ marginRight: 4 }} /> Yazdır</button>
             <button className="btn btn-pdf btn-sm no-print" onClick={handlePdfDownload}>
               <Download size={14} style={{ marginRight: 4 }} /> PDF İndir
             </button>

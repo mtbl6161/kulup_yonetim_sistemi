@@ -9,7 +9,6 @@ import {
   Calculator,
   Clock,
   GraduationCap,
-  Sparkles,
   AlertTriangle,
   CheckCircle2,
   Info,
@@ -426,7 +425,7 @@ export default function EgitimPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text)', margin: '0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sparkles size={18} color="var(--warn)" />
+                <Info size={18} color="var(--warn)" />
                 Mali Dağıtım Simülatörü
               </h3>
               <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px', margin: '0' }}>

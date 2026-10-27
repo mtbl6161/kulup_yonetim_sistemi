@@ -84,7 +84,7 @@ const CSS = `
 .bt-gelir>span{font-size:13.5px;font-weight:600;color:var(--tx2)}
 .bt-gelir input{font:inherit;font-size:17px;font-weight:700;padding:13px 16px;border:1px solid var(--line-2);
   border-radius:12px;background:var(--surf);color:var(--tx);outline:none;text-align:center}
-.bt-gelir input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(45,90,61,.13)}
+.bt-gelir input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(35,71,217,.13)}
 .bt-table{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--surf);
   box-shadow:0 20px 44px -32px rgba(30,66,41,.35)}
 .bt-head{display:grid;grid-template-columns:1fr 96px 1fr;gap:12px;padding:12px 18px;background:var(--g);color:#fff;

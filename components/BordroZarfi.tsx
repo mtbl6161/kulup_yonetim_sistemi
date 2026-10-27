@@ -23,7 +23,7 @@ export default function BordroZarfi({ row, ayarlar, ay, yil }: Props) {
       padding: '8mm',
       background: 'var(--surface)',
       color: 'var(--text)',
-      fontFamily: '"DM Sans", sans-serif',
+      fontFamily: 'var(--font-sans)',
       fontSize: '10px',
       border: '1px solid var(--border)',
       margin: '0 auto 8mm auto',
@@ -37,7 +37,7 @@ export default function BordroZarfi({ row, ayarlar, ay, yil }: Props) {
       {/* Üst Başlık ve Kurum Bilgisi */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, borderBottom: '1.5px solid var(--accent-lighter)', paddingBottom: 8 }}>
         <div>
-          <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 18, fontWeight: 700, color: 'var(--accent)', margin: 0 }}>{ayarlar.kurum_adi}</h2>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--accent)', margin: 0 }}>{ayarlar.kurum_adi}</h2>
           <div style={{ fontSize: 9, color: 'var(--text3)', marginTop: 1, maxWidth: 350 }}>{ayarlar.adres}</div>
         </div>
         <div style={{ textAlign: 'right' }}>

@@ -5,13 +5,14 @@ import SayiInput from '@/components/SayiInput'
 import { supabase } from '@/lib/supabase'
 import { Ayarlar, VergiDilimi, Tatil } from '@/lib/types'
 import { AYLAR, isGunuSayisi, gunEkle, KULUP_BASLANGIC_TATIL_AD } from '@/lib/hesaplama'
-import { 
-  Building2, 
-  Banknote, 
-  Scale, 
-  Calendar, 
-  Save, 
-  ShieldCheck, 
+import {
+  Building2,
+  Search,
+  Banknote,
+  Scale,
+  Calendar,
+  Save,
+  ShieldCheck,
   Info,
   Phone,
   Mail,
@@ -19,7 +20,6 @@ import {
   User,
   Hash,
   Calculator,
-  Zap,
   Trash2,
   Plus,
   Lock,
@@ -28,7 +28,10 @@ import {
   Globe,
   AlertTriangle,
   Key,
-  Clock
+  Clock,
+  Loader2,
+  FileCode2,
+  Download
 } from 'lucide-react'
 import ConfirmModal from '@/components/ConfirmModal'
 import { createCheckoutLink } from '@/lib/lemonsqueezy'
@@ -392,13 +395,26 @@ export default function AyarlarPage() {
   }
 
   const TABS = [
-    { id: 'kurumsal', label: 'Kurumsal Kimlik', icon: <Building2 size={18} /> },
-    { id: 'mali', label: 'Mali Parametreler', icon: <Banknote size={18} /> },
-    { id: 'vergi', label: 'Vergi Dilimleri', icon: <Scale size={18} /> },
-    { id: 'tatil', label: 'Tatil Takvimi', icon: <Calendar size={18} /> },
-    { id: 'lisans', label: 'Lisans & Ödeme', icon: <CreditCard size={18} /> },
-    { id: 'guvenlik', label: 'Güvenlik & Profil', icon: <ShieldCheck size={18} /> },
+    { id: 'kurumsal', label: 'Kurum bilgileri', desc: 'Adınız, adresiniz, yetkili kişiler, vergi ve SGK numaraları', kw: 'kurum ad adres telefon eposta müdür imza kaşe vergi sgk sicil bildirge', icon: <Building2 size={17} /> },
+    { id: 'mali', label: 'Ücret ve kesintiler', desc: 'Saat ücreti, asgari ücret, SGK ve damga vergisi oranları', kw: 'saat ücreti katsayı gösterge yemek maaş sgk damga asgari tavan istisna aidat', icon: <Banknote size={17} /> },
+    { id: 'vergi', label: 'Vergi dilimleri', desc: 'Yıllık vergi dilimleri ve oranları', kw: 'vergi dilim oran gelir yıllık', icon: <Scale size={17} /> },
+    { id: 'tatil', label: 'Takvim ve tatiller', desc: 'Kulübün başladığı gün, resmî ve özel tatiller', kw: 'tatil takvim başlangıç eğitim yılı bayram', icon: <Calendar size={17} /> },
+    { id: 'lisans', label: 'Abonelik', desc: 'Deneme süresi, lisans durumu, plan yenileme', kw: 'lisans abonelik ödeme plan deneme süre yenile fatura', icon: <CreditCard size={17} /> },
+    { id: 'guvenlik', label: 'Şifre', desc: 'Giriş şifrenizi değiştirin', kw: 'şifre parola güvenlik hesap profil', icon: <ShieldCheck size={17} /> },
   ]
+
+  // Ayarlarda arama + kurulum kontrol listesi
+  const [ayAra, setAyAra] = useState('')
+  const ayAraQ = ayAra.toLocaleLowerCase('tr-TR').trim()
+  const gorunenTabs = ayAraQ ? TABS.filter(t => (t.label + ' ' + t.desc + ' ' + t.kw).toLocaleLowerCase('tr-TR').includes(ayAraQ)) : TABS
+  const kurulum: { label: string; ok: boolean; tab: string }[] = [
+    { label: 'Kurum adı', ok: !!form.kurum_adi, tab: 'kurumsal' },
+    { label: 'Müdür / onaylayan kişi', ok: !!form.mudur_adi, tab: 'kurumsal' },
+    { label: 'Vergi ve SGK numaraları', ok: !!(form.vergi_no && form.sgk_no), tab: 'kurumsal' },
+    { label: 'Saat ücreti', ok: !!form.saat_ucreti, tab: 'mali' },
+    { label: 'Kulüp başlangıç tarihi', ok: !!kbMevcut, tab: 'tatil' },
+  ]
+  const kurulumTamam = kurulum.filter(k => k.ok).length
 
   const [passForm, setPassForm] = useState({ newP: '', confirmP: '' })
   const [passSaving, setPassSaving] = useState(false)
@@ -426,11 +442,11 @@ export default function AyarlarPage() {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       <Topbar
-        title="Kurum Ayarları"
-        sub="Sistem parametreleri ve kurumsal bilgiler"
+        title="Okul Ayarları"
+        sub="Kurum bilgilerinizi, ücretleri ve takvimi buradan yönetin"
         actions={
           <button className="btn btn-primary no-print" onClick={kaydet} disabled={saving}>
-            {saving ? <Zap size={16} className="animate-pulse" /> : <Save size={16} />}
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             {saving ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
           </button>
         }
@@ -439,24 +455,52 @@ export default function AyarlarPage() {
       <div style={{ padding: '24px 32px' }}>
         {msg && (
           <div className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: 24 }}>
-            {msg.type === 'success' ? <Zap size={18} /> : <Info size={18} />}
+            {msg.type === 'success' ? <CheckCircle2 size={18} /> : <Info size={18} />}
             {msg.text}
           </div>
         )}
 
-        <div className="tab-bar">
-          {TABS.map(t => (
-            <div 
-              key={t.id} 
-              className={`tab-item ${activeTab === t.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(t.id as any)}
-              style={{ display: 'flex', alignItems: 'center', gap: 8 }}
-            >
-              {t.icon}
-              {t.label}
-            </div>
-          ))}
+        {/* Bölüm sekmeleri: tek satır */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+          <div role="tablist" aria-label="Ayar bölümleri" style={{ display: 'flex', gap: 4, flex: 1, flexWrap: 'wrap' }}>
+            {gorunenTabs.map(t => {
+              const aktif = activeTab === t.id
+              return (
+                <button
+                  key={t.id}
+                  role="tab"
+                  aria-selected={aktif}
+                  title={t.desc}
+                  onClick={() => setActiveTab(t.id as any)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', marginBottom: -1, border: 'none', borderBottom: '2px solid ' + (aktif ? 'var(--accent)' : 'transparent'), background: 'none', cursor: 'pointer', fontSize: 14, fontWeight: aktif ? 600 : 500, color: aktif ? 'var(--text)' : 'var(--text3)', whiteSpace: 'nowrap' }}
+                >
+                  <span style={{ display: 'flex', color: aktif ? 'var(--accent)' : 'var(--text3)' }}>{t.icon}</span>
+                  {t.label}
+                </button>
+              )
+            })}
+            {gorunenTabs.length === 0 && <span style={{ fontSize: 13, color: 'var(--text3)', padding: '12px 4px' }}>“{ayAra}” ile eşleşen ayar bulunamadı.</span>}
+          </div>
+          <div style={{ position: 'relative', width: 230, marginBottom: 6 }}>
+            <Search size={15} style={{ position: 'absolute', left: 11, top: 10, color: 'var(--text3)' }} />
+            <input className="form-input" style={{ paddingLeft: 34, minHeight: 34 }} placeholder="Ayarlarda ara" aria-label="Ayarlarda ara" value={ayAra} onChange={e => setAyAra(e.target.value)} />
+          </div>
         </div>
+
+        {/* Seçili bölümün tek satır açıklaması */}
+        <p style={{ margin: '12px 0 16px', fontSize: 13.5, color: 'var(--text3)' }}>{TABS.find(t => t.id === activeTab)?.desc}</p>
+
+        {/* Eksik kurulum maddeleri: yalnızca eksik varsa */}
+        {kurulumTamam < kurulum.length && (
+          <div className="alert alert-info" style={{ alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 18 }}>
+            <Info size={16} style={{ flexShrink: 0 }} />
+            <span style={{ fontWeight: 600 }}>Kurulum {kurulumTamam}/{kurulum.length}</span>
+            <span>Eksik bilgiler:</span>
+            {kurulum.filter(k => !k.ok).map(k => (
+              <button key={k.label} onClick={() => setActiveTab(k.tab as any)} style={{ border: '1px solid #c9d4fa', background: '#fff', color: 'var(--accent-dark)', borderRadius: 99, padding: '2px 10px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>{k.label} →</button>
+            ))}
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: activeTab === 'mali' ? '1fr 340px' : '1fr', gap: 24, alignItems: 'start' }}>
           
@@ -464,7 +508,8 @@ export default function AyarlarPage() {
             {/* TAB 1: KURUMSAL KİMLİK */}
             {activeTab === 'kurumsal' && (
               <div className="card" style={{ margin: 0 }}>
-                <div className="card-title"><Building2 size={20} color="var(--accent)" /> Kurumsal Kimlik & İletişim</div>
+                <div className="card-title" style={{ marginBottom: 4 }}><Building2 size={20} color="var(--accent)" /> Kurum bilgileri</div>
+                <p style={{ fontSize: 13, color: 'var(--text3)', margin: '0 0 18px' }}>Bu bilgiler bordro, tahakkuk cetveli ve resmî evrakların üst kısmında yazdırılır. Boş bırakılan alanlar çıktıda boş görünür.</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                   <div style={{ gridColumn: 'span 2' }}>
                     <label htmlFor="ay-kurum-adi" className="form-label">Kurum Adı</label>
@@ -536,10 +581,12 @@ export default function AyarlarPage() {
                     <input id="ay-ssk-sube" className="form-input" value={form.ssk_sube || ''} onChange={e => setF('ssk_sube', e.target.value)} />
                   </div>
 
-                  <div style={{ gridColumn: 'span 2', padding: '16px', background: 'var(--bg2)', borderRadius: 12, marginTop: 10 }}>
-                    <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Zap size={16} color="var(--accent)" /> e-Bildirge (SGK XML) Parametreleri
-                    </h4>
+                  <details style={{ gridColumn: 'span 2', padding: '12px 16px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, marginTop: 6 }}>
+                    <summary style={{ fontSize: 13.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <FileCode2 size={15} color="var(--accent)" /> Gelişmiş: SGK e-Bildirge (XML) parametreleri
+                      <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text3)', marginLeft: 'auto' }}>Yalnızca SGK bildirge dosyası alacaksanız</span>
+                    </summary>
+                    <div style={{ height: 12 }} />
                     <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 12 }}>
                       <div>
                         <label htmlFor="ay-sgk-sicil-no" className="form-label">Tam Sicil No (21 Hane)</label>
@@ -563,7 +610,7 @@ export default function AyarlarPage() {
                       </div>
                     </div>
                     <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10 }}>* Bu bilgiler SGK e-Bildirge XML dosyası oluşturulurken kullanılır.</p>
-                  </div>
+                  </details>
 
                   <div style={{ gridColumn: 'span 2' }}>
                     <label htmlFor="ay-imza-url" className="form-label">Dijital İmza / Kaşe Görsel URL</label>
@@ -578,7 +625,8 @@ export default function AyarlarPage() {
             {activeTab === 'mali' && (
               <div className="flex flex-col gap-6">
                 <div className="card" style={{ margin: 0 }}>
-                  <div className="card-title"><Calculator size={20} color="var(--accent)" /> MEB Saat Ücreti Hesaplama Parametreleri</div>
+                  <div className="card-title" style={{ marginBottom: 4 }}><Calculator size={20} color="var(--accent)" /> Saat ücreti</div>
+                  <p style={{ fontSize: 13, color: 'var(--text3)', margin: '0 0 14px' }}>Öğrenci aidatı ve öğretmen ek ders ücreti bu ücretten hesaplanır. Sağdaki özet değerleri değiştirdikçe güncellenir.</p>
                   <div className="alert alert-info">
                     <Info size={18} />
                     <span>MEB 1706 formülü: <strong>(Gösterge × Katsayı) / Bölen</strong> olarak hesaplanır. Yemek hizmeti varsa bölen 3, yoksa 4 alınır.</span>
@@ -623,7 +671,8 @@ export default function AyarlarPage() {
                 </div>
 
                 <div className="card" style={{ margin: 0 }}>
-                  <div className="card-title"><ShieldCheck size={20} color="var(--success)" /> SGK & Vergi Kesinti Oranları</div>
+                  <div className="card-title" style={{ marginBottom: 4 }}><ShieldCheck size={20} color="var(--success)" /> SGK ve vergi kesintileri</div>
+                  <p style={{ fontSize: 13, color: 'var(--text3)', margin: '0 0 18px' }}>Bordro hesabında kesinti olarak uygulanır. Rakamlar her yıl başında değişir; resmî Gazete’deki güncel değerleri girin.</p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>
                     <div>
                       <label htmlFor="ay-asgari-ucret" className="form-label">Asgari Brüt Ücret</label>
@@ -681,7 +730,7 @@ export default function AyarlarPage() {
                         }))
                       }
                     }}>
-                      <Zap size={14} /> 2026 Dilimlerini Yükle
+                      <Download size={14} /> 2026 Dilimlerini Yükle
                     </button>
                     <button className="btn btn-secondary btn-sm" onClick={() => {
                       const d = [...(form.vergi_dilimleri || [])]
@@ -845,7 +894,7 @@ export default function AyarlarPage() {
                               <span className={`badge ${t.tip === 'idari' ? 'badge-orange' : 'badge-green'}`} style={{ fontSize: 10 }}>
                                 {t.tip === 'idari' ? 'İdari' : 'Özel'}
                               </span>
-                              <button className="btn btn-danger btn-sm" style={{ padding: '2px 6px' }} onClick={() => tatilSil(t.id)}><Trash2 size={11} /></button>
+                              <button className="btn btn-outline-danger btn-icon" title="Sil" style={{ width: 28, height: 28, minHeight: 28 }} onClick={() => tatilSil(t.id)}><Trash2 size={11} /></button>
                             </div>
                           </div>
                         ))
@@ -993,7 +1042,7 @@ export default function AyarlarPage() {
                         border: 'none',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
-                        boxShadow: '0 4px 12px rgba(45, 90, 61, 0.2)'
+                        boxShadow: '0 4px 12px rgba(35,71,217, 0.2)'
                       }}
                     >
                       {checkoutLoading ? 'Bağlantı Hazırlanıyor...' : 'Hemen Güvenli Öde'}
@@ -1073,7 +1122,7 @@ export default function AyarlarPage() {
           {/* SİDEBAR SUMMARY (Özellikle Mali Sekmesinde Aktif) */}
           {activeTab === 'mali' && (
             <div style={{ position: 'sticky', top: 24 }}>
-              <div className="card" style={{ background: 'var(--accent)', color: 'white', border: 'none', boxShadow: '0 8px 30px rgba(45,90,61,0.2)' }}>
+              <div className="card" style={{ background: 'var(--accent-lighter)', color: 'var(--text)', border: '1px solid #c9d4fa' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, opacity: 0.9 }}>
                   <Calculator size={20} />
                   <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Hesaplama Özeti</span>
@@ -1081,18 +1130,18 @@ export default function AyarlarPage() {
                 
                 <div style={{ marginBottom: 24 }}>
                   <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 4 }}>Hesaplanan Saat Ücreti</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, fontFamily: 'Playfair Display, serif' }}>₺{sUcret}</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, fontFamily: 'var(--font-display)' }}>₺{sUcret}</div>
                   <div style={{ fontSize: 12, opacity: 0.85, marginTop: 6 }}>
                     Aidatta uygulanan: <strong>₺{form.saat_ucreti != null ? Number(form.saat_ucreti).toFixed(2) : '—'}</strong>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderBottom: '1px solid rgba(35,71,217,0.14)', paddingBottom: 8 }}>
                     <span style={{ opacity: 0.8 }}>Bölen Katsayısı</span>
                     <span className="fw-600">{form.yemek ? '3 (Yemekli)' : '4 (Yemeksiz)'}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderBottom: '1px solid rgba(35,71,217,0.14)', paddingBottom: 8 }}>
                     <span style={{ opacity: 0.8 }}>Günlük Çalışma</span>
                     <span className="fw-600">{form.gunluk_saat} Saat</span>
                   </div>
@@ -1102,8 +1151,8 @@ export default function AyarlarPage() {
                   </div>
                 </div>
 
-                <div style={{ marginTop: 24, padding: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11, lineHeight: 1.5 }}>
-                  <Zap size={14} style={{ marginBottom: 6 }} />
+                <div style={{ marginTop: 24, padding: '12px', background: 'rgba(35,71,217,0.14)', borderRadius: 8, fontSize: 11, lineHeight: 1.5 }}>
+                  <Info size={14} style={{ marginBottom: 6 }} />
                   Katsayı veya gösterge değerlerini değiştirdiğinizde bu alan anlık olarak güncellenir.
                 </div>
               </div>

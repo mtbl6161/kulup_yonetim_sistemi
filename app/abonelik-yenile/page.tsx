@@ -2,8 +2,15 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import {
-  RefreshCw, CheckCircle2, ShieldAlert, Zap,
-  ArrowRight, Lock, LogOut, Loader2, Calendar, AlertTriangle
+  RefreshCw,
+  CheckCircle2,
+  ShieldAlert,
+  ArrowRight,
+  Lock,
+  LogOut,
+  Loader2,
+  Calendar,
+  AlertTriangle
 } from 'lucide-react'
 
 const AYLIK = 750
@@ -55,7 +62,7 @@ function AbonelikYenileIc() {
 
         {/* Uyarı Başlığı */}
         <div style={alertBoxStyle}>
-          <AlertTriangle size={18} color="#c8832a" />
+          <AlertTriangle size={18} color="#C77D00" />
           <span style={{ color: '#7a4f10', fontSize: 13, fontWeight: 600 }}>
             Aboneliğinizin süresi doldu
           </span>
@@ -79,7 +86,7 @@ function AbonelikYenileIc() {
               ...toggleBtnStyle,
               background: secDonem === d ? 'var(--accent)' : 'transparent',
               color: secDonem === d ? '#fff' : 'var(--text2)',
-              boxShadow: secDonem === d ? '0 4px 10px rgba(45, 90, 61, 0.2)' : 'none',
+              boxShadow: secDonem === d ? '0 4px 10px rgba(35,71,217, 0.2)' : 'none',
             }}>
               {d === 'month' ? 'Aylık' : 'Yıllık'}
               {d === 'year' && <span style={badgeStyle}>%20 Tasarruf</span>}
@@ -117,7 +124,7 @@ function AbonelikYenileIc() {
           disabled={loading}
           style={payBtnStyle}
         >
-          {loading ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
+          {loading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
           <span style={{ flex: 1, textAlign: 'center' }}>
             {loading ? 'Yönlendiriliyor...' : 'Aboneliği Yenile'}
           </span>
@@ -153,7 +160,7 @@ function AbonelikYenileIc() {
 // ── STYLES ────────────────────────────────────────────
 const wrapStyle: React.CSSProperties = {
   minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'var(--bg)', padding: '20px 16px', fontFamily: '"DM Sans", sans-serif',
+  background: 'var(--bg)', padding: '20px 16px', fontFamily: 'var(--font-sans)',
   overflowY: 'auto'
 }
 
@@ -177,7 +184,7 @@ const iconBoxStyle: React.CSSProperties = {
 }
 
 const h1Style: React.CSSProperties = {
-  fontFamily: '"Playfair Display", serif',
+  fontFamily: 'var(--font-display)',
   fontSize: 22, fontWeight: 700, color: 'var(--text)', marginBottom: 4, marginTop: 0
 }
 
@@ -222,7 +229,7 @@ const payBtnStyle: React.CSSProperties = {
   width: '100%', minHeight: 52, borderRadius: 14, background: 'var(--accent)',
   color: '#fff', fontSize: 14, fontWeight: 700, border: 'none',
   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
-  padding: '0 20px', boxShadow: '0 8px 20px rgba(45, 90, 61, 0.15)'
+  padding: '0 20px', boxShadow: '0 8px 20px rgba(35,71,217, 0.15)'
 }
 
 const secureInfoStyle: React.CSSProperties = {

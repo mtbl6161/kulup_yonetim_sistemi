@@ -10,7 +10,8 @@ import {
   tahakkukDagitimHesapla, detectActiveCategories, bordroHesapla
 } from '@/lib/hesaplama'
 import { Ayarlar } from '@/lib/types'
-import { Printer } from 'lucide-react'
+import { FileDown } from 'lucide-react'
+import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAc, PDF_RENK, PDF_KENAR } from '@/lib/pdf'
 
 const TAVAN_KATEGORILER = [
   { label: 'Başkan',                    gorev: 'Başkan',              sgkLi: false },
@@ -80,33 +81,6 @@ export default function BilancoPage() {
   }, [ay, yil, okul?.id])
 
   useEffect(() => { load() }, [load])
-
-  const handlePrint = useCallback(() => {
-    const printArea = document.querySelector('.print-area') as HTMLElement | null
-    if (!printArea) { window.print(); return }
-
-    // Önceki zoom değerini temizle
-    printArea.style.removeProperty('zoom')
-
-    // Tablonun gerçek genişliğini (overflow dahil) ölç
-    const table = printArea.querySelector('table') as HTMLElement | null
-    const naturalWidth = table ? table.scrollWidth : printArea.scrollWidth
-
-    // A4 yatay baskı alanı: ~1075px (96 dpi)
-    const a4PrintWidth = 1075
-    const scale = Math.min(1, a4PrintWidth / naturalWidth)
-
-    if (scale < 1) {
-      printArea.style.zoom = scale.toFixed(4)
-    }
-
-    const cleanup = () => {
-      printArea.style.removeProperty('zoom')
-      window.removeEventListener('afterprint', cleanup)
-    }
-    window.addEventListener('afterprint', cleanup)
-    window.print()
-  }, [])
 
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -180,6 +154,75 @@ export default function BilancoPage() {
     return { ...kat, yuzde, brut, net }
   })
 
+  const handlePdf = async () => {
+    const { pdf, autoTable } = await pdfHazirla('portrait')
+    const W = pdf.internal.pageSize.getWidth()
+    let y = pdfBaslik(pdf, {
+      kurum: ayarlar.kurum_adi,
+      baslik: 'Çocuk kulübü bilançosu',
+      alt: `01 ${AYLAR[ay]} ${yil} – ${sonGun} ${AYLAR[ay]} ${yil} tarihleri arası`,
+    })
+
+    // Parametreler: başlık/değer çiftleri, iki satır × altı sütun
+    const parametre = (basliklar: string[], degerler: string[]) => [
+      basliklar.map(b => ({ content: b, styles: { fillColor: PDF_RENK.baslikZemin, fontStyle: 'bold' as const, fontSize: 6, textColor: PDF_RENK.ikincil } })),
+      degerler.map(d => ({ content: d, styles: { fontStyle: 'bold' as const, fontSize: 9 } })),
+    ]
+    autoTable(pdf, pdfTablo({
+      body: [
+        ...parametre(
+          ['Aylıklar için belirlenen katsayı', 'Gündüz öğretimi göstergesi', 'Belirlenebilecek en az saat ücreti', 'Belirlenebilecek en çok saat ücreti', 'Belirlenen 1 saat ücreti', 'En yüksek devlet memuru brüt aylığı'],
+          [bKatsayi.toFixed(6), String(bGosterge), fmt(bEnAz), fmt(bEnCok), fmt(ayarlar.saat_ucreti), fmtTL(bEnYuksekMemur)],
+        ),
+        ...parametre(
+          ['Öğrenci sayısı', 'Şube sayısı', 'Aylık iş günü sayısı', 'Günlük ders saat sayısı', 'Aylık ders saati ve koordinatörlük toplamı', 'Aylık ücret toplamı'],
+          [String(ogrenciSayisi), String(subeSayisi), String(isGunu), String(bGunlukSt), String(bToplamSt), fmt(toplamGelir)],
+        ),
+      ],
+      startY: y,
+      styles: { halign: 'center', valign: 'middle', cellPadding: 1.6 },
+    }))
+    y = pdfSonY(pdf) + 6
+
+    // Aylık tahakkuk
+    pdf.setFont('NotoSans', 'bold'); pdf.setFontSize(8.5)
+    pdf.text('AYLIK TAHAKKUK TOPLAMI', PDF_KENAR, y)
+    autoTable(pdf, pdfTablo({
+      head: [['Kategori', '%', 'Tutar (TL)']],
+      body: tahakkukSatirlari.map(r => [r.label, `%${r.yuzde}`, fmtTL(r.tutar)]),
+      foot: [['Toplam', '', fmtTL(toplamGelir)]],
+      startY: y + 2,
+      columnStyles: { 1: { halign: 'center', cellWidth: 18 }, 2: { halign: 'right', cellWidth: 40 } },
+      didParseCell: (d) => { if (d.section !== 'body' && d.column.index > 0) d.cell.styles.halign = d.column.index === 1 ? 'center' : 'right' },
+    }))
+    y = pdfSonY(pdf) + 6
+
+    // Net ve brüt tavanlar yan yana
+    const yarim = (W - 2 * PDF_KENAR - 6) / 2
+    const tavanTablo = (baslik: string, sutun: string, deger: (k: typeof tavanHesaplari[number]) => number, sol: number) => {
+      pdf.setFont('NotoSans', 'bold'); pdf.setFontSize(8.5)
+      pdf.text(baslik, sol, y)
+      autoTable(pdf, pdfTablo({
+        head: [['Görevi', 'Oran', sutun]],
+        body: tavanHesaplari.map(k => [k.label, `%${k.yuzde}`, fmtTL(deger(k))]),
+        startY: y + 2,
+        margin: { left: sol, right: W - sol - yarim },
+        tableWidth: yarim,
+        columnStyles: { 1: { halign: 'center', cellWidth: 14 }, 2: { halign: 'right', cellWidth: 30 } },
+        didParseCell: (d) => { if (d.section === 'head' && d.column.index > 0) d.cell.styles.halign = d.column.index === 1 ? 'center' : 'right' },
+      }))
+      return pdfSonY(pdf)
+    }
+    const son1 = tavanTablo('EN FAZLA ÖDENECEK NET ÜCRETLER', 'Net ücret', k => k.net, PDF_KENAR)
+    const son2 = tavanTablo('EN FAZLA ÖDENECEK BRÜT ÜCRETLER', 'Brüt ücret', k => k.brut, PDF_KENAR + yarim + 6)
+
+    pdfImza(pdf, {
+      ...ayarlar,
+      mudur_unvani: ayarlar.mudur_unvani || 'Okul Müdürü / Kulüp Başkanı',
+    }, Math.max(son1, son2))
+    pdfAc(pdf, 'Bilanço')
+  }
+
   // Stiller
   const thS: React.CSSProperties = { fontSize: 10, padding: '5px 8px', textAlign: 'center', background: '#f0e6d2', border: '1px solid #ccc', fontWeight: 700, color: '#333' }
   const tdS: React.CSSProperties = { fontSize: 10, padding: '4px 8px', border: '1px solid #ddd' }
@@ -196,11 +239,11 @@ export default function BilancoPage() {
         actions={
           <button 
             className="btn btn-secondary btn-sm no-print" 
-            onClick={handlePrint}
+            onClick={handlePdf}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
-            <Printer size={16} />
-            <span>Yazdır</span>
+            <FileDown size={16} />
+            <span>PDF</span>
           </button>
         }
       />
@@ -268,7 +311,7 @@ export default function BilancoPage() {
 
           {/* AYLIK TAHAKKUK TABLOSU */}
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, background: 'var(--accent)', color: '#fff', padding: '5px 10px', marginBottom: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, background: 'var(--th-bg)', color: 'var(--th-fg)', padding: '5px 10px', marginBottom: 0 }}>
               AYLIK TAHAKKUK TOPLAMI
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>

@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
+import { pdfHazirla, pdfBaslik, pdfTablo, pdfAc, PDF_RENK, PDF_KENAR } from '@/lib/pdf'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { ayLabel, fmtTL, AYLAR } from '@/lib/hesaplama'
@@ -615,30 +616,17 @@ export default function TahsilatTakipPage() {
     if (rListe.length === 0) { setPdfMsg('⚠️ Bu filtrede öğrenci yok.'); setTimeout(() => setPdfMsg(''), 3000); return }
     setPdfMsg('⌛ PDF hazırlanıyor...')
     try {
-      const { default: jsPDF } = await import('jspdf')
-      const { default: autoTable } = await import('jspdf-autotable')
-      async function loadFontB64(path: string) {
-        const res = await fetch(path); const buf = await res.arrayBuffer(); const bytes = new Uint8Array(buf)
-        let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]); return btoa(bin)
-      }
-      const [reg, bold] = await Promise.all([loadFontB64('/fonts/NotoSans-Regular.ttf'), loadFontB64('/fonts/NotoSans-Bold.ttf')])
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-      pdf.addFileToVFS('NotoSans-Regular.ttf', reg); pdf.addFileToVFS('NotoSans-Bold.ttf', bold)
-      pdf.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal', 'Identity-H')
-      pdf.addFont('NotoSans-Bold.ttf', 'NotoSans', 'bold', 'Identity-H')
-      pdf.setFont('NotoSans')
+      const { pdf, autoTable } = await pdfHazirla('portrait')
       const PW = pdf.internal.pageSize.getWidth()
       const donemLabel = rDonemler.find(d => d.key === rDonem)?.label || rDonem
-      const baslikEk = rDurum === 'odeyen' ? 'Ödeyenler' : rDurum === 'odemeyen' ? 'Ödemeyenler' : rDurum === 'geciken' ? 'Vadesi Geçenler' : 'Ödeme Durumu'
-      pdf.setFont('NotoSans', 'bold'); pdf.setFontSize(13)
-      pdf.text(ayarlar?.kurum_adi || 'ÇOCUK KULÜBÜ', PW / 2, 14, { align: 'center' })
-      pdf.setFontSize(11)
-      pdf.text(`${rKategori.ad} — ${baslikEk} Listesi`, PW / 2, 21, { align: 'center' })
-      pdf.setFont('NotoSans', 'normal'); pdf.setFontSize(9)
-      const turEk = turFiltre === 'kulup' ? '   |   Kulüp öğrencileri' : turFiltre === 'okul' ? '   |   Okul öğrencileri' : ''
-      const ozetMetin = `Ödeyen: ${rOdeyenSayisi}   |   ${rPlanVar ? `Kısmi: ${rKismiSayisi}   |   ` : ''}Ödemeyen: ${borclular.length - rKismiSayisi}   |   Toplam: ${rUyeler.length}`
-      pdf.text(`Dönem: ${donemLabel}${rSinif ? '   |   Sınıf: ' + rSinif : ''}${turEk}   |   ${ozetMetin}`, PW / 2, 27, { align: 'center' })
-      const startY = 32
+      const baslikEk = rDurum === 'odeyen' ? 'Ödeyenler' : rDurum === 'odemeyen' ? 'Ödemeyenler' : rDurum === 'geciken' ? 'Vadesi geçenler' : 'Ödeme durumu'
+      const turEk = turFiltre === 'kulup' ? ' · Kulüp öğrencileri' : turFiltre === 'okul' ? ' · Okul öğrencileri' : ''
+      let startY = pdfBaslik(pdf, { kurum: ayarlar?.kurum_adi, baslik: `${rKategori.ad} · ${baslikEk} listesi`, alt: `Dönem: ${donemLabel}${rSinif ? ' · Sınıf: ' + rSinif : ''}${turEk}` })
+      const ozetMetin = `Ödeyen: ${rOdeyenSayisi}  ·  ${rPlanVar ? `Kısmi: ${rKismiSayisi}  ·  ` : ''}Ödemeyen: ${borclular.length - rKismiSayisi}  ·  Toplam: ${rUyeler.length}`
+      pdf.setFont('NotoSans', 'normal'); pdf.setFontSize(8); pdf.setTextColor(...PDF_RENK.ikincil)
+      pdf.text(ozetMetin, PW / 2, startY, { align: 'center' })
+      pdf.setTextColor(...PDF_RENK.metin)
+      startY += 3
 
       const durumYazi = (d: RDurumu) => d === 'odedi' ? 'ÖDEDİ' : d === 'kismi' ? 'KISMİ' : 'ÖDEMEDİ'
       const body = rListe.map((x, i) => [
@@ -652,24 +640,21 @@ export default function TahsilatTakipPage() {
         durumYazi(x.durum) + (x.geciken > 0 ? `\n(${x.geciken} gecikmiş)` : ''),
       ])
       const durumKol = rPlanVar ? 9 : 6
-      autoTable(pdf, {
-        head: [['SIRA', 'Kimlik No', 'Öğrenci Adı Soyadı', 'Sınıfı', 'Öğretmeni', 'Türü', ...(rPlanVar ? ['Ödeme', 'Ödenen', 'Kalan'] : []), 'Durum']],
+      autoTable(pdf, pdfTablo({
+        head: [['Sıra', 'Kimlik No', 'Öğrenci adı soyadı', 'Sınıfı', 'Öğretmeni', 'Türü', ...(rPlanVar ? ['Ödeme', 'Ödenen', 'Kalan'] : []), 'Durum']],
         body, startY,
-        styles: { font: 'NotoSans', fontSize: rPlanVar ? 7.5 : 9, cellPadding: rPlanVar ? 1.5 : 2, lineColor: [210, 210, 210], lineWidth: 0.1, halign: 'center', valign: 'middle' },
-        headStyles: { font: 'NotoSans', fontStyle: 'bold', fillColor: [45, 90, 61], textColor: [255, 255, 255], halign: 'center' },
+        styles: { fontSize: rPlanVar ? 7.5 : 8.5, cellPadding: rPlanVar ? 1.4 : 1.8, halign: 'center' },
         columnStyles: rPlanVar
           ? { 0: { cellWidth: 9 }, 1: { cellWidth: 22 }, 2: { halign: 'left' }, 3: { cellWidth: 12 }, 5: { cellWidth: 12 }, 6: { cellWidth: 17 }, 7: { cellWidth: 18, halign: 'right' }, 8: { cellWidth: 18, halign: 'right' }, 9: { cellWidth: 20, fontStyle: 'bold' } }
           : { 0: { cellWidth: 12 }, 1: { cellWidth: 28 }, 2: { halign: 'left' }, 3: { cellWidth: 16 }, 5: { cellWidth: 16 }, 6: { cellWidth: 22, fontStyle: 'bold' } },
         didParseCell: (d: any) => {
           if (d.section === 'body' && d.column.index === durumKol) {
             const raw = String(d.cell.raw)
-            d.cell.styles.textColor = raw.startsWith('ÖDEDİ') ? [26, 122, 58] : raw.startsWith('KISMİ') ? [196, 120, 20] : [192, 57, 43]
+            d.cell.styles.textColor = raw.startsWith('ÖDEDİ') ? [11, 107, 66] : raw.startsWith('KISMİ') ? [138, 82, 0] : PDF_RENK.hata
           }
         },
-        theme: 'grid',
-      })
-      const blob = pdf.output('blob'); const url = URL.createObjectURL(blob)
-      window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000)
+      }))
+      pdfAc(pdf, `${rKategori.ad} tahsilat listesi`)
       setPdfMsg('✅ PDF hazırlandı.')
     } catch (err: any) {
       setPdfMsg('❌ PDF hatası: ' + (err.message || 'Bilinmiyor'))
@@ -722,7 +707,7 @@ export default function TahsilatTakipPage() {
                         <div className="tk-iconchip" style={{ background: otomatik ? 'var(--info-light)' : 'var(--accent-lighter)', color: renk }}>
                           {otomatik ? <RefreshCw size={18} /> : TIP_ICON[k.tip]}
                         </div>
-                        <h3 style={{ margin: 0, fontFamily: "'Playfair Display', serif", fontSize: 16, fontWeight: 700, color: 'var(--text)', wordBreak: 'break-word', lineHeight: 1.2 }}>{k.ad}</h3>
+                        <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, color: 'var(--text)', wordBreak: 'break-word', lineHeight: 1.2 }}>{k.ad}</h3>
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 14 }}>
                         <span style={badge}>{TIP_ICON[k.tip]} {TIP_LABELS[k.tip]}</span>
@@ -1120,7 +1105,7 @@ export default function TahsilatTakipPage() {
             <div className="card" style={{ ...modalCard, maxWidth: 560 }} onClick={e => e.stopPropagation()}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                 <div>
-                  <h2 style={{ margin: 0, fontFamily: "'Playfair Display', serif", fontSize: 19, fontWeight: 700 }}>{f.planId ? 'Taksit Planını Düzenle' : 'Taksitlendir'}</h2>
+                  <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 700 }}>{f.planId ? 'Taksit Planını Düzenle' : 'Taksitlendir'}</h2>
                   <div style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 4 }}>
                     <TurRozet okul={!kulupOgrencisi(f.o)} /> <strong>{f.o.ad} {f.o.soyad}</strong> · {seciliKategori?.ad} · {f.d.label}
                   </div>
@@ -1183,7 +1168,7 @@ export default function TahsilatTakipPage() {
         <div style={overlay} onClick={() => !saving && setModalAcik(false)}>
           <div className="card" style={modalCard} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-              <h2 style={{ margin: 0, fontFamily: "'Playfair Display', serif", fontSize: 19, fontWeight: 700 }}>{editId ? 'Kategoriyi Düzenle' : 'Yeni Kategori'}</h2>
+              <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 700 }}>{editId ? 'Kategoriyi Düzenle' : 'Yeni Kategori'}</h2>
               <button onClick={() => setModalAcik(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)' }}><X size={20} /></button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1278,8 +1263,6 @@ export default function TahsilatTakipPage() {
 
       <style jsx>{`
         /* Button refinements (page-scoped) */
-        .btn-primary { box-shadow: 0 2px 8px rgba(45,90,61,0.22); font-weight: 600; }
-        .btn-primary:hover { box-shadow: 0 5px 15px rgba(45,90,61,0.30); transform: translateY(-1px); }
 
         /* Segmented tab control */
         .tk-seg { display: inline-flex; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; }
@@ -1298,12 +1281,12 @@ export default function TahsilatTakipPage() {
         /* Selector chips */
         .tk-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 22px; font-size: 12.5px; font-weight: 600; padding: 7px 15px; cursor: pointer; border: 1.5px solid var(--border); background: var(--surface); color: var(--text2); transition: all 0.15s; }
         .tk-chip:hover { border-color: var(--accent-light); color: var(--accent); }
-        .tk-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 10px rgba(45,90,61,0.28); }
+        .tk-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 10px rgba(35,71,217,0.28); }
 
         /* Grid */
         .tk-grid { border-collapse: separate; border-spacing: 0; }
-        .tk-grid tbody tr:nth-child(even) td { background: rgba(45,90,61,0.022); }
-        .tk-grid tbody tr:hover td { background: rgba(45,90,61,0.06); }
+        .tk-grid tbody tr:nth-child(even) td { background: rgba(35,71,217,0.022); }
+        .tk-grid tbody tr:hover td { background: rgba(35,71,217,0.06); }
         .tk-grid tbody tr:hover td.tk-namecell { background: var(--accent-lighter); }
 
         .tk-cell { width: 100%; min-height: 36px; border-radius: 7px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; transition: all 0.12s; border: 1px solid transparent; }
@@ -1359,11 +1342,11 @@ function popKonum(rect: DOMRect, genislik: number, tahminiYukseklik: number): Re
 const overlay: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(26,26,20,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }
 const modalCard: React.CSSProperties = { width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', padding: '24px 26px', marginBottom: 0, boxShadow: '0 24px 60px rgba(0,0,0,0.28)' }
 const emptyBox: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 24px', textAlign: 'center', background: 'var(--surface)', borderRadius: 14, border: '1.5px dashed var(--border)', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }
-const thStyle: React.CSSProperties = { background: 'var(--accent)', color: '#fff', fontSize: 10.5, fontWeight: 600, padding: '11px 6px', textAlign: 'center', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: 0.4 }
+const thStyle: React.CSSProperties = { background: 'var(--th-bg)', color: 'var(--th-fg)', border: '1px solid var(--th-border)', fontSize: 10.5, fontWeight: 600, padding: '11px 6px', textAlign: 'center', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: 0.4 }
 const tdStyle: React.CSSProperties = { padding: '6px', textAlign: 'center', borderRight: '1px solid var(--border-light)' }
 const statBox: React.CSSProperties = { padding: '16px 18px', position: 'relative', overflow: 'hidden' }
 const statLabel: React.CSSProperties = { fontSize: 10.5, color: 'var(--text3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 6 }
-const statVal: React.CSSProperties = { fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }
+const statVal: React.CSSProperties = { fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }
 
 const statAlt: React.CSSProperties = { marginTop: 8, fontSize: 12, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }
 
@@ -1387,5 +1370,5 @@ function TurRozet({ okul, uzun }: { okul: boolean; uzun?: boolean }) {
 }
 
 function secBtn(active: boolean): React.CSSProperties {
-  return { flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 10px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border)'}`, background: active ? 'var(--accent)' : 'var(--surface)', color: active ? '#fff' : 'var(--text2)', boxShadow: active ? '0 2px 8px rgba(45,90,61,0.25)' : 'none', transition: 'all 0.15s' }
+  return { flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 10px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border)'}`, background: active ? 'var(--accent)' : 'var(--surface)', color: active ? '#fff' : 'var(--text2)', boxShadow: active ? '0 2px 8px rgba(35,71,217,0.25)' : 'none', transition: 'all 0.15s' }
 }

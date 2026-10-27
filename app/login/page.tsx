@@ -3,8 +3,10 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logLoginAttempt } from '@/app/actions/logLogin'
-import { Mail, Lock, AlertTriangle, CheckCircle, ArrowLeft, UserPlus, ShieldCheck, Zap, BarChart3, Home } from 'lucide-react'
+import { Mail, Lock, AlertTriangle, CheckCircle, ArrowLeft, UserPlus, ShieldCheck, BarChart3, Home, Calculator } from 'lucide-react'
 import Link from 'next/link'
+import { BrandMark } from '@/components/brand/Logo'
+import { HeroComposition } from '@/components/brand/Illustrations'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -69,17 +71,18 @@ export default function LoginPage() {
       <aside className="au-brand">
         <div className="au-brand-inner">
           <Link href="/tanitim" className="au-logo">
-            <img src="/logo.png" alt="Klüp360" />
+            <BrandMark size={40} tone="light" />
             <span>Klüp<i>360</i></span>
           </Link>
           <div className="au-brand-mid">
             <h2>Kulübünüzün tüm yönetimi, tek panelde.</h2>
             <ul>
-              <li><span className="au-bico"><Zap size={15} /></span> Otomatik bordro ve puantaj</li>
+              <li><span className="au-bico"><Calculator size={15} /></span> Otomatik bordro ve puantaj</li>
               <li><span className="au-bico"><BarChart3 size={15} /></span> Anlık tahsilat ve raporlar</li>
               <li><span className="au-bico"><ShieldCheck size={15} /></span> MEB yönergesine %100 uyum</li>
             </ul>
           </div>
+          <div className="au-hero"><HeroComposition width={460} /></div>
           <p className="au-brand-foot">© {new Date().getFullYear()} Klüp360</p>
         </div>
       </aside>
@@ -127,7 +130,7 @@ export default function LoginPage() {
             <>
               <Link href="/tanitim" className="au-home"><Home size={15} /> Ana Sayfa</Link>
               <div className="au-head">
-                <img src="/logo.png" alt="Klüp360" className="au-card-logo" />
+                <div className="au-card-logo"><BrandMark size={52} /></div>
                 <h1>Tekrar Hoş Geldiniz</h1>
                 <p>Klüp360 Yönetim Paneli</p>
               </div>
@@ -172,35 +175,39 @@ export default function LoginPage() {
 }
 
 const CSS = `
-.au{--g:#2d5a3d;--g-d:#1e4229;--g-dd:#163620;--gold:#c8832a;--bg:#f5f2ec;--surf:#fff;
-  --tx:#1a1a14;--tx2:#5a5748;--tx3:#8a8070;--line:#e6dfd0;--line-2:#d8d0be;--danger:#c0392b;
-  font-family:'DM Sans',system-ui,sans-serif;color:var(--tx);min-height:100vh;
+.au{--g:#2347D9;--g-d:#1B38B8;--g-dd:#0E1116;--gold:#8EA3EE;--bg:#F5F6F8;--surf:#fff;
+  --tx:#0E1116;--tx2:#3F4753;--tx3:#5F6876;--line:#E3E6EB;--line-2:#E3E6EB;--danger:#c0392b;
+  font-family:var(--font-sans);color:var(--tx);min-height:100vh;
   display:grid;grid-template-columns:1.05fr 1fr;-webkit-font-smoothing:antialiased}
 .au *{box-sizing:border-box}
 .au :where(a){text-decoration:none;color:inherit}
 
 /* marka paneli */
-.au-brand{position:relative;overflow:hidden;background:linear-gradient(150deg,var(--g),var(--g-dd));color:#fff;padding:48px}
+.au-brand{position:relative;overflow:hidden;background:var(--g-dd);color:#fff;padding:48px}
 .au-brand::before{content:'';position:absolute;top:-15%;left:-10%;width:80%;height:70%;
   background:radial-gradient(closest-side,rgba(255,255,255,.1),transparent);pointer-events:none}
 .au-brand-inner{position:relative;z-index:2;height:100%;display:flex;flex-direction:column}
 .au-logo{display:flex;align-items:center;gap:10px}
 .au-logo img{width:40px;height:40px;object-fit:contain}
-.au-logo span{font-family:'Playfair Display',serif;font-weight:800;font-size:24px}
+.au-logo span{font-family:var(--font-display);font-weight:800;font-size:24px}
 .au-logo i{color:var(--gold);font-style:normal}
 .au-brand-mid{margin-top:auto;margin-bottom:auto;padding:40px 0}
-.au-brand-mid h2{font-family:'Playfair Display',serif;font-weight:800;font-size:clamp(26px,3vw,36px);
+.au-brand-mid h2{font-family:var(--font-display);font-weight:800;font-size:clamp(26px,3vw,36px);
   line-height:1.2;letter-spacing:-.02em;margin:0 0 28px;max-width:420px}
 .au-brand-mid ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:16px}
 .au-brand-mid li{display:flex;align-items:center;gap:12px;font-size:15.5px;color:rgba(255,255,255,.9)}
 .au-bico{width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.12);display:flex;
   align-items:center;justify-content:center;color:var(--gold);flex-shrink:0}
+.au-brand::before{inset:0;top:0;left:0;width:100%;height:100%;background:radial-gradient(rgba(255,255,255,.1) 1.2px,transparent 1.2px) 0 0/20px 20px}
+.au-hero{margin-top:auto;padding-top:24px;display:flex;justify-content:center}
+.au-hero svg{max-width:100%;height:auto}
+.au-card-logo{display:flex;justify-content:center;margin:0 auto 18px;width:auto;height:auto}
+@media (max-height:760px){.au-hero{display:none}}
 .au-brand-foot{font-size:13px;color:rgba(255,255,255,.55);margin:0}
 
 /* form tarafı */
 .au-main{background:var(--bg);display:flex;align-items:center;justify-content:center;padding:32px 20px}
-.au-card{width:100%;max-width:430px;background:var(--surf);border:1px solid var(--line);border-radius:24px;
-  padding:clamp(28px,4vw,44px);box-shadow:0 30px 60px -30px rgba(30,66,41,.35)}
+.au-card{width:100%;max-width:430px;background:var(--surf);border:1px solid var(--line);border-radius:16px;padding:clamp(28px,4vw,44px);box-shadow:0 24px 56px -28px rgba(14,17,22,.28)}
 .au-back{background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--tx2);
   font-size:13px;margin-bottom:26px;padding:0;font-family:inherit}
 .au-back:hover{color:var(--g)}
@@ -209,9 +216,9 @@ const CSS = `
 .au-home:hover{color:var(--g)}
 .au-head{text-align:center;margin-bottom:28px}
 .au-card-logo{width:60px;height:60px;object-fit:contain;margin:0 auto 18px;display:block}
-.au-head-ico{width:60px;height:60px;border-radius:16px;background:#eafaf1;color:var(--g);display:flex;
+.au-head-ico{width:60px;height:60px;border-radius:16px;background:#EEF2FE;color:var(--g);display:flex;
   align-items:center;justify-content:center;margin:0 auto 18px}
-.au-head h1{font-family:'Playfair Display',serif;font-size:27px;font-weight:800;color:var(--tx);margin:0 0 6px}
+.au-head h1{font-family:var(--font-display);font-size:27px;font-weight:800;color:var(--tx);margin:0 0 6px}
 .au-head p{color:var(--tx2);font-size:14.5px;margin:0}
 .au-form{display:flex;flex-direction:column;gap:18px}
 .au-field{display:flex;flex-direction:column;gap:7px}
@@ -221,24 +228,24 @@ const CSS = `
 .au-link:hover{color:var(--gold)}
 .au-input-wrap{position:relative;display:flex;align-items:center}
 .au-input-wrap svg{position:absolute;left:14px;color:var(--tx3);pointer-events:none}
-.au-input-wrap input{width:100%;height:50px;padding:0 14px 0 44px;border:1px solid var(--line-2);border-radius:12px;
-  background:#fcfcfa;font:inherit;font-size:15px;color:var(--tx);outline:none;transition:border-color .15s,box-shadow .15s}
-.au-input-wrap input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(45,90,61,.13);background:#fff}
-.au-submit{margin-top:6px;height:50px;border:none;border-radius:12px;cursor:pointer;
+.au-input-wrap input{width:100%;height:50px;padding:0 14px 0 44px;border:1px solid var(--line-2);border-radius:8px;
+  background:#fff;font:inherit;font-size:15px;color:var(--tx);outline:none;transition:border-color .15s,box-shadow .15s}
+.au-input-wrap input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(35,71,217,.13);background:#fff}
+.au-submit{margin-top:6px;height:50px;border:none;border-radius:8px;cursor:pointer;
   background:var(--g);color:#fff;font:inherit;font-size:15.5px;font-weight:700;
-  box-shadow:0 10px 24px -10px rgba(45,90,61,.6);transition:transform .2s,background .2s}
+  box-shadow:0 10px 24px -10px rgba(35,71,217,.6);transition:transform .2s,background .2s}
 .au-submit:hover{background:var(--g-d);transform:translateY(-2px)}
 .au-submit:disabled{opacity:.7;cursor:default;transform:none}
-.au-alert{background:#fdf0ee;border:1px solid #f3c4bd;color:var(--danger);padding:12px 15px;border-radius:12px;
+.au-alert{background:#fdf0ee;border:1px solid #f3c4bd;color:var(--danger);padding:12px 15px;border-radius:8px;
   margin-bottom:22px;font-size:13px;display:flex;align-items:center;gap:10px;line-height:1.5}
 .au-alert svg{flex-shrink:0}
-.au-ok{background:#f0fdf4;border:1px solid #86efac;color:#166534;padding:16px;border-radius:12px;
+.au-ok{background:#f0fdf4;border:1px solid #86efac;color:#166534;padding:16px;border-radius:8px;
   font-size:14px;display:flex;align-items:flex-start;gap:12px}
 .au-ok svg{flex-shrink:0;margin-top:1px}
 .au-ok p{margin:4px 0 0;color:#15803d;line-height:1.5}
 .au-foot{margin-top:24px;padding-top:22px;border-top:1px solid var(--line);text-align:center}
 .au-foot p{color:var(--tx2);font-size:13px;margin:0 0 12px}
-.au-alt-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border-radius:12px;
+.au-alt-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border-radius:8px;
   border:1px solid var(--g);color:var(--g);font-size:14px;font-weight:600;transition:background .15s,color .15s}
 .au-alt-btn:hover{background:var(--g);color:#fff}
 

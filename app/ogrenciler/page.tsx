@@ -12,6 +12,7 @@ import OgrenciModal from '@/components/OgrenciModal'
 import { Plus, Search, Pencil, Trash2, GraduationCap, RotateCcw } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import { EmptyStudents } from '@/components/brand/Illustrations'
 
 function OgrencilerIc() {
   const { profil } = useAuth()
@@ -209,7 +210,7 @@ function OgrencilerIc() {
                 {liste.length === 0 ? (
                   <tr><td colSpan={10}>
                     <div className="empty-state">
-                      <div className="empty-icon"><GraduationCap size={48} style={{ color: 'var(--text3)' }} /></div>
+                      <EmptyStudents width={200} />
                       <p>{loading ? 'Yükleniyor...' : 'Öğrenci bulunamadı'}</p>
                     </div>
                   </td></tr>
@@ -234,8 +235,8 @@ function OgrencilerIc() {
                       <td>
                         {listeTuru === 'aktif' ? (
                           <div style={{ display: 'flex', gap: 4 }}>
-                            <button className="btn btn-secondary btn-sm" onClick={() => duzenle(o)} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28 }} title="Düzenle"><Pencil size={14} /></button>
-                            <button className="btn btn-danger btn-sm" onClick={() => setSilOnayId(o.id)} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28 }} title="Sil ve Arşivle"><Trash2 size={14} /></button>
+                            <button className="btn btn-secondary btn-icon" onClick={() => duzenle(o)} title="Düzenle"><Pencil size={14} /></button>
+                            <button className="btn btn-outline-danger btn-icon" onClick={() => setSilOnayId(o.id)} title="Sil ve Arşivle"><Trash2 size={14} /></button>
                           </div>
                         ) : (
                           <button className="btn btn-success btn-sm" onClick={() => geriYukle(o.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 8px' }} title="Arşivden Geri Yükle">

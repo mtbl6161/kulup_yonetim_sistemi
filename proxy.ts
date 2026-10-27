@@ -52,6 +52,7 @@ export async function proxy(request: NextRequest) {
                         || pathname === '/cocuk-kulubu-butce-tablosu'
                         || pathname === '/gelir-vergisi-dilimleri-2026'
                         || pathname.startsWith('/rehber')
+                        || pathname.startsWith('/opengraph-image')
                         || isPaymentPage
 
     // 1. BAKIM MODU KONTROLÜ

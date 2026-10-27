@@ -108,7 +108,7 @@ async function bilgilendirmeMailiGonder(to: string, okulAdi: string, bitis: Date
             Öğrenci kaydı, aidat tahsilatı, puantaj, bordro ve işletme defteri dahil tüm modüller açık.
             Kredi kartı gerekmez; süre sonunda dilerseniz abone olabilirsiniz.
           </p>
-          <a href="${loginUrl}" style="display: inline-block; background: #2d5a3d; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px;">
+          <a href="${loginUrl}" style="display: inline-block; background: #2347D9; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px;">
             Panele Giriş Yap
           </a>
         </div>

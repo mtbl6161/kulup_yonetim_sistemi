@@ -8,6 +8,7 @@ import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
 import { Ogrenci, kulupOgrencisi } from '@/lib/types'
 import { Plus, Search, Pencil, Trash2, School, RotateCcw, X, Save, Info } from 'lucide-react'
+import { EmptyStudents } from '@/components/brand/Illustrations'
 
 // Okul öğrencisi = kulübe kayıtlı olmayan, sadece okul tahsilatlarında (Kırtasiye, Etkinlik vb.) yer alan öğrenci.
 // Aynı `ogrenciler` tablosunda ogrenci_turu = 'okul' olarak tutulur; kulüp ekranlarında görünmez.
@@ -167,7 +168,7 @@ export default function OkulOgrencileriPage() {
                 {liste.length === 0 ? (
                   <tr><td colSpan={8}>
                     <div className="empty-state">
-                      <div className="empty-icon"><School size={48} style={{ color: 'var(--text3)' }} /></div>
+                      <EmptyStudents width={200} />
                       <p>{loading ? 'Yükleniyor...' : listeTuru === 'aktif' ? 'Henüz okul öğrencisi yok. Tek tek ekleyebilir veya Excel\'den toplu aktarabilirsiniz.' : 'Arşivde öğrenci yok.'}</p>
                     </div>
                   </td></tr>
@@ -183,8 +184,8 @@ export default function OkulOgrencileriPage() {
                     <td>
                       {listeTuru === 'aktif' ? (
                         <div style={{ display: 'flex', gap: 4 }}>
-                          <button className="btn btn-secondary btn-sm" onClick={() => duzenleAc(o)} style={iconBtn} title="Düzenle"><Pencil size={14} /></button>
-                          <button className="btn btn-danger btn-sm" onClick={() => setSilOnay(o)} style={iconBtn} title="Sil ve Arşivle"><Trash2 size={14} /></button>
+                          <button className="btn btn-secondary btn-icon" onClick={() => duzenleAc(o)} title="Düzenle"><Pencil size={14} /></button>
+                          <button className="btn btn-outline-danger btn-icon" onClick={() => setSilOnay(o)} title="Sil ve Arşivle"><Trash2 size={14} /></button>
                         </div>
                       ) : (
                         <button className="btn btn-success btn-sm" onClick={() => aktiflik(o, true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 8px' }}>
@@ -226,7 +227,7 @@ export default function OkulOgrencileriPage() {
         <div style={overlay} onClick={() => !saving && setModalAcik(false)}>
           <div className="card" style={modalCard} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-              <h2 style={{ margin: 0, fontFamily: "'Playfair Display', serif", fontSize: 19, fontWeight: 700 }}>{editId ? 'Okul Öğrencisini Düzenle' : 'Yeni Okul Öğrencisi'}</h2>
+              <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 700 }}>{editId ? 'Okul Öğrencisini Düzenle' : 'Yeni Okul Öğrencisi'}</h2>
               <button onClick={() => setModalAcik(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)' }}><X size={20} /></button>
             </div>
             {formMsg && <div className="alert alert-danger" style={{ marginBottom: 14 }}>{formMsg}</div>}
@@ -266,7 +267,6 @@ export default function OkulOgrencileriPage() {
   )
 }
 
-const iconBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28 }
 const grid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }
 const overlay: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(26,26,20,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }
 const modalCard: React.CSSProperties = { width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', padding: '24px 26px', marginBottom: 0, boxShadow: '0 24px 60px rgba(0,0,0,0.28)' }

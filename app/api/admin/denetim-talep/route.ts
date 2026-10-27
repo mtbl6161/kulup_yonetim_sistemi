@@ -60,7 +60,7 @@ async function sendKrediBilgisiEmail(to: string, adSoyad: string, ilAdi: string,
             <p style="margin: 0; color: #111827;"><strong>Geçici Şifre:</strong> <span style="font-family: monospace; background: #e5e7eb; padding: 2px 8px; border-radius: 4px;">${password}</span></p>
           </div>
           <p style="color: #6b7280; font-size: 13px; margin: 0 0 20px;">İlk girişinizden sonra şifrenizi değiştirmenizi tavsiye ederiz.</p>
-          <a href="${loginUrl}" style="display: inline-block; background: #2d5a3d; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px;">
+          <a href="${loginUrl}" style="display: inline-block; background: #2347D9; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px;">
             Panele Giriş Yap
           </a>
         </div>

@@ -28,7 +28,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ width: 40, height: 40, border: '4px solid #2d5a3d', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto 20px', animation: 'spin 1s linear infinite' }} />
+          <div style={{ width: 40, height: 40, border: '4px solid #2347D9', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto 20px', animation: 'spin 1s linear infinite' }} />
           <p style={{ fontFamily: 'sans-serif', color: 'var(--text2)', fontSize: 13 }}>Sistem Hazırlanıyor...</p>
         </div>
       </div>
@@ -47,7 +47,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
       <main
         id="main-content"
         style={{
-          marginLeft: collapsed ? 80 : 280,
+          marginLeft: collapsed ? 72 : 248,
           flex: 1,
           minWidth: 0,
           display: 'flex',

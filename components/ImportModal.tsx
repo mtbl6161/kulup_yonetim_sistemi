@@ -1,6 +1,5 @@
 'use client'
 import { useState, useRef, useCallback } from 'react'
-import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 import { logIslem } from '@/lib/audit'
 import { Ogrenci, Personel, OgrenciTuru } from '@/lib/types'
@@ -95,7 +94,9 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
   const kolonlar = okulOgr ? OKUL_OGR_KOLONLAR : tip === 'ogrenci' ? OGR_KOLONLAR : PER_KOLONLAR
 
   // ── Şablon indir ──────────────────────────────────────────────
-  function sablonIndir() {
+  async function sablonIndir() {
+    // xlsx ağır bir paket: yalnızca kullanıcı şablon/dosya işlediğinde yüklenir
+    const XLSX = await import('xlsx')
     const ornekler = okulOgr ? OKUL_OGR_ORNEK : tip === 'ogrenci' ? OGR_ORNEK : PER_ORNEK
     const ws = XLSX.utils.aoa_to_sheet([kolonlar, ...ornekler])
 
@@ -267,8 +268,9 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
   // ── Dosya işle ────────────────────────────────────────────────
   function dosyaIsle(file: File) {
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        const XLSX = await import('xlsx')
         const buffer = e.target?.result
         const wb = XLSX.read(buffer, { type: 'array' })
         const ws = wb.Sheets[wb.SheetNames[0]]

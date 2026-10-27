@@ -267,7 +267,7 @@ export default function MuhasebePage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
           <div className="card" style={{ padding: 0, border: '1px solid var(--accent)' }}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--th-border)', background: 'var(--th-bg)', color: 'var(--th-fg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Beyanname Matrah Bildirimi</h3>
             </div>
             <div style={{ padding: '24px' }}>

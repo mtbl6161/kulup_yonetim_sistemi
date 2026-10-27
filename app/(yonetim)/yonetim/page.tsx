@@ -7,7 +7,7 @@ import {
   UserPlus, Trash2, Mail, Lock, Building, AlertTriangle, CheckCircle, XCircle,
   GraduationCap, Users, Search, ClipboardList, RefreshCw, ShieldCheck,
   LayoutDashboard, School, Activity, CreditCard, Wallet, TrendingUp, Megaphone,
-  MapPin, Eye, ChevronRight, Compass, Zap, Star, Settings, Key, Info, User, LogOut, CalendarDays, X
+  MapPin, Eye, ChevronRight, Compass, Moon, Sun, Star, Settings, Key, Info, User, LogOut, CalendarDays, X
 } from 'lucide-react'
 import React, { memo } from 'react'
 
@@ -527,7 +527,7 @@ export default function YonetimDashboard() {
         <header style={{ height: 64, background: T.sidebar, borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: T.success, boxShadow: `0 0 0 4px ${T.success}20` }} /><span style={{ fontSize: 13, fontWeight: 700, color: T.secondary }}>Yönetim Paneli Aktif</span></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <button onClick={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')} style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${T.border}`, background: T.card, cursor: 'pointer', color: T.secondary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{themeMode === 'light' ? <Zap size={16} /> : <Compass size={16} />}</button>
+            <button onClick={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')} style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${T.border}`, background: T.card, cursor: 'pointer', color: T.secondary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{themeMode === 'light' ? <Moon size={16} /> : <Sun size={16} />}</button>
             <div style={{ textAlign: 'right' }}><div style={{ fontSize: 13, fontWeight: 700 }}>Admin</div><div style={{ fontSize: 11, color: T.secondary }}>{session?.user?.email}</div></div>
             <div style={{ width: 40, height: 40, borderRadius: 12, background: T.muted, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={20} /></div>
           </div>
@@ -786,7 +786,7 @@ export default function YonetimDashboard() {
 
           {sekme === 'ayarlar' && (
             <div style={{ maxWidth: 400 }}>
-              <div style={S.card}><div style={{ padding: 24 }}><h3 style={{ margin: '0 0 20px 0', fontSize: 16, fontWeight: 900 }}>Sistem Ayarları</h3><div style={{ background: bakimAktif ? `${T.danger}10` : T.muted, borderRadius: 12, padding: 16, border: `1px solid ${bakimAktif ? T.danger : T.border}` }}><div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}><div style={{ width: 40, height: 40, borderRadius: 10, background: bakimAktif ? T.danger : T.secondary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={20} color="white" /></div><div><div style={{ fontWeight: 800, fontSize: 14 }}>Bakım Modu</div><div style={{ fontSize: 11, color: bakimAktif ? T.danger : T.secondary }}>{bakimAktif ? 'SİSTEM KAPALI' : 'SİSTEM AKTİF'}</div></div></div><button onClick={handleBakimToggle} style={{ ...S.btn(bakimAktif ? T.danger : T.primary), width: '100%', height: 44, justifyContent: 'center' }}>{bakimAktif ? 'Bakımı Kapat' : 'Bakımı Başlat'}</button></div></div></div>
+              <div style={S.card}><div style={{ padding: 24 }}><h3 style={{ margin: '0 0 20px 0', fontSize: 16, fontWeight: 900 }}>Sistem Ayarları</h3><div style={{ background: bakimAktif ? `${T.danger}10` : T.muted, borderRadius: 12, padding: 16, border: `1px solid ${bakimAktif ? T.danger : T.border}` }}><div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}><div style={{ width: 40, height: 40, borderRadius: 10, background: bakimAktif ? T.danger : T.secondary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Settings size={20} color="white" /></div><div><div style={{ fontWeight: 800, fontSize: 14 }}>Bakım Modu</div><div style={{ fontSize: 11, color: bakimAktif ? T.danger : T.secondary }}>{bakimAktif ? 'SİSTEM KAPALI' : 'SİSTEM AKTİF'}</div></div></div><button onClick={handleBakimToggle} style={{ ...S.btn(bakimAktif ? T.danger : T.primary), width: '100%', height: 44, justifyContent: 'center' }}>{bakimAktif ? 'Bakımı Kapat' : 'Bakımı Başlat'}</button></div></div></div>
             </div>
           )}
         </main>

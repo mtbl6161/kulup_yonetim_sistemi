@@ -105,13 +105,13 @@ const CSS = `
 .ic-card{background:var(--surf);border:1px solid var(--line);border-radius:18px;padding:26px;
   display:flex;align-items:flex-start;gap:18px;box-shadow:0 12px 30px -22px rgba(30,66,41,.4)}
 .ic-ico{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.ic-ico-green{background:#eafaf1;color:var(--g)}
+.ic-ico-green{background:#EEF2FE;color:var(--g)}
 .ic-ico-gold{background:#fdf3e2;color:var(--gold)}
 .ic-card h3{font-size:17px;font-weight:700;color:var(--tx);margin:0 0 6px}
 .ic-card p{color:var(--tx2);margin:0;font-size:15px;line-height:1.6}
 .ic-formwrap{background:var(--surf);border:1px solid var(--line);border-radius:22px;padding:clamp(24px,3vw,36px);
   box-shadow:0 24px 50px -34px rgba(30,66,41,.4)}
-.ic-form-title{font-family:'Playfair Display',serif;font-size:24px;font-weight:800;margin:0 0 22px;color:var(--tx)}
+.ic-form-title{font-family:var(--font-display);font-size:24px;font-weight:800;margin:0 0 22px;color:var(--tx)}
 .ic-form{display:flex;flex-direction:column;gap:16px}
 .ic-field{display:flex;flex-direction:column;gap:7px}
 .ic-field>span{font-size:13.5px;font-weight:600;color:var(--tx2)}
@@ -119,14 +119,14 @@ const CSS = `
 .ic-field input,.ic-field textarea{font:inherit;font-size:15px;padding:13px 15px;border:1px solid var(--line-2);
   border-radius:12px;background:#fcfcfa;color:var(--tx);outline:none;width:100%;resize:vertical;
   transition:border-color .15s,box-shadow .15s}
-.ic-field input:focus,.ic-field textarea:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(45,90,61,.13);background:#fff}
+.ic-field input:focus,.ic-field textarea:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(35,71,217,.13);background:#fff}
 .ic-submit{margin-top:6px;padding:15px 24px;border:none;border-radius:12px;cursor:pointer;
   background:linear-gradient(135deg,var(--g),var(--g-d));color:#fff;font-size:16px;font-weight:700;
-  box-shadow:0 10px 24px -10px rgba(45,90,61,.6);transition:transform .2s,opacity .2s}
+  box-shadow:0 10px 24px -10px rgba(35,71,217,.6);transition:transform .2s,opacity .2s}
 .ic-submit:hover{transform:translateY(-2px)}
 .ic-submit:disabled{opacity:.7;cursor:default;transform:none}
 .ic-success{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;padding:36px 0}
-.ic-success-ico{width:64px;height:64px;border-radius:50%;background:#eafaf1;color:var(--g);display:flex;align-items:center;justify-content:center}
+.ic-success-ico{width:64px;height:64px;border-radius:50%;background:#EEF2FE;color:var(--g);display:flex;align-items:center;justify-content:center}
 .ic-success h3{font-size:22px;font-weight:800;color:var(--tx);margin:6px 0 0}
 .ic-success p{color:var(--tx2);font-size:15.5px;margin:0}
 .ic-again{background:none;border:none;color:var(--g);font-weight:700;cursor:pointer;font-size:14px;margin-top:8px}

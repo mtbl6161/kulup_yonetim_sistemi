@@ -5,7 +5,10 @@ import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
 import { SinifDefteri, Personel, Tatil, Sinif, Ayarlar } from '@/lib/types'
 import { GUNLER, AYLAR, gunSayisi, tatilMi, ayLabel, haftaIciMi } from '@/lib/hesaplama'
-import { Download, RefreshCw, Calendar, Grid } from 'lucide-react'
+import { Download, RefreshCw, Calendar, Grid, Info, School, UserCog, Plus, Check, X } from 'lucide-react'
+import Bildirim from '@/components/Bildirim'
+import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAc, PDF_RENK, PDF_KENAR } from '@/lib/pdf'
+import { ayHaftalari, varsayilanHafta, tatilAdi, bugunMu, basHarf, gecmisMi, HaftaSecici, GunBasligi, TatilBlogu, GUN_UZUN, HaftaGunu } from '@/components/HaftalikPlan'
 import React from 'react'
 import ConfirmModal from '@/components/ConfirmModal'
 
@@ -15,210 +18,6 @@ interface VisibleDay {
   year: number
   isCurrentMonth: boolean
 }
-
-// ── Tablo Stilleri ──────────────────────────────────────────
-function thStyle(width: number): React.CSSProperties {
-  return { padding: '12px 6px', color: '#fff', fontWeight: 700, fontSize: 10, border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', width, minWidth: width, boxSizing: 'border-box', verticalAlign: 'middle' }
-}
-const tdStyle: React.CSSProperties = { padding: '4px', border: '1px solid #eee', verticalAlign: 'middle', fontSize: 10, textAlign: 'center', position: 'relative' }
-
-// ── RenderTable Bileşeni (Stabilite için dışarıda) ───────────
-interface RenderTableProps {
-  sinif: Sinif
-  hours: number[]
-  type: 'ders' | 'koord'
-  currentTab: string
-  ayarlar: Ayarlar | null
-  ay: number
-  yil: number
-  visibleDays: VisibleDay[]
-  tatiller: Tatil[]
-  dersGetir: (sinifAd: string, dersNo: number, gun: number, ay: number, yil: number) => SinifDefteri | null
-  durumDegistir: (id: number, current: string) => Promise<void>
-  openPicker: (e: any, day: number, month: number, year: number, sinifId: number, dersNo: number, gunAdi: string) => void
-  fastSil: (e: any, id: number) => void
-}
-
-const RenderTable = ({ 
-  sinif, hours, type, currentTab, ayarlar, ay, yil, visibleDays, tatiller,
-  dersGetir, durumDegistir, openPicker, fastSil
-}: RenderTableProps) => (
-  <div className={`table-print-container ${currentTab === type ? 'tab-active' : 'tab-inactive'} print-area`}>
-    {/* Print Only Header */}
-    <div className="print-only" style={{ marginBottom: 15, textAlign: 'center', borderBottom: '2px solid #333', paddingBottom: 15 }}>
-      <div style={{ fontSize: 16, fontWeight: 900, color: 'var(--danger)', marginBottom: 4 }}>{ayarlar?.kurum_adi?.toUpperCase() || 'ÇOCUK KULÜBÜ'}</div>
-      <h2 style={{ margin: 0, fontSize: 13, fontWeight: 800 }}>{sinif.ad.toUpperCase()} SINIF DEFTERİ - {type === 'ders' ? 'ÖĞRETMEN' : 'KOORDİNATÖR'}</h2>
-      <div style={{ fontSize: 11, fontWeight: 600, marginTop: 2 }}>{ayLabel(ay, yil).toUpperCase()} — (01 {AYLAR[ay]} - {gunSayisi(yil, ay)} {AYLAR[ay]} {yil})</div>
-    </div>
-
-    <div className="scroll-outer" style={{ width: '100%', overflow: 'hidden' }}>
-      <div className="scroll-container" style={{ width: '100%', maxHeight: '600px', overflow: 'auto' }}>
-        <table style={{ width: `${visibleDays.length * 100 + 125}px`, borderCollapse: 'separate', borderSpacing: 0, fontSize: 11, tableLayout: 'fixed' }}>
-          <thead style={{ position: 'sticky', top: 0, zIndex: 20 }}>
-            <tr>
-              <th style={{ ...thStyle(120), position: 'sticky', left: 0, top: 0, zIndex: 30, background: '#1e3d29', borderRight: '2px solid #0f1f15' }}>Saat / Gün</th>
-              {visibleDays.map(vd => {
-                const tatil = tatilMi(vd.month, vd.day, vd.year, tatiller)
-                const hg = new Date(vd.year, vd.month - 1, vd.day, 12).getDay()
-                const isHaftaSonu = hg === 0 || hg === 6
-                const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
-                return (
-                  <th key={`${vd.day}-${vd.month}`} style={{ ...thStyle(100), background: (tatil || isHaftaSonu) ? 'var(--border)' : 'var(--accent)' }}>
-                    {gunAdi}<br /><span style={{ fontSize: 13, fontWeight: 700 }}>{vd.day}</span>
-                  </th>
-                )
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {hours.map((dersNo, idx) => (
-              <tr key={dersNo}>
-                <td style={{ ...tdStyle, fontWeight: 700, background: 'var(--bg)', position: 'sticky', left: 0, zIndex: 10, borderRight: '2px solid #ddd', color: type === 'koord' ? 'var(--info)' : 'var(--text)' }}>
-                  {type === 'koord' ? 'KOORD' : `${idx + 1}. DERS`}
-                </td>
-                {visibleDays.map(vd => {
-                  const ders = dersGetir(sinif.ad, dersNo, vd.day, vd.month, vd.year)
-                  const tatil = tatilMi(vd.month, vd.day, vd.year, tatiller)
-                  const hg = new Date(vd.year, vd.month - 1, vd.day, 12).getDay()
-                  const isHaftaSonu = hg === 0 || hg === 6
-                  const ogr = ders ? ders.ogretmen as unknown as Personel | null : null
-                  const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
-                  
-                  return (
-                    <td key={`${vd.day}-${vd.month}`} className="program-cell" 
-                      style={{ ...tdStyle, background: (tatil || isHaftaSonu) ? 'var(--border-light)' : '#fff', cursor: (tatil || isHaftaSonu || (!ders && type === 'ders')) ? 'default' : 'pointer' }} 
-                      onClick={(e) => {
-                        if (tatil || isHaftaSonu) return
-                        if (ders) durumDegistir(ders.id, ders.durum)
-                        else if (type === 'koord') openPicker(e, vd.day, vd.month, vd.year, sinif.id, dersNo, gunAdi)
-                        // type==='ders' ise boş hücreye tıklamak bir şey yapmaz (ders programından gelir)
-                      }}
-                    >
-                      <div style={{ width: 100, minWidth: 100, padding: 4 }}>
-                        {(!tatil && !isHaftaSonu) ? (
-                          ders ? (
-                            <div className="cell-content">
-                              {type === 'koord' && <button className="fast-del-mini no-print" onClick={(e) => fastSil(e, ders.id)}>×</button>}
-                                <div style={{ fontWeight: 700, fontSize: 10, color: '#343a40', textDecoration: ders.durum === 'gelmedi' ? 'line-through' : 'none' }}>
-                                  {ogr?.ad}
-                                  {ogr?.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 9 }}> (Ayrıldı)</span>}
-                                </div>
-                                <div className={`status-badge ${ders.durum}`}>
-                                  {ders.durum === 'geldi' ? '✓ GELDİ' : '✕ GELMEDİ'}
-                                </div>
-                            </div>
-                          ) : (
-                            type === 'koord'
-                              ? <div className="btn-ata-mini no-print">+</div>
-                              : <div style={{ fontSize: 9, color: '#ccc' }}>—</div>
-                          )
-                        ) : <div style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 600 }}>{isHaftaSonu ? 'H.SONU' : 'TATİL'}</div>}
-                      </div>
-                    </td>
-                  )
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-)
-
-// ── RenderWeeklyTable Bileşeni (Haftalık görünüm stabilitesi için) ──
-interface RenderWeeklyTableProps {
-  sinif: Sinif
-  week: VisibleDay[]
-  currentHours: number[]
-  currentTab: 'ders' | 'koord'
-  defter: SinifDefteri[]
-  tatiller: Tatil[]
-  wIndex: number
-  dersGetir: (sinifAd: string, dersNo: number, gun: number, ay: number, yil: number) => SinifDefteri | null
-  durumDegistir: (id: number, current: string) => Promise<void>
-  openPicker: (e: any, day: number, month: number, year: number, sinifId: number, dersNo: number, gunAdi: string) => void
-  fastSil: (e: any, id: number) => void
-}
-
-const RenderWeeklyTable = ({
-  sinif, week, currentHours, currentTab, defter, tatiller, wIndex,
-  dersGetir, durumDegistir, openPicker, fastSil
-}: RenderWeeklyTableProps) => (
-  <div className="week-block">
-    <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--bg)', borderRadius: 6, fontWeight: 700, fontSize: 13, color: 'var(--text2)', borderLeft: '4px solid var(--accent)', display: 'inline-block' }}>
-      📅 {wIndex + 1}. Hafta ({week[0].day} {AYLAR[week[0].month || 1]} - {week[week.length - 1].day} {AYLAR[week[week.length - 1].month || 1]})
-    </div>
-    <div className="scroll-container" style={{ width: '100%', overflowX: 'auto' }}>
-      <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 11 }}>
-        <thead>
-          <tr>
-            <th style={{ ...thStyle(100), background: 'var(--accent)' }}>Saat</th>
-            {week.map(vd => {
-              const tatil = tatilMi(vd.month, vd.day, vd.year, tatiller)
-              const hg = new Date(vd.year, vd.month - 1, vd.day, 12).getDay()
-              const isHaftaSonu = hg === 0 || hg === 6
-              const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
-              return (
-                <th key={`${vd.day}-${vd.month}`} style={{ ...thStyle(100), background: (tatil || isHaftaSonu) ? 'var(--border)' : 'var(--accent)' }}>
-                  {gunAdi}<br /><span style={{ fontSize: 13, fontWeight: 700 }}>{vd.day}</span>
-                </th>
-              )
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {currentHours.map((dersNo, idx) => (
-            <tr key={dersNo}>
-              <td style={{ ...tdStyle, fontWeight: 700, background: 'var(--bg)', color: currentTab === 'koord' ? 'var(--info)' : 'var(--text)' }}>
-                {currentTab === 'koord' ? 'KOORD' : `${idx + 1}. DERS`}
-              </td>
-              {week.map(vd => {
-                const ders = dersGetir(sinif.ad, dersNo, vd.day, vd.month, vd.year)
-                const tatil = tatilMi(vd.month, vd.day, vd.year, tatiller)
-                const hg = new Date(vd.year, vd.month - 1, vd.day, 12).getDay()
-                const isHaftaSonu = hg === 0 || hg === 6
-                const ogr = ders ? ders.ogretmen as unknown as Personel | null : null
-                const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
-                return (
-                  <td key={`${vd.day}-${vd.month}`} className="program-cell" 
-                    style={{ ...tdStyle, background: (tatil || isHaftaSonu) ? 'var(--border-light)' : '#fff', cursor: (tatil || isHaftaSonu || (!ders && currentTab === 'ders')) ? 'default' : 'pointer' }}
-                    onClick={(e) => {
-                      if (tatil || isHaftaSonu) return
-                      if (ders) durumDegistir(ders.id, ders.durum)
-                      else if (currentTab === 'koord') openPicker(e, vd.day, vd.month, vd.year, sinif.id, dersNo, gunAdi)
-                    }}
-                  >
-                    <div style={{ width: 100, minWidth: 100, padding: 4 }}>
-                      {(!tatil && !isHaftaSonu) ? (
-                        ders ? (
-                          <div className="cell-content">
-                            {currentTab === 'koord' && <button className="fast-del-mini no-print" onClick={(e) => fastSil(e, ders.id)}>×</button>}
-                            <div style={{ fontWeight: 700, fontSize: 10, color: '#333', textDecoration: ders.durum === 'gelmedi' ? 'line-through' : 'none' }}>
-                              {ogr?.ad}
-                              {ogr?.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 9 }}> (Ayrıldı)</span>}
-                            </div>
-                            <div className={`status-badge ${ders.durum}`}>
-                              {ders.durum === 'geldi' ? '✓ GELDİ' : '✕ GELMEDİ'}
-                            </div>
-                          </div>
-                        ) : (
-                          currentTab === 'koord'
-                            ? <div className="btn-ata-mini no-print">+</div>
-                            : <div style={{ fontSize: 9, color: '#ccc' }}>—</div>
-                        )
-                      ) : <div style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 600 }}>{isHaftaSonu ? 'H.SONU' : 'TATİL'}</div>}
-                    </div>
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </div>
-)
 
 export default function SinifDefteriPage() {
   const { ay, yil } = useAy()
@@ -241,11 +40,12 @@ export default function SinifDefteriPage() {
     message: string
   } | null>(null)
 
-  const [gorunum, setGorunum] = useState<'aylik' | 'haftalik'>('aylik')
-  const [activeTabs, setActiveTabs] = useState<Record<number, 'ders' | 'koord'>>({})
-
-  const getTab = (id: number) => activeTabs[id] || 'ders'
-  const setTab = (id: number, t: 'ders' | 'koord') => setActiveTabs(prev => ({ ...prev, [id]: t }))
+  const [defterTuru, setDefterTuru] = useState<'ders' | 'koord'>('ders')
+  // Haftalık yoklama: seçili hafta (null = bugünün haftası / ilk hafta)
+  const [haftaSecim, setHaftaSecim] = useState<number | null>(null)
+  // Öğretmen vurgulama: seçilen öğretmenin dersleri öne çıkar, diğerleri soluklaşır
+  const [vurgu, setVurgu] = useState<number | null>(null)
+  useEffect(() => { setHaftaSecim(null) }, [ay, yil])
 
   // --- TAKVİM HESAPLAMA ---
   const visibleDays = useMemo(() => {
@@ -349,6 +149,13 @@ export default function SinifDefteriPage() {
   }, [ay, yil])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!picker) return
+    const kapat = (e: KeyboardEvent) => { if (e.key === 'Escape') setPicker(null) }
+    window.addEventListener('keydown', kapat)
+    return () => window.removeEventListener('keydown', kapat)
+  }, [picker])
 
   function programdanAktar() {
     setConf({
@@ -734,197 +541,69 @@ export default function SinifDefteriPage() {
     ) || null
   }
 
-  const handlePdfDownload = async () => {
-    const { default: jsPDF } = await import('jspdf')
-    const { default: autoTable } = await import('jspdf-autotable')
-
-    async function loadFontB64(path: string) {
-      const res = await fetch(path)
-      const buf = await res.arrayBuffer()
-      const bytes = new Uint8Array(buf)
-      let binary = ''
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-      return btoa(binary)
-    }
-    const [regularB64, boldB64] = await Promise.all([
-      loadFontB64('/fonts/NotoSans-Regular.ttf'),
-      loadFontB64('/fonts/NotoSans-Bold.ttf'),
-    ])
-
-    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-    pdf.addFileToVFS('NotoSans-Regular.ttf', regularB64)
-    pdf.addFileToVFS('NotoSans-Bold.ttf', boldB64)
-    pdf.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal', 'Identity-H')
-    pdf.addFont('NotoSans-Bold.ttf', 'NotoSans', 'bold', 'Identity-H')
-    pdf.setFont('NotoSans')
-
-    const PW = pdf.internal.pageSize.getWidth()
+  const handlePdfDownload = async (tur: 'aylik' | 'haftalik' = 'aylik') => {
+    const { pdf, autoTable } = await pdfHazirla('landscape')
     const PH = pdf.internal.pageSize.getHeight()
-    const M = 10
+    const GUN = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt']
     const hedefSiniflar = seciliSinif ? siniflar.filter(s => s.id === seciliSinif) : siniflar
+    const pdfDersSaati = Math.max(1, Math.min(10, ayarlar?.ders_saati_sayisi ?? 6))
+    const kapali = (d: number, m: number, y: number) => { const g = new Date(y, m - 1, d, 12).getDay(); return g === 0 || g === 6 || tatilMi(m, d, y, tatiller) }
+    const hucre = (ders: SinifDefteri | null) => {
+      if (!ders) return ''
+      const ogr = ders.ogretmen as any
+      return `${ogr?.ad || ''}${ogr?.aktif === false ? ' (Ayrıldı)' : ''}\n${ders.durum === 'geldi' ? 'Geldi' : 'GELMEDİ'}`
+    }
+    const boya = (kapaliMi: boolean) => (data: any) => {
+      if (data.column.index === 0) return
+      if (kapaliMi) { data.cell.styles.fillColor = PDF_RENK.kapaliZemin; if (data.section === 'head') data.cell.styles.textColor = PDF_RENK.kapaliMetin }
+      if (data.section === 'body' && data.cell.text.some((t: string) => t.includes('GELMEDİ'))) data.cell.styles.textColor = PDF_RENK.hata
+    }
 
-    hedefSiniflar.forEach((sinif, sIdx) => {
+    let ilk = true
+    for (const sinif of hedefSiniflar) {
       // Her sınıf için hem öğretmen hem koordinatör defteri
-      ['Ders', 'Koordinatör'].forEach((typeLabel, tIdx) => {
-        if (sIdx > 0 || tIdx > 0) pdf.addPage()
+      for (const typeLabel of ['Öğretmen', 'Koordinatör']) {
+        if (!ilk) pdf.addPage()
+        ilk = false
+        const y = pdfBaslik(pdf, { kurum: ayarlar?.kurum_adi, baslik: `${sinif.ad} sınıf defteri · ${typeLabel}`, alt: `${ayLabel(ay, yil)} · ${tur === 'aylik' ? 'aylık' : 'haftalık'} görünüm` })
+        const currentHours = Array.from({ length: pdfDersSaati }, (_, i) => typeLabel === 'Öğretmen' ? i + 1 : i + 11)
+        const satirAdi = (i: number) => typeLabel === 'Öğretmen' ? `${i + 1}. ders` : `${i + 1}. koord.`
 
-        // Institutional Header
-        pdf.setFontSize(11)
-        pdf.setFont('NotoSans', 'bold')
-        pdf.setTextColor(0, 0, 0)
-        pdf.text(ayarlar?.kurum_adi?.toUpperCase() || 'ÇOCUK KULÜBÜ', PW / 2, 12, { align: 'center' })
-        
-        pdf.setFontSize(9)
-        pdf.text(`${sinif.ad.toUpperCase()} SINIF DEFTERİ - ${typeLabel.toUpperCase()}`, PW / 2, 17, { align: 'center' })
-        pdf.setFont('NotoSans', 'normal')
-        pdf.text(`${ayLabel(ay, yil).toUpperCase()} (${gorunum === 'aylik' ? 'AYLIK' : 'HAFTALIK'})`, PW / 2, 22, { align: 'center' })
-
-        const pdfDersSaati = Math.max(1, Math.min(10, ayarlar?.ders_saati_sayisi ?? 6))
-        const currentHours = typeLabel === 'Ders'
-          ? Array.from({ length: pdfDersSaati }, (_, i) => i + 1)
-          : Array.from({ length: pdfDersSaati }, (_, i) => i + 11)
-
-        if (gorunum === 'aylik') {
-          // --- AYLIK GÖRÜNÜM ---
-          const daysInMonth = gunSayisi(yil, ay)
-          const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1)
-          
-          const headRows: any[] = [[
-            { content: 'Saat / Gün', styles: { halign: 'center', fillColor: [255, 255, 255] } },
-            ...daysArray.map(d => {
-              const dInfo = new Date(yil, ay - 1, d, 12)
-              const hg = dInfo.getDay()
-              const gunAdi = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
-              const isWE = hg === 0 || hg === 6
-              const isT = tatilMi(ay, d, yil, tatiller)
-              return { 
-                content: `${gunAdi}\n${d}`, 
-                styles: { halign: 'center', fillColor: (isWE || isT) ? [245, 245, 245] : [255, 255, 255] } 
-              }
-            })
-          ]]
-
-          const bodyRows = currentHours.map((dersNo, idx) => {
-            return [
-              typeLabel === 'Ders' ? `${idx + 1}. DERS` : 'KOORD.',
-              ...daysArray.map(d => {
-                const ders = dersGetir(sinif.ad, dersNo, d, ay, yil)
-                if (!ders) return ''
-                const ogr = ders.ogretmen as any
-                const status = ders.durum === 'geldi' ? 'GELDİ' : 'GELMEDİ'
-                const ayrildiText = ogr?.aktif === false ? ' (Ayrıldı)' : ''
-                return `${ogr?.ad || ''}${ayrildiText}\n(${status})`
-              })
-            ]
-          })
-
-          autoTable(pdf, {
-            head: headRows,
-            body: bodyRows,
-            startY: 28,
-            margin: { top: M, left: M, right: M, bottom: M },
-            styles: { font: 'NotoSans', fontSize: 5, lineWidth: 0.1, lineColor: [40, 40, 40], cellPadding: 0.8, valign: 'middle', textColor: [0, 0, 0] },
-            headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold' },
-            columnStyles: { 0: { cellWidth: 15, fontStyle: 'bold' } },
-            didParseCell: (data) => {
-              if (data.column.index > 0) {
-                const d = daysArray[data.column.index - 1]
-                const isWE = new Date(yil, ay - 1, d, 12).getDay() % 6 === 0
-                const isT = tatilMi(ay, d, yil, tatiller)
-                if (isWE || isT) data.cell.styles.fillColor = [245, 245, 245]
-                if (data.cell.text.some(t => t.includes('GELMEDİ'))) data.cell.styles.textColor = [180, 0, 0]
-              }
-            }
-          })
+        if (tur === 'aylik') {
+          const gunler = Array.from({ length: gunSayisi(yil, ay) }, (_, i) => i + 1)
+          autoTable(pdf, pdfTablo({
+            head: [['Ders', ...gunler.map(d => `${GUN[new Date(yil, ay - 1, d, 12).getDay()]}\n${d}`)]],
+            body: currentHours.map((dersNo, i) => [satirAdi(i), ...gunler.map(d => hucre(dersGetir(sinif.ad, dersNo, d, ay, yil)))]),
+            startY: y,
+            styles: { fontSize: 5, cellPadding: 0.7, halign: 'center' },
+            headStyles: { fontSize: 5.5 },
+            columnStyles: { 0: { cellWidth: 14, fontStyle: 'bold', halign: 'left' } },
+            didParseCell: (data) => { if (data.column.index > 0) boya(kapali(gunler[data.column.index - 1], ay, yil))(data) },
+          }))
         } else {
-          // --- HAFTALIK GÖRÜNÜM ---
-          let currentY = 28
+          let currentY = y
           visibleWeeks.forEach((week, wIdx) => {
-            pdf.setFont('NotoSans', 'bold')
-            pdf.setFontSize(8)
-            pdf.text(`📅 ${wIdx + 1}. HAFTA (${week[0].day} ${AYLAR[week[0].month || 1]} - ${week[week.length - 1].day} ${AYLAR[week[week.length - 1].month || 1]})`, M, currentY - 2)
-
-            const headRows: any[] = [[
-              { content: 'Saat', styles: { halign: 'center' } },
-              ...week.map(vd => {
-                const hg = new Date(vd.year, vd.month - 1, vd.day).getDay()
-                return { content: `${['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]}\n${vd.day}`, styles: { halign: 'center' } }
-              })
-            ]]
-
-            const bodyRows = currentHours.map((dersNo, idx) => {
-              return [
-                typeLabel === 'Ders' ? `${idx + 1}. DERS` : 'KOORD.',
-                ...week.map(vd => {
-                  const ders = dersGetir(sinif.ad, dersNo, vd.day, vd.month, vd.year)
-                  if (!ders) return ''
-                  const ogr = ders.ogretmen as any
-                  const status = ders.durum === 'geldi' ? 'GELDİ' : 'GELMEDİ'
-                  const ayrildiText = ogr?.aktif === false ? ' (Ayrıldı)' : ''
-                  return `${ogr?.ad || ''}${ayrildiText}\n(${status})`
-                })
-              ]
-            })
-
-            autoTable(pdf, {
-              head: headRows,
-              body: bodyRows,
-              startY: currentY,
-              margin: { left: M, right: M },
-              styles: { font: 'NotoSans', fontSize: 6.5, lineWidth: 0.1, lineColor: [40, 40, 40], cellPadding: 1.2, valign: 'middle', textColor: [0, 0, 0] },
-              headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold' },
-              columnStyles: { 0: { cellWidth: 20, fontStyle: 'bold' } },
-              didParseCell: (data) => {
-                if (data.column.index > 0) {
-                  const vd = week[data.column.index - 1]
-                  const hg = new Date(vd.year, vd.month - 1, vd.day).getDay()
-                  const isWE = hg === 0 || hg === 6
-                  const isT = tatilMi(vd.month, vd.day, vd.year, tatiller)
-                  if (isWE || isT) data.cell.styles.fillColor = [245, 245, 245]
-                  if (data.cell.text.some(t => t.includes('GELMEDİ'))) data.cell.styles.textColor = [180, 0, 0]
-                }
-              }
-            })
-            currentY = (pdf as any).lastAutoTable.finalY + 12
-            if (currentY > PH - 45 && wIdx < visibleWeeks.length - 1) {
-              pdf.addPage()
-              currentY = 20
-            }
+            pdf.setFont('NotoSans', 'bold'); pdf.setFontSize(8)
+            pdf.text(`${wIdx + 1}. hafta · ${week[0].day} ${AYLAR[week[0].month || 1]} – ${week[week.length - 1].day} ${AYLAR[week[week.length - 1].month || 1]}`, PDF_KENAR, currentY + 3)
+            autoTable(pdf, pdfTablo({
+              head: [['Ders', ...week.map(vd => `${GUN[new Date(vd.year, vd.month - 1, vd.day, 12).getDay()]}\n${vd.day}`)]],
+              body: currentHours.map((dersNo, i) => [satirAdi(i), ...week.map(vd => hucre(dersGetir(sinif.ad, dersNo, vd.day, vd.month, vd.year)))]),
+              startY: currentY + 5,
+              styles: { fontSize: 6.5, halign: 'center' },
+              columnStyles: { 0: { cellWidth: 20, fontStyle: 'bold', halign: 'left' } },
+              didParseCell: (data) => { if (data.column.index > 0) { const vd = week[data.column.index - 1]; boya(kapali(vd.day, vd.month, vd.year))(data) } },
+            }))
+            currentY = pdfSonY(pdf) + 8
+            if (currentY > PH - 50 && wIdx < visibleWeeks.length - 1) { pdf.addPage(); currentY = 16 }
           })
         }
 
-        // Signature Blocks (Per Page as these are independent sheets of a dossier)
-        const finalY = (pdf as any).lastAutoTable?.finalY || 150
-        const signY = Math.max(finalY + 12, PH - 35)
-        const duzenleyenAdi   = ayarlar?.duzenleyen_adi   ?? '___________________'
-        const duzenleyenUnvan = ayarlar?.duzenleyen_unvani ?? 'Büro Personeli'
-        const onaylayanAdi    = ayarlar?.mudur_adi         ?? '___________________'
-        const onaylayanUnvan  = 'Okul Müdürü / Kulüp Başkanı'
+        // Her sayfa dosyada bağımsız bir sayfa olduğu için imza her sayfada
+        pdfImza(pdf, { ...ayarlar, mudur_unvani: ayarlar?.mudur_unvani || 'Okul Müdürü / Kulüp Başkanı' }, pdfSonY(pdf, 150), true)
+      }
+    }
 
-        pdf.setFontSize(8)
-        pdf.setFont('NotoSans', 'bold')
-        pdf.text('DÜZENLEYEN', M + 40, signY, { align: 'center' })
-        pdf.text('ONAYLAYAN', PW - M - 40, signY, { align: 'center' })
-        pdf.setFontSize(7.5)
-        pdf.text(duzenleyenAdi, M + 40, signY + 6, { align: 'center' })
-        pdf.setFont('NotoSans', 'normal')
-        pdf.setFontSize(7)
-        pdf.text(duzenleyenUnvan, M + 40, signY + 10, { align: 'center' })
-        pdf.line(M + 10, signY + 16, M + 70, signY + 16)
-        pdf.setFont('NotoSans', 'bold')
-        pdf.setFontSize(7.5)
-        pdf.text(onaylayanAdi, PW - M - 40, signY + 6, { align: 'center' })
-        pdf.setFont('NotoSans', 'normal')
-        pdf.setFontSize(7)
-        pdf.text(onaylayanUnvan, PW - M - 40, signY + 10, { align: 'center' })
-        pdf.line(PW - M - 70, signY + 16, PW - M - 10, signY + 16)
-      })
-    })
-
-    const blob = pdf.output('blob')
-    const url = URL.createObjectURL(blob)
-    window.open(url, '_blank')
-    setTimeout(() => URL.revokeObjectURL(url), 60000)
+    pdfAc(pdf, 'Sınıf defteri')
   }
 
   const gorunenSiniflar = seciliSinif ? siniflar.filter(s => s.id === seciliSinif) : siniflar
@@ -932,249 +611,254 @@ export default function SinifDefteriPage() {
   const DERS_SAATLERI = Array.from({ length: dersSaatiSayisi }, (_, i) => i + 1)
   const KOORD_SAATLERI = Array.from({ length: dersSaatiSayisi }, (_, i) => i + 11)
 
+  // ── Haftalık yoklama ───────────────────────────────────────
+  const HUCRE_H = 70
+  const BOSLUK = 8
+  const saatler = defterTuru === 'ders' ? DERS_SAATLERI : KOORD_SAATLERI
+  const haftalar = ayHaftalari(yil, ay)
+  const aktifHafta = Math.max(0, Math.min(haftaSecim ?? varsayilanHafta(haftalar), haftalar.length - 1))
+  const haftaGunleri = haftalar[aktifHafta] || []
+  const isGunu = (g: { day: number; month: number; year: number }) => !tatilMi(g.month, g.day, g.year, tatiller)
+  const islenebilir = (g: HaftaGunu) => gecmisMi(g) || bugunMu(g)
+
+  function durumAyarla(ders: SinifDefteri, hedef: 'geldi' | 'gelmedi') {
+    if (ders.durum !== hedef) durumDegistir(ders.id, ders.durum)
+  }
+
+  // Hafta hapları: işlenmiş derslerde devam oranı (gelmedi varsa turuncu)
+  const doluluk = haftalar.map(h => {
+    let geldi = 0, toplam = 0
+    for (const g of h) {
+      if (!isGunu(g) || !islenebilir(g)) continue
+      for (const s of gorunenSiniflar) for (const n of saatler) {
+        const d = dersGetir(s.ad, n, g.day, g.month, g.year)
+        if (d) { toplam++; if (d.durum === 'geldi') geldi++ }
+      }
+    }
+    return toplam ? Math.round(geldi / toplam * 100) : null
+  })
+
+  // Ay özeti (bugüne kadar işlenen dersler)
+  const ozetMap = new Map<number, { ad: string; geldi: number; gelmedi: number }>()
+  const gelinmeyen: { gun: number; dersNo: number; ad: string; sinif: string }[] = []
+  for (const vd of visibleDays) {
+    const g = { ...vd, dow: new Date(vd.year, vd.month - 1, vd.day, 12).getDay() }
+    if (g.dow === 0 || g.dow === 6 || !isGunu(g) || !islenebilir(g)) continue
+    for (const s of gorunenSiniflar) for (const n of saatler) {
+      const d = dersGetir(s.ad, n, g.day, g.month, g.year)
+      if (!d?.ogretmen_id) continue
+      const ad = (d.ogretmen as any)?.ad || 'Bilinmiyor'
+      const o = ozetMap.get(d.ogretmen_id) || { ad, geldi: 0, gelmedi: 0 }
+      if (d.durum === 'geldi') o.geldi++; else { o.gelmedi++; gelinmeyen.push({ gun: g.day, dersNo: n > 10 ? n - 10 : n, ad, sinif: s.ad }) }
+      ozetMap.set(d.ogretmen_id, o)
+    }
+  }
+  const ozetListe = [...ozetMap.entries()].map(([id, v]) => ({ id, ...v })).sort((a, b) => (b.geldi + b.gelmedi) - (a.geldi + a.gelmedi))
+  const topGeldi = ozetListe.reduce((t, o) => t + o.geldi, 0)
+  const topGelmedi = ozetListe.reduce((t, o) => t + o.gelmedi, 0)
+  const devamOrani = topGeldi + topGelmedi ? Math.round(topGeldi / (topGeldi + topGelmedi) * 100) : null
+
+  const vurguAd = vurgu === null ? null : (personel.find(p => p.id === vurgu)?.ad || ozetListe.find(o => o.id === vurgu)?.ad || 'Öğretmen')
+
+  const segmentDugme = (aktif: boolean): React.CSSProperties => ({ height: 30, padding: '0 12px', borderRadius: 7, border: `1px solid ${aktif ? 'var(--border)' : 'transparent'}`, background: aktif ? '#fff' : 'transparent', fontWeight: aktif ? 600 : 500, fontSize: 13, color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: aktif ? '0 1px 2px rgba(14,17,22,0.08)' : 'none' })
+
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       <Topbar
         title="Sınıf Defteri"
-        sub={`${ayLabel(ay, yil)} — Öğretmen Devam Takibi`}
+        sub={`${ayLabel(ay, yil)} · öğretmen devam takibi`}
         actions={
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button 
-              className="btn no-print" 
-              disabled={pickerSaving} 
-              style={{ 
-                background: 'var(--accent)', 
-                color: '#fff', 
-                border: 'none', 
-                fontWeight: 600, 
-                padding: '6px 12px', 
-                fontSize: 13, 
-                borderRadius: 6, 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 6,
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }} 
-              onClick={programdanAktar}
-              onMouseOver={e => e.currentTarget.style.background = 'var(--accent-hover)'}
-              onMouseOut={e => e.currentTarget.style.background = 'var(--accent)'}
-            >
-              <RefreshCw size={14} className={pickerSaving ? "animate-spin" : ""} />
-              {pickerSaving ? 'Eşitleniyor...' : 'Ders Programı ile Eşitle'}
+          <>
+            <button className="btn btn-secondary btn-sm no-print" disabled={pickerSaving} onClick={programdanAktar} title="Ders programındaki atamaları bu aya aktarır">
+              <RefreshCw size={14} className={pickerSaving ? 'animate-spin' : ''} />
+              {pickerSaving ? 'Eşitleniyor…' : 'Ders programıyla eşitle'}
             </button>
-            <div style={{ display: 'flex', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
-              {(['aylik', 'haftalik'] as const).map(g => (
-                <button
-                  key={g} className="btn btn-sm no-print"
-                  style={{
-                    borderRadius: 0, border: 'none',
-                    background: gorunum === g ? 'var(--accent)' : 'transparent',
-                    color: gorunum === g ? '#fff' : 'var(--text2)',
-                    padding: '6px 12px',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6
-                  }}
-                  onClick={() => setGorunum(g)}
-                >
-                  {g === 'aylik' ? <Calendar size={14} /> : <Grid size={14} />}
-                  {g === 'aylik' ? 'Aylık' : 'Haftalık'}
-                </button>
-              ))}
-            </div>
-            <button
-              className="btn btn-pdf btn-sm"
-              onClick={handlePdfDownload}
-            >
-              <Download size={14} /> PDF İndir
-            </button>
-          </div>
+            <button className="btn btn-secondary btn-sm no-print" onClick={() => handlePdfDownload('aylik')}><Download size={14} /> Aylık PDF</button>
+            <button className="btn btn-secondary btn-sm no-print" onClick={() => handlePdfDownload('haftalik')}><Download size={14} /> Haftalık PDF</button>
+          </>
         }
       />
 
-      <div style={{ padding: '16px 28px 250px 28px' }}>
-        {msg && <div className="no-print" style={{ marginBottom: 16 }}><div className={`alert ${msg.startsWith('✅') ? 'alert-success' : 'alert-danger'}`}>{msg}</div></div>}
+      <div style={{ padding: '20px 28px 48px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <Bildirim msg={msg} onClose={() => setMsg('')} className="no-print" />
 
-        <div className="card no-print" style={{ padding: '12px 16px', marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, textTransform: 'uppercase' }}>Sınıf Seçimi</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={() => setSeciliSinif(null)} style={{ padding: '6px 16px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '2px solid', borderColor: seciliSinif === null ? 'var(--accent)' : 'var(--border)', background: seciliSinif === null ? 'var(--accent)' : '#fff', color: seciliSinif === null ? '#fff' : 'var(--text2)', transition: 'all 0.2s' }}>Tüm Sınıflar</button>
-            {siniflar.map(s => (
-              <button key={s.id} onClick={() => setSeciliSinif(seciliSinif === s.id ? null : s.id)} style={{ padding: '6px 16px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '2px solid', borderColor: seciliSinif === s.id ? 'var(--accent)' : 'var(--border)', background: seciliSinif === s.id ? 'var(--accent)' : '#fff', color: seciliSinif === s.id ? '#fff' : 'var(--text2)', transition: 'all 0.2s' }}>{s.ad}</button>
-            ))}
+        {/* Araç çubuğu: sınıf · defter türü · hafta · açıklama */}
+        <div className="card no-print" style={{ margin: 0, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <div role="tablist" aria-label="Sınıf" style={{ display: 'flex', gap: 3, padding: 3, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 9, flexWrap: 'wrap' }}>
+            <button role="tab" aria-selected={seciliSinif === null} onClick={() => setSeciliSinif(null)} style={segmentDugme(seciliSinif === null)}>Tüm sınıflar</button>
+            {siniflar.map(s => <button key={s.id} role="tab" aria-selected={seciliSinif === s.id} onClick={() => setSeciliSinif(s.id)} style={segmentDugme(seciliSinif === s.id)}>{s.ad}</button>)}
           </div>
-          
-          <div style={{ marginTop: 15, fontSize: 11, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 16 }}>ℹ️</span>
-            <span>Öğretmenlerin yoklama durumunu değiştirmek için <b>isimlerin altındaki etiketlere</b> tıklayabilirsiniz.</span>
+          <div role="tablist" aria-label="Defter" style={{ display: 'flex', gap: 3, padding: 3, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 9 }}>
+            <button role="tab" aria-selected={defterTuru === 'ders'} onClick={() => setDefterTuru('ders')} style={segmentDugme(defterTuru === 'ders')}><School size={14} /> Öğretmen</button>
+            <button role="tab" aria-selected={defterTuru === 'koord'} onClick={() => setDefterTuru('koord')} style={segmentDugme(defterTuru === 'koord')}><UserCog size={14} /> Koordinatör</button>
+          </div>
+          <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
+          <HaftaSecici haftalar={haftalar} secili={aktifHafta} onSec={setHaftaSecim} doluluk={doluluk} />
+          <div style={{ flex: 1 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 12.5, color: 'var(--text2)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="sd-lejant" style={{ background: 'var(--success-light)', borderColor: 'var(--success-border)', color: '#0B6B42' }}><Check size={10} strokeWidth={3.5} /></span>Geldi</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="sd-lejant" style={{ background: 'var(--danger-light)', borderColor: 'var(--danger-border)', color: 'var(--danger-hover)' }}><X size={10} strokeWidth={3.5} /></span>Gelmedi</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="sd-lejant" style={{ borderStyle: 'dashed' }} />İleri tarih</span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 48 }}>
-          {gorunenSiniflar.map(sinif => {
-            const currentTab = getTab(sinif.id)
-            
-            return (
-              <div key={sinif.id} className="sinif-block" style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)', background: '#fff' }}>
-                <div className="no-print" style={{ padding: '16px 20px', background: '#f8f9fa', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>
-                    {sinif.ad} <span style={{ fontWeight: 400, color: 'var(--text3)', fontSize: 13 }}>({sinif.yas_grubu})</span>
-                  </h3>
-                  
-                  {/* Tab Selector */}
-                  <div style={{ display: 'flex', background: 'var(--bg)', padding: 3, borderRadius: 8, border: '1px solid var(--border)' }}>
-                    <button 
-                      onClick={() => setTab(sinif.id, 'ders')}
-                      style={{ 
-                        border: 'none', padding: '6px 16px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                        background: currentTab === 'ders' ? 'var(--accent)' : 'transparent',
-                        color: currentTab === 'ders' ? '#fff' : 'var(--text2)',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      🏫 Öğretmen Defteri
-                    </button>
-                    <button 
-                      onClick={() => setTab(sinif.id, 'koord')}
-                      style={{ 
-                        border: 'none', padding: '6px 16px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                        background: currentTab === 'koord' ? 'var(--info)' : 'transparent',
-                        color: currentTab === 'koord' ? '#fff' : 'var(--text2)',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      👔 Koordinatör Defteri
-                    </button>
+        {siniflar.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px 20px', textAlign: 'center', background: 'var(--surface)', borderRadius: 12, border: '1px dashed var(--border-strong)' }}>
+            <Calendar size={40} color="var(--text3)" style={{ marginBottom: 14 }} />
+            <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Sınıf defteri boş</h2>
+            <p style={{ color: 'var(--text3)', maxWidth: 420, margin: '8px 0 0' }}>Aktif sınıf yok ya da veriler yükleniyor. Sınıflar tanımlıysa önce ders programını doldurup “Ders programıyla eşitle” düğmesini kullanın.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <div style={{ flex: '999 1 640px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {gorunenSiniflar.map(sinif => (
+                <section key={sinif.id} className="card" style={{ margin: 0, padding: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, padding: '0 4px 10px' }}>
+                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{sinif.ad}</h3>
+                    {sinif.yas_grubu && <span style={{ fontSize: 12.5, color: 'var(--text3)' }}>{sinif.yas_grubu}</span>}
+                    <span style={{ fontSize: 12.5, color: 'var(--text3)' }}>{defterTuru === 'ders' ? 'Öğretmen defteri' : 'Koordinatör defteri'}</span>
+                    {vurguAd && <button className="vurgu-cip" onClick={() => setVurgu(null)} aria-label={`${vurguAd} vurgusunu kaldır`}>{vurguAd} vurgulanıyor <X size={12} /></button>}
                   </div>
-                </div>
+                  <div style={{ display: 'flex', gap: BOSLUK }}>
+                    <div style={{ width: 64, flex: 'none', display: 'flex', flexDirection: 'column', gap: BOSLUK }}>
+                      <div style={{ height: 74 }} />
+                      {saatler.map((n, i) => <div key={n} style={{ height: HUCRE_H, display: 'flex', alignItems: 'center', fontWeight: 600, fontSize: 13, color: defterTuru === 'koord' ? 'var(--info)' : 'var(--text)' }}>{i + 1}. {defterTuru === 'koord' ? 'koord.' : 'ders'}</div>)}
+                    </div>
+                    {haftaGunleri.map(g => {
+                      const tAd = tatilAdi(g, tatiller)
+                      const bugun = bugunMu(g)
+                      const isle = islenebilir(g)
+                      const gunDersleri = saatler.map(n => dersGetir(sinif.ad, n, g.day, g.month, g.year)).filter(Boolean) as SinifDefteri[]
+                      const gelmeyen = gunDersleri.filter(d => d.durum === 'gelmedi').length
+                      const ozet = tAd ? 'Tatil' : !gunDersleri.length ? 'Ders yok' : isle ? `${gunDersleri.length - gelmeyen} / ${gunDersleri.length} geldi` : 'Planlandı'
+                      return (
+                        <div key={g.day} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: BOSLUK, borderRadius: 10, background: bugun ? '#F6F8FF' : 'transparent', padding: '0 4px 4px' }}>
+                          <GunBasligi g={g} tatil={!!tAd} yukseklik={74} ozet={ozet} ozetRenk={gelmeyen ? 'var(--danger-hover)' : bugun ? 'var(--accent-dark)' : undefined} />
+                          {tAd ? (
+                            <TatilBlogu ad={tAd} alt="Yoklama alınmaz" yukseklik={saatler.length * HUCRE_H + (saatler.length - 1) * BOSLUK} />
+                          ) : saatler.map(n => {
+                            const ders = dersGetir(sinif.ad, n, g.day, g.month, g.year)
+                            const og = ders?.ogretmen as any
+                            const vurguMu = vurgu !== null && ders?.ogretmen_id === vurgu
+                            const soluk = vurgu !== null && !vurguMu
+                            if (!ders) {
+                              return defterTuru === 'koord' ? (
+                                <button key={n} className="sd-bos" style={{ height: HUCRE_H, opacity: soluk ? 0.35 : 1 }} onClick={(e) => openPicker(e, g.day, g.month, g.year, sinif.id, n, GUN_UZUN[g.dow])} aria-label={`${GUN_UZUN[g.dow]} ${g.day} için koordinatör ata`}>
+                                  <Plus size={14} /> Koordinatör ata
+                                </button>
+                              ) : (
+                                <div key={n} className="sd-yok" style={{ height: HUCRE_H, opacity: soluk ? 0.35 : 1 }}>Ders yok</div>
+                              )
+                            }
+                            const gelmedi = ders.durum === 'gelmedi'
+                            return (
+                              <div key={n} className="sd-hucre" style={{ height: HUCRE_H, borderStyle: isle ? 'solid' : 'dashed', background: gelmedi ? '#FFF8F8' : vurguMu ? 'var(--accent-lighter)' : isle ? 'var(--surface)' : '#FAFBFC', borderColor: gelmedi ? 'var(--danger-border)' : vurguMu ? '#C9D4FA' : 'var(--border)', opacity: soluk ? 0.35 : 1, transition: 'opacity .15s' }}>
+                                {defterTuru === 'koord' && <button className="sd-sil no-print" onClick={(e) => fastSil(e, ders.id)} aria-label="Koordinatör atamasını sil"><X size={12} /></button>}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                                  <span style={{ fontWeight: 600, fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: gelmedi ? 'var(--danger-hover)' : isle ? 'var(--text)' : 'var(--text3)', textDecoration: gelmedi ? 'line-through' : 'none' }}>{og?.ad || 'Bilinmiyor'}</span>
+                                  {og?.aktif === false && <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--danger)' }}>Ayrıldı</span>}
+                                </div>
+                                {isle ? (
+                                  <div role="radiogroup" aria-label={`${g.day} ${AYLAR[g.month]}, ${og?.ad || ''} yoklama`} style={{ display: 'flex', gap: 4 }}>
+                                    <button role="radio" aria-checked={!gelmedi} aria-label="Geldi" title="Geldi" className={`sd-durum ${!gelmedi ? 'geldi' : ''}`} onClick={() => durumAyarla(ders, 'geldi')}><Check size={11} strokeWidth={3.2} /><span className="sd-durum-metin">Geldi</span></button>
+                                    <button role="radio" aria-checked={gelmedi} aria-label="Gelmedi" title="Gelmedi" className={`sd-durum ${gelmedi ? 'gelmedi' : ''}`} onClick={() => durumAyarla(ders, 'gelmedi')}><X size={11} strokeWidth={3.2} /><span className="sd-durum-metin">Gelmedi</span></button>
+                                  </div>
+                                ) : (
+                                  <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>Planlandı</span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
 
-                {gorunum === 'aylik' && (
-                  <RenderTable 
-                    sinif={sinif} 
-                    hours={currentTab === 'ders' ? DERS_SAATLERI : KOORD_SAATLERI} 
-                    type={currentTab} 
-                    currentTab={currentTab} 
-                    ayarlar={ayarlar} 
-                    ay={ay} 
-                    yil={yil} 
-                    visibleDays={visibleDays} 
-                    tatiller={tatiller}
-                    dersGetir={dersGetir}
-                    durumDegistir={durumDegistir}
-                    openPicker={openPicker}
-                    fastSil={fastSil}
-                  />
+            <aside style={{ flex: '1 1 280px', maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 16, position: 'sticky', top: 88 }}>
+              <section className="card" style={{ margin: 0, padding: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{ayLabel(ay, yil).split(' ')[0]} yoklama özeti</h3>
+                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{seciliSinif ? gorunenSiniflar[0]?.ad : 'Tüm sınıflar'} · bugüne kadar işlenen dersler · derslerini görmek için öğretmene tıklayın</div>
+                {devamOrani === null ? (
+                  <div style={{ fontSize: 13, color: 'var(--text3)', marginTop: 14 }}>Henüz işlenmiş ders yok.</div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 14 }}>
+                      <span style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 600, letterSpacing: '-0.03em' }}>%{devamOrani}</span>
+                      <span className="tabular" style={{ fontSize: 12.5, color: 'var(--text3)' }}>devam · {topGeldi} / {topGeldi + topGelmedi} ders</span>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 3, background: 'var(--danger-light)', marginTop: 8, overflow: 'hidden' }}><div style={{ width: `${devamOrani}%`, height: '100%', background: 'var(--success)' }} /></div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 12 }}>
+                      {ozetListe.slice(0, 12).map(o => (
+                        <button key={o.id} type="button" className="yuk-satir" aria-pressed={vurgu === o.id} onClick={() => setVurgu(vurgu === o.id ? null : o.id)} title={vurgu === o.id ? 'Vurguyu kaldır' : 'Bu öğretmenin derslerini vurgula'} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, ...(vurgu === o.id ? { background: 'var(--accent-lighter)', borderColor: '#C9D4FA' } : {}) }}>
+                          <span style={{ width: 22, height: 22, flex: 'none', borderRadius: '50%', fontSize: 9.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', background: vurgu === o.id ? 'var(--accent)' : '#EEF0F4', color: vurgu === o.id ? '#fff' : 'var(--text2)' }}>{basHarf(o.ad)}</span>
+                          <span style={{ flex: 1, fontWeight: vurgu === o.id ? 600 : 500, color: vurgu === o.id ? 'var(--accent-dark)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.ad}</span>
+                          <span className="tabular" style={{ fontSize: 12, color: '#0B6B42' }} title="Geldi">{o.geldi}</span>
+                          <span className="tabular" style={{ fontSize: 12, width: 26, textAlign: 'right', color: o.gelmedi ? 'var(--danger-hover)' : 'var(--text3)' }} title="Gelmedi">{o.gelmedi}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, fontSize: 11, color: 'var(--text3)', marginTop: 6 }}><span>geldi</span><span>gelmedi</span></div>
+                  </>
                 )}
-
-                {gorunum === 'haftalik' && (
-                  <div className="no-print" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 32, background: '#fff' }}>
-                    {visibleWeeks.map((week, wIndex) => (
-                      <RenderWeeklyTable 
-                        key={wIndex}
-                        sinif={sinif}
-                        week={week}
-                        currentHours={currentTab === 'ders' ? DERS_SAATLERI : KOORD_SAATLERI}
-                        currentTab={currentTab}
-                        defter={defter}
-                        tatiller={tatiller}
-                        wIndex={wIndex}
-                        dersGetir={dersGetir}
-                        durumDegistir={durumDegistir}
-                        openPicker={openPicker}
-                        fastSil={fastSil}
-                      />
+              </section>
+              <section className="card" style={{ margin: 0, padding: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Gelinmeyen dersler</h3>
+                {gelinmeyen.length === 0 ? (
+                  <div style={{ fontSize: 13, color: 'var(--text3)', marginTop: 10 }}>Bu ay gelinmeyen ders yok.</div>
+                ) : (
+                  <div style={{ marginTop: 6 }}>
+                    {gelinmeyen.slice().reverse().slice(0, 6).map((k, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: i ? '1px solid var(--border-light)' : 'none' }}>
+                        <div style={{ width: 38, height: 40, flex: 'none', border: '1px solid var(--border)', borderRadius: 7, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1.1 }}>
+                          <span className="tabular" style={{ fontWeight: 500 }}>{k.gun}</span>
+                          <span style={{ fontSize: 9.5, color: 'var(--text3)' }}>{AYLAR[ay].slice(0, 3).toLocaleUpperCase('tr-TR')}</span>
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.ad}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text3)' }}>{k.dersNo}. ders{gorunenSiniflar.length > 1 ? ` · ${k.sinif}` : ''}</div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
-              </div>
-            )
-          })}
-        </div>
-
-      <div className="no-print" style={{ marginTop: 60, padding: '30px 0', borderTop: '1px dashed var(--border)', textAlign: 'center' }}>
-          <p style={{ color: 'var(--text3)', fontSize: 13, marginBottom: 15 }}>⚠️ Eksik veya hatalı veriler mi görüyorsunuz?</p>
-          <button 
-            className="btn no-print" 
-            onClick={programdanAktar} 
-            disabled={pickerSaving}
-            style={{ 
-              background: 'var(--accent)', 
-              color: '#fff', 
-              border: 'none',
-              padding: '10px 24px',
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8
-            }}
-            onMouseOver={e => e.currentTarget.style.background = 'var(--accent-hover)'}
-            onMouseOut={e => e.currentTarget.style.background = 'var(--accent)'}
-          >
-            <RefreshCw size={14} className={pickerSaving ? "animate-spin" : ""} />
-            {pickerSaving ? 'Eşitleniyor...' : 'Ders Programı ile Eşitle'}
-          </button>
-          <div style={{ fontSize: 11, color: '#999', marginTop: 10 }}>Bu işlem, ders programındaki tüm kayıtları mevcut aya kopyalar.</div>
-        </div>
+              </section>
+            </aside>
+          </div>
+        )}
       </div>
 
       {picker && (
-        <div
-          className="picker-overlay"
-          onClick={() => setPicker(null)}
-          style={{ position: 'fixed', inset: 0, zIndex: 9000 }}
-        >
+        <div className="picker-overlay" onClick={() => setPicker(null)} style={{ position: 'fixed', inset: 0, zIndex: 9000 }}>
           <div
             className="fast-picker"
+            role="dialog"
+            aria-label="Koordinatör seç"
             style={{
               position: 'fixed',
-              top: (
-                picker.rect.bottom + 320 > window.innerHeight
-                  ? picker.rect.top - 320
-                  : picker.rect.bottom + 6
-              ),
-              left: Math.min(
-                Math.max(picker.rect.left, 8),
-                window.innerWidth - 230
-              ),
-              zIndex: 9999,
-              width: 220,
-              maxHeight: 300,
-              display: 'flex',
-              flexDirection: 'column',
+              top: picker.rect.bottom + 320 > window.innerHeight ? Math.max(8, picker.rect.top - 320) : picker.rect.bottom + 6,
+              left: Math.min(Math.max(picker.rect.left, 8), window.innerWidth - 248),
+              zIndex: 9999, width: 240, maxHeight: 300, display: 'flex', flexDirection: 'column',
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div className="picker-header">
-              {picker.day} {AYLAR[picker.month || 1]} — {picker.dersNo >= 11 ? 'Koordinatör Seç' : 'Öğretmen Seç'}
-            </div>
+            <div className="picker-header">{picker.gunAdi} {picker.day} {AYLAR[picker.month || 1]} · {picker.dersNo >= 11 ? 'Koordinatör seç' : 'Öğretmen seç'}</div>
             <div className="picker-list" style={{ overflowY: 'auto', flex: 1 }}>
               {(() => {
                 const filtered = personel.filter(p => {
-                  if (p.aktif === false) return false;
+                  if (p.aktif === false) return false
                   const g = (p.gorev || '').toLowerCase()
-                  if (picker.dersNo >= 11) {
-                    return g.includes('koordinatör') || g.includes('koord') || g.includes('başkan')
-                  }
+                  if (picker.dersNo >= 11) return g.includes('koordinatör') || g.includes('koord') || g.includes('başkan')
                   return !['muhasebe', 'temizlik', 'başkan', 'denetim'].some(kw => g.includes(kw))
                 })
                 if (filtered.length === 0) {
-                  return (
-                    <div style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text3)', textAlign: 'center' }}>
-                      {picker.dersNo >= 11 ? 'Koordinatör öğretmen bulunamadı' : 'Personel bulunamadı'}
-                    </div>
-                  )
+                  return <div style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text3)', textAlign: 'center' }}>{picker.dersNo >= 11 ? 'Koordinatör görevli personel bulunamadı' : 'Personel bulunamadı'}</div>
                 }
                 return filtered.map(p => (
                   <button key={p.id} className="picker-item" onClick={() => directKaydet(p.id, picker)}>
-                    {p.ad} <span style={{ fontSize: 10, opacity: 0.6 }}>- {p.gorev}</span>
+                    {p.ad} <span style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 400 }}>{p.gorev}</span>
                   </button>
                 ))
               })()}
@@ -1199,124 +883,35 @@ export default function SinifDefteriPage() {
       )}
 
       <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        :global(.animate-spin) { animation: spin 1s linear infinite; }
+        .sd-hucre { container-type: inline-size; position: relative; border-radius: 9px; border-width: 1px; padding: 7px 8px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; }
+        .sd-durum { flex: 1; height: 26px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text3); font: inherit; font-size: 11.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; padding: 0; transition: background .12s, border-color .12s, color .12s; }
+        .sd-durum { min-width: 0; overflow: hidden; white-space: nowrap; }
+        @container (max-width: 150px) { .sd-durum-metin { display: none; } }
+        .sd-durum:hover { border-color: var(--border-strong); color: var(--text); }
+        .sd-durum.geldi { background: var(--success-light); border-color: var(--success-border); color: #0B6B42; }
+        .sd-durum.gelmedi { background: var(--danger-light); border-color: var(--danger-border); color: var(--danger-hover); }
+        .sd-durum:focus-visible, .sd-bos:focus-visible { outline: none; box-shadow: var(--ring); }
+        .sd-bos { width: 100%; border-radius: 9px; border: 1px dashed var(--border-strong); background: transparent; color: var(--text3); font: inherit; font-size: 12.5px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+        .sd-bos:hover { border-color: var(--accent); border-style: solid; color: var(--accent-dark); background: var(--accent-lighter); }
+        .sd-yok { border-radius: 9px; border: 1px dashed var(--border); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text3); }
+        .sd-sil { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 1px solid var(--danger-border); background: var(--danger-light); color: var(--danger); display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity .15s; }
+        .sd-hucre:hover .sd-sil, .sd-sil:focus-visible { opacity: 1; }
+        .sd-sil:hover { background: var(--danger); color: #fff; }
+        @media (hover: none) { .sd-sil { opacity: 1; } }
+        .sd-lejant { width: 16px; height: 16px; border-radius: 5px; border: 1px solid var(--border-strong); display: inline-flex; align-items: center; justify-content: center; }
 
-        :global(.scroll-container) { scrollbar-width: thick; scrollbar-color: var(--accent) #e0e0e0; overflow: auto; }
-        :global(.scroll-container::-webkit-scrollbar) { height: 12px !important; display: block !important; }
-        :global(.scroll-container::-webkit-scrollbar-track) { background: var(--bg) !important; }
-        :global(.scroll-container::-webkit-scrollbar-thumb) { background: var(--border) !important; border-radius: 8px; border: 3px solid var(--bg); }
-        
-        :global(.program-cell) { cursor: pointer; transition: all 0.2s; min-height: 60px; position: relative; }
-        :global(.program-cell:hover) { background: #fffcf0 !important; box-shadow: inset 0 0 0 1px rgba(45,90,61,0.1); }
-        
-        :global(.btn-ata-mini) { width: 26px; height: 26px; border-radius: 50%; border: 1px dashed #ccc; background: #fff; cursor: pointer; color: #999; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; }
-        :global(.btn-ata-mini:hover) { background: var(--accent); color: #fff; border-style: solid; transform: scale(1.1); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        
-        :global(.cell-content) { position: relative; width: calc(100% - 6px); height: 100%; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; margin: 0 3px; background: #f8f9fa; border: 1.5px solid #dee2e6; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); transition: border-color 0.15s; }
-        :global(.program-cell:hover .cell-content) { border-color: #adb5bd; }
-        
-        :global(.fast-del-mini) { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; background: #fff; color: #e53e3e; border: 1px solid #eee; border-radius: 50%; font-size: 12px; display: none; align-items: center; justify-content: center; cursor: pointer; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: all 0.2s; }
-        :global(.program-cell:hover .fast-del-mini) { display: flex; }
-        :global(.fast-del-mini:hover) { background: #ef4444; color: #fff; border-color: #ef4444; transform: scale(1.1); }
-        
-        :global(.status-badge) { margin-top: 4px; padding: 2px 6px; border-radius: 10px; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px; display: inline-block; }
-        :global(.status-badge.geldi) { background: var(--accent); color: #fff; }
-        :global(.status-badge.gelmedi) { background: #c53030; color: #fff; }
-
-        :global(.add-btn-dash) { 
-          color: var(--border); 
-          font-size: 20px; 
-          font-weight: 300; 
-          opacity: 0.5; 
-          transition: all 0.2s;
-        }
-        :global(.program-cell:hover .add-btn-dash) { color: var(--accent); opacity: 1; transform: scale(1.2); }
-        
-        @keyframes popIn {
-          from { transform: scale(0.95); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-
-        /* ── Picker ─────────────────────────────────── */
-        .picker-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 9000;
-          background: transparent;
-        }
-        .fast-picker {
-          background: #ffffff;
-          border-radius: 12px;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10);
-          border: 1px solid #e5e7eb;
-          overflow: hidden;
-          animation: popIn 0.15s ease;
-          min-width: 200px;
-        }
-        .picker-header {
-          padding: 10px 14px;
-          font-size: 11px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: var(--accent);
-          background: #f8faf8;
-          border-bottom: 1px solid #e5e7eb;
-        }
-        .picker-list {
-          max-height: 260px;
-          overflow-y: auto;
-          padding: 4px 0;
-        }
-        .picker-item {
-          display: block;
-          width: 100%;
-          padding: 9px 14px;
-          text-align: left;
-          background: none;
-          border: none;
-          cursor: pointer;
-          font-size: 12px;
-          font-weight: 600;
-          color: var(--text1, #111);
-          border-radius: 0;
-          transition: background 0.12s;
-        }
-        .picker-item:hover {
-          background: #f0fdf4;
-          color: var(--accent);
-        }
-
-        .print-only { display: none; }
-
-        @media screen {
-          :global(.tab-inactive) { display: none; }
-        }
-
-        @media print {
-          @page { size: A4 landscape; margin: 10mm; }
-          :global(.no-print) { display: none !important; }
-          .print-only { display: block !important; }
-          :global(.scroll-outer) { overflow: visible !important; border: 1px solid #000 !important; border-radius: 0 !important; width: 100% !important; }
-          :global(.scroll-container) { max-height: none !important; height: auto !important; overflow: visible !important; width: 100% !important; }
-          table { width: 100% !important; table-layout: auto !important; border: 1px solid #000 !important; border-collapse: collapse !important; }
-          th, td { border: 1px solid #000 !important; color: #000 !important; position: static !important; }
-          th { background: #f0f0f0 !important; color: #000 !important; }
-          :global(.sinif-block) { border: none !important; margin-bottom: 0 !important; padding: 0 !important; overflow: visible !important; break-after: page; }
-          :global(.tab-inactive) { display: block !important; }
-          :global(.print-spacer) { display: block !important; height: 30px !important; }
-          :global(.table-print-container) { break-inside: avoid; margin-bottom: 20px; width: 100%; overflow: visible !important; }
-          body { background: #fff !important; padding: 0 !important; margin: 0 !important; overflow: visible !important; }
-          .card { box-shadow: none !important; border: none !important; overflow: visible !important; }
-          :global(.print-area) { zoom: 1 !important; transform: none !important; overflow: visible !important; }
-          :global(.status-badge) { border: 1px solid #000 !important; color: #000 !important; background: transparent !important; }
-        }
+        .fast-picker { background: var(--surface); border-radius: 12px; box-shadow: var(--shadow-float); border: 1px solid var(--border); overflow: hidden; min-width: 200px; }
+        .picker-header { padding: 10px 14px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); background: var(--surface2); border-bottom: 1px solid var(--border); }
+        .picker-list { max-height: 260px; overflow-y: auto; padding: 4px 0; }
+        .picker-item { display: block; width: 100%; padding: 9px 14px; text-align: left; background: none; border: none; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: var(--text); }
+        .picker-item:hover { background: var(--accent-lighter); color: var(--accent-dark); }
+        .yuk-satir { display: block; width: calc(100% + 16px); margin: 0 -8px; text-align: left; border: 1px solid transparent; background: none; border-radius: 8px; padding: 6px 8px; font: inherit; color: inherit; cursor: pointer; transition: background .12s; }
+        .yuk-satir:hover { background: var(--surface2); }
+        .yuk-satir:focus-visible { outline: none; box-shadow: var(--ring); }
+        .vurgu-cip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px 0 10px; border-radius: 99px; border: 1px solid #C9D4FA; background: var(--accent-lighter); color: var(--accent-dark); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .vurgu-cip:hover { background: #E1E8FD; }
       `}</style>
     </div>
   )

@@ -7,9 +7,11 @@ import { supabase } from '@/lib/supabase'
 import { fmtTL, ayLabel, isGunuSayisi, tarihFmt } from '@/lib/hesaplama'
 import { Ogrenci, Tahsilat, Ayarlar, kulupOgrencisi } from '@/lib/types'
 import { logIslem } from '@/lib/audit'
+import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAc, PDF_RENK } from '@/lib/pdf'
 import { useAuth } from '@/lib/AuthContext'
 import ConfirmModal from '@/components/ConfirmModal'
-import { Printer, Wallet, History, Save, Loader2, CreditCard, Trash2, CheckCircle2, X } from 'lucide-react'
+import { FileDown, Wallet, History, Save, Loader2, CreditCard, Trash2, CheckCircle2, X } from 'lucide-react'
+import { EmptyPayments } from '@/components/brand/Illustrations'
 
 export default function OdemePage() {
   const { ay, yil } = useAy()
@@ -381,6 +383,41 @@ export default function OdemePage() {
   const toplamOdenen = ozet.reduce((s, r) => s + r.odenen, 0)
   const toplamKalan = ozet.reduce((s, r) => s + Math.max(r.kalan, 0), 0)
 
+  // Ekrandaki (filtrelenmiş) ödeme durumu listesi, ortak PDF stilinde
+  const handlePdf = async () => {
+    const { pdf, autoTable } = await pdfHazirla('portrait')
+    const filtreAdi = filtre === 'borclu' ? 'Borcu olanlar' : filtre === 'odendi' ? 'Tam ödeyenler' : 'Tüm öğrenciler'
+    const y = pdfBaslik(pdf, {
+      kurum: ayarlar?.kurum_adi || okul?.ad,
+      baslik: 'Ödeme durumu listesi',
+      alt: `${ayLabel(ay, yil)} · ${isGunu} iş günü · ${filtreAdi}${sinifFiltre ? ` · Sınıf: ${sinifFiltre}` : ''}`,
+    })
+    const durumYazi = (r: typeof ozet[number]) => r.ogrenci.ucretsiz_mi ? 'Ücretsiz' : r.durum === 'tam' ? 'Ödendi' : r.durum === 'kismi' ? 'Kısmi' : 'Ödenmedi'
+    const top = (fn: (r: typeof ozet[number]) => number) => fmtTL(filtrelenmis.reduce((t, r) => t + fn(r), 0))
+    autoTable(pdf, pdfTablo({
+      head: [['Sıra', 'Öğrenci', 'Sınıf', 'Gereken (TL)', 'Ödenen (TL)', 'Kalan (TL)', 'Durum']],
+      body: filtrelenmis.map((r, i) => [
+        i + 1,
+        `${r.ogrenci.ad} ${r.ogrenci.soyad}${r.ogrenci.aktif === false ? ' (Ayrıldı)' : ''}`,
+        r.ogrenci.sinif || '-',
+        fmtTL(r.gereken), fmtTL(r.odenen), fmtTL(Math.max(r.kalan, 0)), durumYazi(r),
+      ]),
+      foot: [[{ content: 'Toplam', colSpan: 3 }, top(r => r.gereken), top(r => r.odenen), top(r => Math.max(r.kalan, 0)), '']],
+      startY: y,
+      columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 2: { cellWidth: 18 }, 3: { cellWidth: 27, halign: 'right' }, 4: { cellWidth: 27, halign: 'right' }, 5: { cellWidth: 27, halign: 'right' }, 6: { cellWidth: 20, halign: 'center' } },
+      didParseCell: (d) => {
+        if (d.section !== 'body' && d.column.index >= 3 && d.column.index <= 5) d.cell.styles.halign = 'right'
+        const r = filtrelenmis[d.row.index]
+        if (d.section === 'body' && r && d.column.index === 6) {
+          d.cell.styles.fontStyle = 'bold'
+          if (!r.ogrenci.ucretsiz_mi && r.durum !== 'tam') d.cell.styles.textColor = r.durum === 'kismi' ? [138, 82, 0] : PDF_RENK.hata
+        }
+      },
+    }))
+    pdfImza(pdf, { ...ayarlar, mudur_unvani: ayarlar?.mudur_unvani || 'Okul Müdürü / Kulüp Başkanı' }, pdfSonY(pdf))
+    pdfAc(pdf, 'Ödeme durumu')
+  }
+
   return (
     <div>
       <Topbar
@@ -389,11 +426,12 @@ export default function OdemePage() {
         actions={
           <button 
             className="btn btn-secondary btn-sm no-print" 
-            onClick={() => window.print()}
+            onClick={handlePdf}
+            disabled={loading}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
-            <Printer size={16} />
-            <span>Yazdır</span>
+            <FileDown size={16} />
+            <span>PDF</span>
           </button>
         }
       />
@@ -432,7 +470,7 @@ export default function OdemePage() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 15, width: '100%' }}>
                 <div className="prog-bar" style={{ flex: 1, height: 10, marginTop: 0, background: 'rgba(0,0,0,0.08)' }}>
-                  <div className="prog-fill" style={{ width: `${(progress.current / progress.total) * 100}%`, boxShadow: '0 0 10px rgba(45,90,61,0.3)' }}></div>
+                  <div className="prog-fill" style={{ width: `${(progress.current / progress.total) * 100}%`, boxShadow: '0 0 10px rgba(35,71,217,0.3)' }}></div>
                 </div>
                 <button 
                   className="btn" 
@@ -676,9 +714,7 @@ export default function OdemePage() {
             </div>
             {loading ? <div className="alert alert-info">⏳ Yükleniyor...</div> : tahsilatlar.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}>
-                  <CreditCard size={48} />
-                </div>
+                <EmptyPayments width={200} />
                 <p>Bu ay henüz ödeme kaydı yok</p>
               </div>
             ) : (

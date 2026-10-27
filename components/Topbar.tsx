@@ -12,23 +12,23 @@ export default function Topbar({ title, sub, actions }: Props) {
       className="no-print"
       style={{
         background: 'var(--surface)',
-        borderBottom: '1px solid #d8d0be',
-        padding: '14px 28px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        borderBottom: '1px solid var(--border)',
+        padding: '0 32px',
+        minHeight: 68,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
         position: 'sticky', top: 0, zIndex: 100,
-        boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
       }}
     >
-      <div>
-        <div style={{ fontFamily: 'Playfair Display, serif', fontSize: 20, fontWeight: 600 }}>
+      <div style={{ minWidth: 0 }}>
+        <h1 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text)', lineHeight: 1.2 }}>
           {title}
-        </div>
+        </h1>
         {sub && (
-          <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{sub}</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 2 }}>{sub}</div>
         )}
       </div>
       {actions && (
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {actions}
         </div>
       )}
