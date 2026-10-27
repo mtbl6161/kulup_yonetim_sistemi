@@ -36,9 +36,12 @@ export async function POST(request: NextRequest) {
   const status = findVal('status')
   const mdStatus = findVal('mdStatus')
 
+  // Yönlendirme URL'si: prod'da Host header'ına GÜVENME, yapılandırılmış domaini kullan
+  // (Host header saldırgan tarafından değiştirilebilir → open-redirect/XSS riski).
   const host = request.headers.get('host')
-  const protocol = host?.includes('localhost') ? 'http' : 'https'
-  const currentAppUrl = `${protocol}://${host}`
+  const currentAppUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (host?.includes('localhost') ? `http://${host}` : 'https://klup360.com')
 
   // Önce Iyzico'nun genel hata durumuna bak (ID kontrolünden önce)
   if (status === 'failure' || (mdStatus && mdStatus !== '1')) {
@@ -97,6 +100,32 @@ export async function POST(request: NextRequest) {
 
     const admin = adminClient()
 
+    // 0. Replay (tekrar) koruması: bu ödeme daha önce işlendi mi?
+    //    islenen_odemeler tablosundaki PRIMARY KEY sayesinde aynı paymentId
+    //    ikinci kez işlenemez; böylece sahte/çift callback lisansı tekrar uzatamaz.
+    const disOdemeId = `iyzico:${result.paymentId}`
+    const mark = await admin
+      .from('islenen_odemeler')
+      .insert({ dis_odeme_id: disOdemeId, saglayici: 'iyzico', okul_id: okulId })
+
+    if (mark.error) {
+      if (mark.error.code === '23505') {
+        // Bu ödeme zaten işlenmiş → lisansı TEKRAR uzatma, kullanıcıyı başarıya yönlendir
+        console.warn('[iyzico callback] Tekrar eden ödeme yoksayıldı:', disOdemeId)
+        return new NextResponse(
+          `<html><body><script>window.parent.location.href = "${currentAppUrl}/odeme-yap?sonuc=basarili&donem=${donem}";</script></body></html>`,
+          { headers: { 'Content-Type': 'text/html' } }
+        )
+      }
+      // 42P01 = tablo henüz yok (migration çalıştırılmamış) → ödemeyi bloke etme, sadece uyar
+      if (mark.error.code !== '42P01') {
+        throw new Error(`Replay kontrol hatası: ${mark.error.message}`)
+      }
+      console.warn('[iyzico callback] islenen_odemeler tablosu yok; replay koruması PASİF. migration_islenen_odemeler.sql çalıştırın.')
+    }
+    const replayKorumaAktif = !mark.error
+
+    try {
     // 1. Ödeme kaydını kaydet
     const { error: odemeHata } = await admin.from('okul_odemeleri').insert({
       okul_id:        okulId,
@@ -157,6 +186,15 @@ export async function POST(request: NextRequest) {
           console.error(`[iyzico callback auth_unban] User: ${p.id}`, authErr)
         }
       }
+    }
+
+    } catch (isErr) {
+      // İşlem yarıda kaldıysa marker'ı geri al ki GEÇERLİ bir ödeme tekrar denenebilsin
+      if (replayKorumaAktif) {
+        await admin.from('islenen_odemeler').delete().eq('dis_odeme_id', disOdemeId)
+          .then(() => {}, () => {})
+      }
+      throw isErr
     }
 
     // Başarı sayfasına yönlendir (window.parent kullanarak)

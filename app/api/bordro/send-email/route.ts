@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await adminClient.auth.getUser(token)
   if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
 
-  const { allowed, remaining } = rateLimit(`email:${user.id}`, 100, 60 * 60 * 1000)
+  const { allowed, remaining } = await rateLimit(`email:${user.id}`, 100, 60 * 60 * 1000)
   if (!allowed) {
     return NextResponse.json({ error: 'Saatlik e-posta limitine ulaştınız (100 adet).' }, { status: 429 })
   }

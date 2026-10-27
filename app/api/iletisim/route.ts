@@ -4,7 +4,7 @@ import nodemailer from 'nodemailer'
 
 export async function POST(request: NextRequest) {
   const ip = getIp(request)
-  const { allowed } = rateLimit(`contact:${ip}`, 5, 60 * 60 * 1000)
+  const { allowed } = await rateLimit(`contact:${ip}`, 5, 60 * 60 * 1000)
   if (!allowed) {
     return NextResponse.json({ error: 'Çok fazla istek gönderdiniz.' }, { status: 429 })
   }

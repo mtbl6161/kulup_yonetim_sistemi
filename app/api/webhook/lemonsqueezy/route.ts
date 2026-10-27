@@ -11,7 +11,11 @@ export async function POST(req: NextRequest) {
   const hmac = crypto.createHmac('sha256', secret)
   const digest = hmac.update(body).digest('hex')
 
-  if (signature !== digest) {
+  // Sabit zamanlı karşılaştırma (timing attack'e karşı). Geçersiz/eksik imza,
+  // uzunluk uyuşmazlığı nedeniyle güvenle reddedilir.
+  const sigBuf = Buffer.from(signature, 'hex')
+  const digBuf = Buffer.from(digest, 'hex')
+  if (sigBuf.length !== digBuf.length || !crypto.timingSafeEqual(sigBuf, digBuf)) {
     return NextResponse.json({ error: 'Geçersiz imza' }, { status: 401 })
   }
 
@@ -35,6 +39,22 @@ export async function POST(req: NextRequest) {
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
           process.env.SUPABASE_SERVICE_ROLE_KEY!
         )
+
+        // 0. Replay (tekrar) koruması: aynı webhook olayı yalnızca bir kez işlenir
+        const disOdemeId = `ls:${eventName}:${data.id}`
+        const mark = await supabaseAdmin
+          .from('islenen_odemeler')
+          .insert({ dis_odeme_id: disOdemeId, saglayici: 'lemonsqueezy', okul_id: okulId })
+        if (mark.error) {
+          if (mark.error.code === '23505') {
+            console.warn('⚠️ Tekrar eden webhook yoksayıldı:', disOdemeId)
+            return NextResponse.json({ received: true, duplicate: true })
+          }
+          // 42P01 = tablo yok (migration çalıştırılmamış) → bloke etme, sadece uyar
+          if (mark.error.code !== '42P01') throw mark.error
+          console.warn('⚠️ islenen_odemeler tablosu yok; replay koruması PASİF. migration_islenen_odemeler.sql çalıştırın.')
+        }
+        const replayKorumaAktif = !mark.error
 
         const interval = customData?.interval || 'year'
         
@@ -68,6 +88,11 @@ export async function POST(req: NextRequest) {
 
         if (updateErr) {
           console.error('❌ Supabase Güncelleme Hatası:', updateErr.message)
+          // İşlem başarısızsa marker'ı geri al ki Lemon Squeezy tekrar denediğinde işlensin
+          if (replayKorumaAktif) {
+            await supabaseAdmin.from('islenen_odemeler').delete().eq('dis_odeme_id', disOdemeId)
+              .then(() => {}, () => {})
+          }
           throw updateErr
         }
 

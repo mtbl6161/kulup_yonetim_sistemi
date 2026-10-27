@@ -6,7 +6,7 @@ import { denemeBitisTarihi } from '@/lib/deneme'
 
 export async function POST(request: NextRequest) {
   // 10 dakikada 5 kayıt denemesi (IP bazlı)
-  const { allowed } = rateLimit(`kayit:${getIp(request)}`, 5, 10 * 60 * 1000)
+  const { allowed } = await rateLimit(`kayit:${getIp(request)}`, 5, 10 * 60 * 1000)
   if (!allowed) {
     return NextResponse.json({ error: 'Çok fazla istek. Lütfen bekleyin.' }, { status: 429 })
   }
