@@ -277,13 +277,12 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
       const giderler = hareketler.filter(h => h.tur === 'gider').sort(asc)
       const gelirler = hareketler.filter(h => h.tur === 'gelir').sort(asc)
 
-      let firstPage = true
-
       function headFor(title: 'GİDER' | 'GELİR'): any {
         return [
           [
             { content: 'Sıra No', rowSpan: 2 },
-            { content: title === 'GİDER' ? 'Alınan Fatura veya Belgenin' : 'Alındı Belgesi veya Banka Dekontunun', colSpan: 2 },
+            // İki başlık da iki satır: karşılıklı sayfalarda tablolar aynı hizada başlar
+            { content: title === 'GİDER' ? 'Alınan Fatura\nveya Belgenin' : 'Alındı Belgesi veya\nBanka Dekontunun', colSpan: 2 },
             { content: 'Açıklama', rowSpan: 2 },
             { content: 'Miktarı / Tutarı (₺)', rowSpan: 2 },
           ],
@@ -294,41 +293,46 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
         ]
       }
 
-      // Gerçek defter mantığı: her taraf (GİDER / GELİR) KENDİ bölümü ve KENDİ sayfa numarasıyla.
-      // Satırlar tarih sırasıyla akar; sayfa dolunca (RPP satır) o tarafın bir sonraki sayfasına geçer.
-      // Sıra no ve Nakli Toplam/Toplam sayfadan sayfaya devam eder. GELİR devreden'den, GİDER 0'dan başlar.
-      function renderSection(title: 'GİDER' | 'GELİR', rows: IsletmeHareket[], run0: number) {
-        let run = run0, sira = 0
-        const nPages = Math.max(Math.ceil(rows.length / RPP), 1)
-        for (let p = 0; p < nPages; p++) {
-          if (!firstPage) pdf.addPage()
-          firstPage = false
-          const y0 = pdfBaslik(pdf, { kurum: birimKurumAdi(birim, ayarlar, okul?.ad), baslik: 'İşletme hesabı defteri', alt: title, sag: `${title} sayfası ${p + 1} / ${nPages}` })
+      // Gerçek defter mantığı: açık defterde solda GİDER, sağda GELİR sayfası karşılıklı durur.
+      // Sayfalar çift çift dizilir (Gider 1, Gelir 1, Gider 2, Gelir 2 …); bir taraf daha kısa
+      // kalsa da karşısına aynı numaralı boş sayfa gelir. Her sayfa RPP satırlık sabit cetveldir;
+      // sıra no ve Nakli Toplam/Toplam sayfadan sayfaya devam eder. GELİR devreden'den, GİDER 0'dan başlar.
+      const taraflar = [
+        { title: 'GİDER' as const, rows: giderler, run: 0, sira: 0 },
+        { title: 'GELİR' as const, rows: gelirler, run: devreden, sira: 0 },
+      ]
+      const nPages = Math.max(Math.ceil(giderler.length / RPP), Math.ceil(gelirler.length / RPP), 1)
 
-          const slice = rows.slice(p * RPP, (p + 1) * RPP)
-          const nakli = run
+      for (let p = 0; p < nPages; p++) {
+        for (const t of taraflar) {
+          if (p > 0 || t.title === 'GELİR') pdf.addPage()
+          const y0 = pdfBaslik(pdf, { kurum: birimKurumAdi(birim, ayarlar, okul?.ad), baslik: 'İşletme hesabı defteri', alt: `${t.title} · ${yil}` })
+          // Defter sayfa numarası: sağ üstte yalnızca rakam, kalın ve büyük
+          pdf.setFont('NotoSans', 'bold'); pdf.setFontSize(16); pdf.setTextColor(...PDF_RENK.metin)
+          pdf.text(String(p + 1), PW - M, 15, { align: 'right' })
+
+          const slice = t.rows.slice(p * RPP, (p + 1) * RPP)
           const body: any[] = []
-          body.push([{ content: 'Nakli Toplam', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold' } }, { content: fmtTL(nakli), styles: { halign: 'right', fontStyle: 'bold' } }])
-          for (const r of slice) { sira++; run += Number(r.tutar || 0); body.push([sira, tarihFmt(r.tarih), r.belge_no || '-', r.aciklama || '', fmtTL(Number(r.tutar))]) }
-          body.push([{ content: 'Toplam', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: PDF_RENK.toplamZemin } }, { content: fmtTL(run), styles: { halign: 'right', fontStyle: 'bold', fillColor: PDF_RENK.toplamZemin } }])
+          body.push([{ content: 'Nakli Toplam', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold' } }, { content: fmtTL(t.run), styles: { halign: 'right', fontStyle: 'bold' } }])
+          for (const r of slice) { t.sira++; t.run += Number(r.tutar || 0); body.push([t.sira, tarihFmt(r.tarih), r.belge_no || '-', r.aciklama || '', fmtTL(Number(r.tutar))]) }
+          // Boş satırlar: karşılıklı sayfalar aynı boyda, elle yazmaya uygun cetvel
+          for (let i = slice.length; i < RPP; i++) body.push(['', '', '', '', ''])
+          body.push([{ content: 'Toplam', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: PDF_RENK.toplamZemin } }, { content: fmtTL(t.run), styles: { halign: 'right', fontStyle: 'bold', fillColor: PDF_RENK.toplamZemin } }])
 
           autoTable(pdf, pdfTablo({
-            head: headFor(title),
+            head: headFor(t.title),
             body,
             startY: y0,
             margin: { left: M, right: M, top: 14, bottom: 14 },
             tableWidth: usable,
-            styles: { fontSize: 8, cellPadding: 1.6 },
+            styles: { fontSize: 8, cellPadding: 1.6, minCellHeight: 7 },
             columnStyles: colStyles,
           }))
         }
       }
 
-      // Önce GİDER bölümü (kendi sayfa 1..N), sonra GELİR bölümü (kendi sayfa 1..M)
-      if (giderler.length) renderSection('GİDER', giderler, 0)
-      if (gelirler.length) renderSection('GELİR', gelirler, devreden)
-
-      pdfAc(pdf, 'İşletme hesabı defteri')
+      // Resmî defter: sayfa altında üretim bilgisi basılmaz
+      pdfAc(pdf, 'İşletme hesabı defteri', false)
       bilgi('✅ Defter PDF hazırlandı.')
     } catch (err: any) {
       bilgi('❌ PDF hatası: ' + (err.message || 'Bilinmiyor'), 5000)

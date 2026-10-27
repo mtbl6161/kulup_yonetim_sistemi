@@ -136,9 +136,9 @@ export function pdfAltBilgi(pdf: Pdf, belge?: string) {
   pdf.setTextColor(...PDF_RENK.metin)
 }
 
-/** Alt bilgiyi ekleyip PDF'i yeni sekmede açar. */
-export function pdfAc(pdf: Pdf, belge?: string) {
-  pdfAltBilgi(pdf, belge)
+/** Alt bilgiyi ekleyip PDF'i yeni sekmede açar. altBilgi: false → alt bilgi basılmaz (ör. resmî defter). */
+export function pdfAc(pdf: Pdf, belge?: string, altBilgi: boolean = true) {
+  if (altBilgi) pdfAltBilgi(pdf, belge)
   const url = URL.createObjectURL(pdf.output('blob'))
   window.open(url, '_blank')
   setTimeout(() => URL.revokeObjectURL(url), 60000)
