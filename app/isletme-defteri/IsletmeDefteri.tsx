@@ -20,6 +20,31 @@ import { useDegisince } from '@/lib/useDegisince'
 import { bugunISO, OdemeTipi, ParsedRow, parseTutar, parseTarih, cellStr, ekstreBasligiBul, ColMap, autoDetect, FormState, bosForm, DefterTablo, turBtn } from './yardimcilar'
 import EkstreModal from '@/app/isletme-defteri/EkstreModal'
 
+// Kulüp defterinin kendiliğinden gelen satırları: Hesap Hareketleri (Ödeme Takibi aidatları ve dağıtım giderleri)
+// ile kulüp tahsilat takibi ödemeleri. Kimlikler negatiftir; elle girilen isletme_defteri satırlarıyla çakışmaz.
+async function kulupOtomatikHareketler(yil: number): Promise<IsletmeHareket[]> {
+  const bas = `${yil}-01-01`, bit = `${yil}-12-31`
+  const [{ data: hh }, { data: tk }] = await Promise.all([
+    supabase.from('hesap_hareketleri').select('id, tarih, tutar, tur, aciklama, dekont_no, kaynak').gte('tarih', bas).lte('tarih', bit),
+    supabase.from('tahsilat_kayitlari').select('id, tarih, tutar, aciklama, tahsilat_kategorileri!inner(ad, birim), ogrenciler(ad, soyad)')
+      .eq('tahsilat_kategorileri.birim', 'kulup').gte('tarih', bas).lte('tarih', bit),
+  ])
+  const ayi = (t: string) => Number(t.slice(5, 7))
+  const hesap: IsletmeHareket[] = (hh || []).map(h => ({
+    id: -h.id, tarih: h.tarih, tutar: Number(h.tutar), tur: h.tur, belge_no: h.dekont_no, aciklama: h.aciklama,
+    kaynak: 'otomatik', otomatikKaynak: h.kaynak === 'tahsilat' ? 'Ödeme Takibi' : 'Hesap Hareketleri', ay: ayi(h.tarih), yil,
+  }))
+  type Bir<T> = T | T[] | null
+  type TkSatir = { id: number; tarih: string; tutar: number | null; aciklama: string | null; tahsilat_kategorileri: Bir<{ ad: string }>; ogrenciler: Bir<{ ad: string; soyad: string }> }
+  const tek = <T,>(v: Bir<T>): T | null => (Array.isArray(v) ? v[0] ?? null : v)
+  const tahsilat: IsletmeHareket[] = ((tk || []) as unknown as TkSatir[]).filter(t => Number(t.tutar) > 0).map(t => {
+    const ogr = tek(t.ogrenciler)
+    const aciklama = [tek(t.tahsilat_kategorileri)?.ad, ogr ? `${ogr.ad} ${ogr.soyad}` : null, t.aciklama].filter(Boolean).join(' · ')
+    return { id: -(1_000_000_000 + t.id), tarih: t.tarih, tutar: Number(t.tutar), tur: 'gelir', aciklama, kaynak: 'otomatik', otomatikKaynak: 'Tahsilat Takip', ay: ayi(t.tarih), yil }
+  })
+  return [...hesap, ...tahsilat].sort((a, b) => (a.tarih < b.tarih ? 1 : a.tarih > b.tarih ? -1 : 0))
+}
+
 export default function IsletmeDefteri({ birim }: { birim: Birim }) {
   const { ay, yil } = useAy()
   const { okul, profil } = useAuth()
@@ -72,7 +97,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
       supabase.from('isletme_devir').select('devreden_tutar').eq('birim', birim).eq('yil', yil).maybeSingle(),
       supabase.from('ayarlar').select('*').single(),
     ])
-    setHareketler(data || [])
+    setHareketler([...(data || []), ...(birim === 'kulup' ? await kulupOtomatikHareketler(yil) : [])])
     setAyarlar(ayr || null)
     const dv = devir?.devreden_tutar != null ? Number(devir.devreden_tutar) : 0
     setDevreden(dv)
@@ -499,7 +524,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       <Topbar
-        title={birim === 'oab' ? 'OAB İşletme Defteri' : 'İşletme Defteri'}
+        title={birim === 'oab' ? 'OAB İşletme Defteri' : birim === 'kulup' ? 'Kulüp İşletme Defteri' : 'İşletme Defteri'}
         sub={`${view === 'kapak' ? `${yil} Yılı — Aylık Özet (Kapak)` : view === 'defter' ? `${ayLabel(ay, yil)} — Defter Görünümü` : `${ayLabel(ay, yil)} — Gelir / Gider Hareketleri`}`}
         actions={
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -517,6 +542,11 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
 
       <div style={{ padding: 28 }}>
         {msg && <div className={`alert ${msg.startsWith('✅') ? 'alert-success' : msg.startsWith('❌') ? 'alert-danger' : 'alert-info'}`} style={{ marginBottom: 16 }}>{msg}</div>}
+        {birim === 'kulup' && (
+          <div className="alert alert-info" style={{ marginBottom: 16 }}>
+            Ödeme Takibi’ndeki aidat tahsilatları, Hesap Hareketleri’ndeki giderler ve Kulüp Tahsilat Takip ödemeleri deftere kendiliğinden yazılır; onları kendi ekranlarında düzeltin. Burada yalnızca o ekranlarda olmayan gelir ve giderleri (kira, fatura, malzeme vb.) girin.
+          </div>
+        )}
 
         {view === 'kapak' ? (
           <>
@@ -626,7 +656,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
               <BookText size={19} style={{ color: 'var(--accent)' }} />
               {editId ? 'Hareketi Düzenle' : 'Yeni Hareket'}
             </span>
-            {!editId && (
+            {!editId && birim !== 'kulup' && (
               <button className="btn btn-secondary btn-sm" onClick={() => { setImportOpen(true); setOnizleme(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
                 <FileSpreadsheet size={14} /> Ekstre Aktar
               </button>
@@ -709,7 +739,10 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
                   <tr key={h.id}>
                     <td>{tarihFmt(h.tarih)}</td>
                     <td style={{ fontSize: 12, color: 'var(--text2)' }}>{h.belge_no || '-'}</td>
-                    <td>{h.aciklama || <span style={{ color: 'var(--text3)' }}>—</span>}</td>
+                    <td>
+                      {h.aciklama || <span style={{ color: 'var(--text3)' }}>—</span>}
+                      {h.otomatikKaynak && <span className="badge badge-gray" style={{ marginLeft: 8, fontSize: 10.5 }}>{h.otomatikKaynak}</span>}
+                    </td>
                     <td style={{ textAlign: 'center' }}>
                       <span className={`badge ${h.tur === 'gelir' ? 'badge-green' : 'badge-red'}`}>{h.tur === 'gelir' ? 'Gelir' : 'Gider'}</span>
                     </td>
@@ -720,10 +753,12 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
                       {fmtTL(bakiyeMap.get(h.id) ?? 0)}
                     </td>
                     <td style={{ textAlign: 'center' }}>
+                      {h.kaynak === 'otomatik' ? <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>Otomatik</span> : (
                       <div style={{ display: 'inline-flex', gap: 6 }}>
                         <button className="btn btn-secondary btn-icon" title="Düzenle" onClick={() => duzenle(h)}><Pencil size={13} /></button>
                         <button className="btn btn-outline-danger btn-icon" title="Sil" onClick={() => setConf({ id: h.id, aciklama: h.aciklama || tarihFmt(h.tarih) })}><Trash2 size={13} /></button>
                       </div>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -44,6 +44,7 @@ const NAV: { baslik: string; id: string; alan?: Alan; adminOnly?: boolean; super
     adminOnly: true,
     items: [
       { href: '/odeme', label: 'Ödeme Takibi', sub: 'Aidat gecikmeleri ve tahsilat', tags: 'borç, ödeme, gecikme, aidat', icon: <Wallet size={17} /> },
+      { href: '/kulup/tahsilat-takip', label: 'Tahsilat Takip', sub: 'Kırtasiye, gezi, etkinlik — aidat dışı', tags: 'kulüp, tahsilat, kategori, kırtasiye, gezi, etkinlik, forma, borç, ödedi', icon: <ClipboardList size={17} /> },
       { href: '/puantaj', label: 'Puantaj Girişi', sub: 'Çalışma saati ve hoca onayı', tags: 'saat, hesapla, onay', icon: <Clock size={17} /> },
       { href: '/bordro', label: 'Bordro Özeti', sub: 'Maaş hesaplama ve ödeme fişleri', tags: 'maaş, banka, para, fiş', icon: <BarChart3 size={17} /> },
     ],
@@ -55,6 +56,7 @@ const NAV: { baslik: string; id: string; alan?: Alan; adminOnly?: boolean; super
     adminOnly: true,
     items: [
       { href: '/muhasebe', label: 'Muhasebe Yönetimi', sub: 'Hesap planı ve mali kayıtlar', tags: 'muhasebe, kayıt, defter', icon: <Calculator size={17} /> },
+      { href: '/kulup/isletme-defteri', label: 'İşletme Defteri', sub: 'Kulübün gelir-gider defteri', tags: 'kulüp, işletme, defter, gelir, gider, kapak, devir', icon: <BookText size={17} /> },
       { href: '/hesap-hareketleri', label: 'Hesap Hareketleri', sub: 'Tüm para akışını inceleyin', tags: 'para, banka, giriş, çıkış', icon: <Landmark size={17} /> },
       { href: '/gelir-gider', label: 'Gelir / Gider Özet', sub: 'Kar / Zarar analizi yapın', tags: 'fatura, harcama, kar', icon: <TrendingUp size={17} /> },
       { href: '/bilanco', label: 'Bilanço', sub: 'Genel finansal durum tablosu', tags: 'rapor, nakit, varlık', icon: <FileText size={17} /> },

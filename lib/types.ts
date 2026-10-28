@@ -40,8 +40,8 @@ export interface Profil {
   created_at?: string
 }
 
-/** Tahsilat takibi ve işletme defterinin ait olduğu birim: okul ya da okul aile birliği */
-export type Birim = 'okul' | 'oab'
+/** Tahsilat takibi ve işletme defterinin ait olduğu birim: okul, okul aile birliği ya da kulüp */
+export type Birim = 'okul' | 'oab' | 'kulup'
 
 /** Birimin resmî çıktılarda görünen adı */
 export function birimKurumAdi(birim: Birim, ayarlar: Pick<Ayarlar, 'kurum_adi' | 'oab_adi'> | null, okulAdi?: string | null): string {
@@ -339,7 +339,9 @@ export interface IsletmeHareket {
   aciklama?: string | null
   tutar: number
   tur: IsletmeTur
-  kaynak?: 'manuel' | 'banka'
+  kaynak?: 'manuel' | 'banka' | 'otomatik'
+  /** kaynak 'otomatik' ise satırın geldiği ekran (kulüp defteri: Ödeme Takibi / Tahsilat Takip) */
+  otomatikKaynak?: string
   ay?: number
   yil?: number
   okul_id?: number
