@@ -256,8 +256,6 @@ export default function DenetimPage() {
       return
     }
 
-    const [yil, ay] = secilenAyKey.split('-').map(Number)
-
     async function veriYukle() {
       setYukleniyor(true)
       const [yil, ay] = secilenAyKey!.split('-').map(Number)

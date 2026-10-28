@@ -323,7 +323,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
       setOdemeKategoriler(kat || [])
       setOdemeVerisiYuklendi(true)
     })()
-  }, [importOpen, odemeVerisiYuklendi])
+  }, [importOpen, odemeVerisiYuklendi, birim])
 
   const kirtasiyeKategori = useMemo(
     () => odemeKategoriler.find(k => k.veri_kaynagi === 'manuel' && /k[ıi]rtasiye/i.test(k.ad)) || null,

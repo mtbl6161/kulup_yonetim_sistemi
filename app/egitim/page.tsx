@@ -130,7 +130,7 @@ export default function EgitimPage() {
   
   // Simülatör Ayar Katsayıları
   const [simKatsayi, setSimKatsayi] = useState<number>(1.387871)
-  const [simGosterge, setSimGosterge] = useState<number>(140)
+  const [simGosterge] = useState<number>(140)
   const [simYemek, setSimYemek] = useState<boolean>(true)
 
   // Simülatör Dağıtım Oranları State'i

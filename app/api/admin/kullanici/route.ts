@@ -1,4 +1,5 @@
-import { adminClient, getCallerIfSuperAdmin } from '@/lib/apiAuth'
+import { adminClient, getCallerIfSuperAdmin, tumKullanicilar } from '@/lib/apiAuth'
+import type { User } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { serverError } from '@/lib/api-error'
 import { logAudit } from '@/lib/audit.server'
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
   // Proflilleri çek (Kendimiz hariç)
   const { data: profiller, error: profileError } = await admin
     .from('profiller')
-    .select('id, rol, okul_id, created_at, okullar(id, ad, lisans_bitis, odeme_durumu)')
+    .select('id, rol, okul_id, created_at, okullar(id, ad, lisans_bitis, odeme_durumu, il_id, created_at)')
     .neq('id', caller.id)
     .order('created_at', { ascending: false })
 
@@ -22,8 +23,8 @@ export async function GET(request: NextRequest) {
   if (!profiller) return NextResponse.json({ kullanicilar: [] })
 
   // Auth kullanıcılarını çek (E-posta ve Son Giriş için)
-  const { data: { users }, error: authError } = await admin.auth.admin.listUsers()
-  if (authError) return serverError(authError)
+  let users: User[]
+  try { users = await tumKullanicilar(admin) } catch (e) { return serverError(e as Error) }
 
   // Okul istatistiklerini hesapla
   const okulIds = Array.from(new Set(profiller.map((p) => p.okul_id).filter(Boolean)))

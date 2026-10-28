@@ -10,7 +10,7 @@ const AYLIK = 750
 const YILLIK = 7500
 
 function OdemeYapIc() {
-  const { signOut, profil, okul, session } = useAuth()
+  const { signOut, okul } = useAuth()
   const [secDonem, setSecDonem] = useState<'month' | 'year'>('month')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

@@ -23,10 +23,10 @@ import { bordroSatirlariHesapla } from '@/lib/bordroHesap'
 export default function BordroPage() {
   const { ay, yil } = useAy()
   const { okul, profil } = useAuth()
-  const [personel, setPersonel] = useState<Personel[]>([])
-  const [defter, setDefter] = useState<SinifDefteri[]>([])
+  const [, setPersonel] = useState<Personel[]>([])
+  const [, setDefter] = useState<SinifDefteri[]>([])
   const [puantajData, setPuantajData] = useState<Puantaj[]>([])
-  const [siniflar, setSiniflar] = useState<Sinif[]>([])
+  const [, setSiniflar] = useState<Sinif[]>([])
   const [ayarlar, setAyarlar] = useState<Ayarlar | null>(null)
   const [kaydedilmis, setKaydedilmis] = useState<Bordro[]>([])
   const [tahakkuk, setTahakkuk] = useState<Tahakkuk | null>(null)
@@ -36,7 +36,6 @@ export default function BordroPage() {
   const [satirlar, setSatirlar] = useState<BordroSatir[]>([])
   const [hesaplandi, setHesaplandi] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
   const [selectedRow, setSelectedRow] = useState<BordroSatir | null>(null)
   const [mailProgress, setMailProgress] = useState<{ current: number, total: number, name: string } | null>(null)
@@ -90,7 +89,6 @@ export default function BordroPage() {
     setTatiller(tat || [])
     
     // Gerçekleşen toplam tahsilatı (kasanıza giren para) hesapla
-    const gercekTahsilat = (tahsData || []).reduce((sum, t) => sum + (Number(t.tutar) || 0), 0)
     const uniqueStudents = new Set((tahsData || []).map(t => t.ogrenci_id)).size
     
     setOgrenciSayisi(uniqueStudents)
@@ -237,7 +235,7 @@ export default function BordroPage() {
       setSatirlar([])
       setHesaplandi(false)
     }
-  }, [ay, yil])
+  }, [ay, yil, okul?.id])
 
   useYukleme(load)
 
@@ -493,20 +491,10 @@ export default function BordroPage() {
 
 
 
-  async function odemeIsaretle(bordroId: number, odendi: boolean) {
-    const { error } = await supabase.from('bordro').update({ odendi }).eq('id', bordroId)
-    if (error) return // ekrandaki durum değişmez; hata alt bildirimde gösterilir
-    if (odendi) {
-      const satir = satirlar.find(x => x.bordroId === bordroId)
-      if (satir) logIslem({ islem: 'ode', tablo: 'bordro', kayit_id: bordroId, aciklama: `${satir.personel.ad} maaşı ödendi (${ayLabel(ay, yil)})` })
-    }
-    setSatirlar(s => s.map(x => x.bordroId === bordroId ? { ...x, odendi } : x))
-  }
-
   // Tüm personeli tek tabloda sıralı göster
   const sortedSatirlar = bordroSirala(satirlar)
 
-  const { toplamBrut, toplamGvMatrah, toplamGvHesaplanan, toplamGvIstisna, toplamGv, toplamDvHesaplanan, toplamDvIstisna, toplamDv, toplamSgkKisi, toplamSgkIssiz, toplamKesinti, toplamNet, toplamSgkIsv, toplamSaat, toplamSgkDetayKisa, toplamSgkDetayMalul, toplamSgkDetaySaglik, toplamSgkDetayIssiz, toplamSgkDetayToplam } = bordroToplamlari(sortedSatirlar)
+  const { toplamBrut, toplamGvMatrah, toplamGvHesaplanan, toplamGvIstisna, toplamGv, toplamDvHesaplanan, toplamDvIstisna, toplamDv, toplamSgkKisi, toplamSgkIssiz, toplamKesinti, toplamNet, toplamSaat, toplamSgkDetayKisa, toplamSgkDetayMalul, toplamSgkDetaySaglik, toplamSgkDetayIssiz, toplamSgkDetayToplam } = bordroToplamlari(sortedSatirlar)
   
   // Bordro henüz hesaplanmadıysa puantaj verilerinden toplamı çek
   const sistemToplamSaat = puantajData.reduce((sum, x) => {
@@ -518,30 +506,9 @@ export default function BordroPage() {
   const hDisplaySaat = hesaplandi ? toplamSaat : sistemToplamSaat
 
   const isGunu = isGunuSayisi(yil, ay, tatiller)
-  const topSaat = defter.reduce((s, d) => s + (d.etkinlik_saati || 1), 0)
   const toplamTahakkuk = tahakkuk?.toplam_gelir || 0
   const sonGun = gunSayisi(yil, ay)
 
-  const dagitimRows = [
-    { label: 'Temel Giderler (Materyal, Beslenme, SGK Prim, Diğer)', pct: ayarlar?.dagitim_temel_gider ?? 26 },
-    { label: 'Kulüp Yönetim Kurulu Başkanı - Müdür', pct: ayarlar?.dagitim_baskan ?? 7 },
-    { label: 'Kulüp Yönetim Kurulu Üyesi - Müdür Yardımcısı', pct: ayarlar?.dagitim_baskan_yrd ?? 5 },
-    { label: 'Öğretmen, Usta Öğretici, Koordinatör Öğretmen', pct: ayarlar?.dagitim_ogretmen ?? 55 },
-    { label: 'Yazışma-Muhasebe İşlerini Yürüten Personel', pct: ayarlar?.dagitim_muhasebe ?? 2 },
-    { label: 'Temizlik Bakım ve Beslenme İşlerini Yürüten Personel', pct: ayarlar?.dagitim_temizlik ?? 4 },
-    { label: 'Denetim Yetkilisi', pct: ayarlar?.dagitim_denetim ?? 1 },
-  ]
-
-  const tavanKatsayi = ayarlar?.tavan_katsayi || 13184.78
-  const tavanRows = [
-    { gorev: 'Başkan', pct: 275 },
-    { gorev: 'Başkan Yardımcısı', pct: 250 },
-    { gorev: 'Öğretmen', pct: 300 },
-    { gorev: 'Koordinatör Öğretmen', pct: 275 },
-    { gorev: 'Usta Öğretici', pct: 400 },
-    { gorev: 'Muhasebe Memuru', pct: 80 },
-    { gorev: 'Temizlik Personeli', pct: 80 },
-  ]
 
   // Tablo hücre stilleri
   const thStyle: React.CSSProperties = { fontSize: 9, padding: '4px 3px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap', borderRight: '1px solid #ccc', borderBottom: '1px solid #999', background: '#f0e6d2', color: '#333', fontWeight: 700 }

@@ -8,22 +8,30 @@ import { useAy } from '@/lib/AyContext'
 import { uyari } from '@/lib/diyalog'
 import type { Ayarlar, Bordro, Personel } from '@/lib/types'
 import { useYukleme } from '@/lib/useYukleme'
+import { useAuth } from '@/lib/AuthContext'
+import { EKSIK_GUN_NEDENLERI, eksikGunAdi, eksikGunSayisi, primGunu } from '@/lib/sgkEksikGun'
+import type { EksikGunKaydi } from '@/lib/sgkEksikGun'
 
 // Sorgu personel(*) ile birleştirir; her bordro satırının personeli vardır
 type MuhasebeSatir = Bordro & { personel: Personel }
 
 export default function MuhasebePage() {
-  const [loading, setLoading] = useState(false)
+  const [, setLoading] = useState(false)
   const { ay: activeMonth, yil: activeYear } = useAy()
 
   const [settings, setSettings] = useState<Ayarlar | null>(null)
   const [payrollData, setPayrollData] = useState<MuhasebeSatir[]>([])
+  const { okul } = useAuth()
+  // personel_id → seçilen eksik gün nedeni; tablo yoksa (migration çalıştırılmadı) null
+  const [eksikler, setEksikler] = useState<Record<number, EksikGunKaydi> | null>({})
 
   const fetchData = async () => {
     setLoading(true)
     const { data: ayar } = await supabase.from('ayarlar').select('*').single()
     const { data: bordro } = await supabase.from('bordro').select('*, personel(*)').eq('yil', activeYear).eq('ay', activeMonth)
-    
+    const { data: eg, error: egHata } = await supabase.from('sgk_eksik_gun').select('*').eq('yil', activeYear).eq('ay', activeMonth)
+    setEksikler(egHata ? null : Object.fromEntries((eg || []).map((k: EksikGunKaydi) => [k.personel_id, k])))
+
     setSettings(ayar)
     setPayrollData(bordro || [])
     setLoading(false)
@@ -32,6 +40,16 @@ export default function MuhasebePage() {
   useYukleme(() => {
     fetchData()
   }, [activeMonth, activeYear])
+
+  async function eksikKaydet(personelId: number, kod: string, aciklama: string | null) {
+    const onceki = eksikler?.[personelId]
+    const kayit: EksikGunKaydi = { personel_id: personelId, yil: activeYear, ay: activeMonth, kod, aciklama: aciklama?.trim() || null }
+    setEksikler(e => ({ ...(e || {}), [personelId]: kayit }))
+    const { error } = kod
+      ? await supabase.from('sgk_eksik_gun').upsert({ ...kayit, okul_id: okul?.id }, { onConflict: 'personel_id,yil,ay' })
+      : await supabase.from('sgk_eksik_gun').delete().eq('personel_id', personelId).eq('yil', activeYear).eq('ay', activeMonth)
+    if (error) setEksikler(e => ({ ...(e || {}), ...(onceki ? { [personelId]: onceki } : {}) }))
+  }
 
   // Hata Denetimi
   const hatalar = payrollData.filter(b => {
@@ -171,7 +189,8 @@ export default function MuhasebePage() {
     if (!settings.sgk_sicil_no) return uyari('SGK Sicil No ayarlar sayfasında tanımlanmamış!')
 
     const filteredEmployees = payrollData.filter((b) => b.personel?.sgk_li)
-    const daysInMonth = new Date(activeYear, activeMonth, 0).getDate()
+    const nedensiz = filteredEmployees.filter(b => eksikGunSayisi(primGunu(b.toplam_saat)) > 0 && !eksikler?.[b.personel_id]?.kod)
+    if (nedensiz.length) return uyari(`Eksik günü olan personel için SGK eksik gün nedeni seçilmemiş: ${nedensiz.map(b => b.personel.ad).join(', ')}. Aşağıdaki bildirge taslağından nedeni seçin.`)
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <AYLIKBILDIRGELER>
@@ -182,7 +201,7 @@ export default function MuhasebePage() {
       ${filteredEmployees.map((b, index: number) => {
         const ad = (b.personel.ad.split(' ')[0] || '').toUpperCase()
         const soyad = (b.personel.ad.split(' ').slice(1).join(' ') || '').toUpperCase()
-        const gun = Math.min(30, Math.round(b.toplam_saat / 7.5)) || 1
+        const gun = primGunu(b.toplam_saat)
         const g = (b.personel.gorev || '').toLowerCase()
         const is011 = g.includes('temizlik') || g.includes('hizmet') || g.includes('büro') || g.includes('bakım') || g.includes('memur')
         
@@ -194,8 +213,8 @@ export default function MuhasebePage() {
           ikramiye = Math.max(0, b.brut - ucret)
         }
         
-        const eksikGun = daysInMonth - gun
-        return `<SIGORTALI SIRA="${index + 1}" TCKNO="${b.personel.tc}" AD="${ad}" SOYAD="${soyad}" PEK="${b.brut.toFixed(2)}" PRIM_IKRAMIYE="${ikramiye.toFixed(2)}" GUN="${gun}" EKSIKGUNSAYISI="${eksikGun > 0 ? eksikGun : ''}" EKSIKGUNNEDENI="${eksikGun > 0 ? '21' : ''}" MESLEKKOD="${b.personel.meslek_kodu || ''}" />`
+        const eksikGun = eksikGunSayisi(gun)
+        return `<SIGORTALI SIRA="${index + 1}" TCKNO="${b.personel.tc}" AD="${ad}" SOYAD="${soyad}" PEK="${b.brut.toFixed(2)}" PRIM_IKRAMIYE="${ikramiye.toFixed(2)}" GUN="${gun}" EKSIKGUNSAYISI="${eksikGun > 0 ? eksikGun : ''}" EKSIKGUNNEDENI="${eksikGun > 0 ? eksikler?.[b.personel_id]?.kod ?? '' : ''}" MESLEKKOD="${b.personel.meslek_kodu || ''}" />`
       }).join('\n      ')}
     </SIGORTALILAR>
   </BILDIRGELER>
@@ -301,6 +320,11 @@ export default function MuhasebePage() {
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #d97706', background: '#d97706', color: '#fff' }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>SGK e-Bildirge Taslağı (APHB)</h3>
             </div>
+            {eksikler === null ? (
+              <div className="alert alert-warn" style={{ margin: 16 }}>Eksik gün nedenleri kaydedilemiyor: veritabanında <strong>sgk_eksik_gun</strong> tablosu yok. supabase/migration_sgk_eksik_gun.sql dosyasını Supabase SQL Editor&apos;da çalıştırın.</div>
+            ) : (
+              <p style={{ margin: 0, padding: '10px 16px', fontSize: 12, color: 'var(--text2)', borderBottom: '1px solid var(--border)' }}>SGK ayı 30 gün sayar. 30 günden az bildirilen her personel için eksik gün nedenini seçin ve kısaca açıklayın; seçim olmadan SGK XML oluşturulmaz.</p>
+            )}
             <div style={{ padding: 0 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
@@ -312,13 +336,15 @@ export default function MuhasebePage() {
                     <th style={{ padding: '12px 16px', textAlign: 'right' }}>İkramiye</th>
                     <th style={{ padding: '12px 16px', textAlign: 'center' }}>Gün</th>
                     <th style={{ padding: '12px 16px', textAlign: 'center' }}>Eksik</th>
+                    <th style={{ padding: '12px 16px', minWidth: 300 }}>Eksik gün nedeni</th>
                     <th style={{ padding: '12px 16px' }}>Meslek</th>
                   </tr>
                 </thead>
                 <tbody>
                   {payrollData.filter(b => b.personel?.sgk_li).map((b, idx) => {
-                    const daysInMonth = new Date(activeYear, activeMonth, 0).getDate()
-                    const gun = Math.min(30, Math.round(b.toplam_saat / 7.5)) || 1
+                    const gun = primGunu(b.toplam_saat)
+                    const eksik = eksikGunSayisi(gun)
+                    const secim = eksikler?.[b.personel_id]
                     const g = (b.personel.gorev || '').toLowerCase()
                     const is011 = g.includes('temizlik') || g.includes('hizmet') || g.includes('büro') || g.includes('bakım') || g.includes('memur')
                     let u = b.brut, i = 0
@@ -334,7 +360,23 @@ export default function MuhasebePage() {
                         <td style={{ padding: '10px 16px', textAlign: 'right' }}>₺{u.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
                         <td style={{ padding: '10px 16px', textAlign: 'right' }}>₺{i.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
                         <td style={{ padding: '10px 16px', textAlign: 'center' }}>{gun}</td>
-                        <td style={{ padding: '10px 16px', textAlign: 'center' }}>{daysInMonth - gun > 0 ? daysInMonth - gun : ''}</td>
+                        <td style={{ padding: '10px 16px', textAlign: 'center' }}>{eksik > 0 ? eksik : ''}</td>
+                        <td style={{ padding: '6px 16px' }}>
+                          {eksik > 0 && eksikler && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <select className="form-select" aria-label={`${b.personel.ad} eksik gün nedeni`} style={{ minHeight: 30, fontSize: 12, borderColor: secim?.kod ? undefined : 'var(--danger)' }}
+                                value={secim?.kod ?? ''} onChange={e => eksikKaydet(b.personel_id, e.target.value, secim?.aciklama ?? null)}>
+                                <option value="">Neden seçin</option>
+                                {EKSIK_GUN_NEDENLERI.map(n => <option key={n.kod} value={n.kod}>{n.kod} – {n.ad}</option>)}
+                              </select>
+                              {secim?.kod && (
+                                <input key={`${b.personel_id}-${secim.kod}`} className="form-input" style={{ minHeight: 30, fontSize: 12 }} placeholder={`Açıklama (ör. ${eksikGunAdi(secim.kod)} tarihleri)`}
+                                  aria-label={`${b.personel.ad} eksik gün açıklaması`} defaultValue={secim.aciklama ?? ''} maxLength={200}
+                                  onBlur={e => { if ((e.target.value.trim() || null) !== (secim.aciklama ?? null)) eksikKaydet(b.personel_id, secim.kod, e.target.value) }} />
+                              )}
+                            </div>
+                          )}
+                        </td>
                         <td style={{ padding: '10px 16px' }}>{b.personel.meslek_kodu}</td>
                       </tr>
                     )

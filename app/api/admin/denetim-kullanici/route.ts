@@ -1,4 +1,4 @@
-import { adminClient, getCallerIfSuperAdmin } from '@/lib/apiAuth'
+import { adminClient, getCallerIfSuperAdmin, tumKullanicilar } from '@/lib/apiAuth'
 import { NextResponse, type NextRequest } from 'next/server'
 import { serverError } from '@/lib/api-error'
 import { logAudit } from '@/lib/audit.server'
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   if (error) return serverError(error)
 
-  const { data: { users } } = await admin.auth.admin.listUsers()
+  const users = await tumKullanicilar(admin)
 
   const liste = (profiller ?? []).map((p) => {
     const authUser = users.find((u) => u.id === p.id)
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
   // Bu e-posta ile daha önce auth kullanıcısı açılmış mı? (ör. panel dışından
   // oluşturulup profili hiç yazılmamış hesaplar). Profilsizse denetçi olarak bağla.
-  const { data: { users } } = await admin.auth.admin.listUsers({ perPage: 1000 })
+  const users = await tumKullanicilar(admin)
   const mevcut = users.find(u => u.email?.toLowerCase() === normalizedEmail)
 
   let userId: string

@@ -52,7 +52,7 @@ export function bordroToplamlari(sortedSatirlar: BordroSatir[]) {
 
 export async function bordroOzetPdf({ satirlar: sortedSatirlar, ayarlar, ay, yil }: { satirlar: BordroSatir[]; ayarlar: Ayarlar | null; ay: number; yil: number }) {
   const sonGun = gunSayisi(yil, ay)
-  const { toplamBrut, toplamGvMatrah, toplamGvHesaplanan, toplamGvIstisna, toplamGv, toplamDvHesaplanan, toplamDvIstisna, toplamDv, toplamSgkKisi, toplamSgkIssiz, toplamKesinti, toplamNet, toplamSgkIsv, toplamSaat, toplamSgkDetayKisa, toplamSgkDetayMalul, toplamSgkDetaySaglik, toplamSgkDetayIssiz, toplamSgkDetayToplam } = bordroToplamlari(sortedSatirlar)
+  const { toplamBrut, toplamGvMatrah, toplamGvHesaplanan, toplamGvIstisna, toplamGv, toplamDvHesaplanan, toplamDvIstisna, toplamDv, toplamSgkKisi, toplamSgkIssiz, toplamKesinti, toplamNet, toplamSaat, toplamSgkDetayKisa, toplamSgkDetayMalul, toplamSgkDetaySaglik, toplamSgkDetayIssiz, toplamSgkDetayToplam } = bordroToplamlari(sortedSatirlar)
   const { pdf, autoTable } = await pdfHazirla('landscape')
   const M = 5 // geniş tablo (287 mm) için dar kenar
 

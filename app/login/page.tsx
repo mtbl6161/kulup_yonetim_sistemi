@@ -40,7 +40,8 @@ export default function LoginPage() {
         router.push('/')
         setTimeout(() => {
           if (window.location.pathname === '/login') {
-            window.location.href = '/'
+            // Tam yeniden yükleme: oturum çerezleri sunucu tarafında da geçerli olsun
+            window.location.assign(new URL('/', window.location.origin))
           }
         }, 1000)
       }

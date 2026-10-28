@@ -1,4 +1,4 @@
-import { adminClient, getCallerIfSuperAdmin } from '@/lib/apiAuth'
+import { adminClient, getCallerIfSuperAdmin, tumKullanicilar } from '@/lib/apiAuth'
 import { NextResponse, type NextRequest } from 'next/server'
 import { epostaGonder, htmlKacis } from '@/lib/eposta'
 import { serverError } from '@/lib/api-error'
@@ -33,7 +33,7 @@ async function adaylariGetir(admin: ReturnType<typeof adminClient>): Promise<Ada
 
   const { data: profiller } = await admin
     .from('profiller').select('id, okul_id').eq('rol', 'admin').in('okul_id', okulIds)
-  const { data: { users } } = await admin.auth.admin.listUsers({ perPage: 1000 })
+  const users = await tumKullanicilar(admin)
 
   const adaylar: Aday[] = []
   for (const o of okullar) {

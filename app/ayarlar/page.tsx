@@ -134,7 +134,7 @@ export default function AyarlarPage() {
   const [tatilEkleAcik, setTatilEkleAcik] = useState(false)
   const [conf, setConf] = useState<{
     open: boolean,
-    type: 'tatilSil' | 'sihirbaz' | 'tatilEklendi',
+    type: 'tatilSil' | 'tatilEklendi',
     id?: number,
     title: string,
     message: string
@@ -321,69 +321,6 @@ export default function AyarlarPage() {
     setConf(null)
     const { error } = await supabase.from('tatiller').delete().eq('id', id)
     if (!error) setTatiller(t => t.filter(x => x.id !== id))
-  }
-
-  async function tatilSihirbazı2026() {
-    setConf({
-      open: true,
-      type: 'sihirbaz',
-      title: 'Resmi Tatil Sihirbazı',
-      message: '2026 yılı resmi tatilleri otomatik olarak eklenecek. Devam edilsin mi?'
-    })
-  }
-
-  async function tatilSihirbazıGercek() {
-    setConf(null)
-    setTatilSaving(true)
-    
-    // Mevcut okulun ID'sini al
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profil } = await supabase.from('profiller').select('okul_id').eq('id', user?.id).single()
-    const okulId = profil?.okul_id
-
-    if (!okulId) {
-      setMsg({ type: 'error', text: 'Okul bilgisi bulunamadı' })
-      setTatilSaving(false)
-      return
-    }
-
-    const resmiTatiller = [
-      { ad: 'Yılbaşı', bas: '2026-01-01', bit: '2026-01-01', tip: 'resmi' },
-      { ad: '23 Nisan Ulusal Egemenlik ve Çocuk Bayramı', bas: '2026-04-23', bit: '2026-04-23', tip: 'resmi' },
-      { ad: '1 Mayıs Emek ve Dayanışma Günü', bas: '2026-05-01', bit: '2026-05-01', tip: 'resmi' },
-      { ad: '19 Mayıs Atatürk\'ü Anma, Gençlik ve Spor Bayramı', bas: '2026-05-19', bit: '2026-05-19', tip: 'resmi' },
-      { ad: '15 Temmuz Demokrasi ve Milli Birlik Günü', bas: '2026-07-15', bit: '2026-07-15', tip: 'resmi' },
-      { ad: '30 Ağustos Zafer Bayramı', bas: '2026-08-30', bit: '2026-08-30', tip: 'resmi' },
-      { ad: '29 Ekim Cumhuriyet Bayramı', bas: '2026-10-29', bit: '2026-10-29', tip: 'resmi' },
-      { ad: 'Ramazan Bayramı 1. Gün', bas: '2026-03-20', bit: '2026-03-20', tip: 'resmi' },
-      { ad: 'Ramazan Bayramı 2. Gün', bas: '2026-03-21', bit: '2026-03-21', tip: 'resmi' },
-      { ad: 'Ramazan Bayramı 3. Gün', bas: '2026-03-22', bit: '2026-03-22', tip: 'resmi' },
-      { ad: 'Kurban Bayramı 1. Gün', bas: '2026-05-27', bit: '2026-05-27', tip: 'resmi' },
-      { ad: 'Kurban Bayramı 2. Gün', bas: '2026-05-28', bit: '2026-05-28', tip: 'resmi' },
-      { ad: 'Kurban Bayramı 3. Gün', bas: '2026-05-29', bit: '2026-05-29', tip: 'resmi' },
-      { ad: 'Kurban Bayramı 4. Gün', bas: '2026-05-30', bit: '2026-05-30', tip: 'resmi' },
-    ]
-
-    const inserts = resmiTatiller.map(t => ({
-      okul_id: okulId,
-      ad: t.ad,
-      baslangic_tarihi: t.bas,
-      bitis_tarihi: t.bit,
-      tip: t.tip
-    }))
-
-    // Önce hepsini ekle (Hata almamak için düz insert)
-    const { error } = await supabase.from('tatiller').insert(inserts)
-    
-    if (error && !error.message.includes('duplicate')) {
-      setMsg({ type: 'error', text: 'Sihirbaz hatası: ' + error.message })
-    } else {
-      const { data } = await supabase.from('tatiller').select('*').eq('okul_id', okulId).order('baslangic_tarihi')
-      setTatiller(data || [])
-      setMsg({ type: 'success', text: '✅ Sihirbaz: 2026 Resmi tatilleri başarıyla eklendi!' })
-      setTimeout(() => setMsg(null), 3000)
-    }
-    setTatilSaving(false)
   }
 
   const saatUcretiHesapla = () => {
@@ -891,7 +828,6 @@ export default function AyarlarPage() {
           tehlikeli={conf.type === 'tatilSil'}
           onOnayla={() => {
             if (conf.type === 'tatilSil') tatilSilGercek(conf.id!)
-            else if (conf.type === 'sihirbaz') tatilSihirbazıGercek()
           }}
           onIptal={() => setConf(null)}
         />

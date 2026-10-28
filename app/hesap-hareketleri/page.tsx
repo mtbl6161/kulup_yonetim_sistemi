@@ -67,10 +67,6 @@ export default function HesapHareketleriPage() {
     bakiyeMap[h.id] = bakiye
   }
 
-  const GIDER_KATEGORILERI = [
-    'Temel Gider', 'Kırtasiye', 'Temizlik Malzemesi', 'Yemek', 'Ulaşım', 'Teknik Donanım', 'Diğer',
-  ]
-
   // Ekrandaki (filtrelenmiş) liste, ortak PDF stilinde
   const handlePdf = async () => {
     const { pdf, autoTable } = await pdfHazirla('portrait')

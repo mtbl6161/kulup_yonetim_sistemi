@@ -29,6 +29,7 @@ export default function PuantajPage() {
   const [msg, setMsg] = useState<{ type: 'info' | 'success' | 'error'; text: string } | null>(null)
   const [conf, setConf] = useState(false)
 
+  const profilOkulId = profil?.okul_id
   const load = useCallback(async () => {
     setLoading(true)
     const startDate = `${yil}-${String(ay).padStart(2, '0')}-01`
@@ -41,7 +42,7 @@ export default function PuantajPage() {
         supabase.from('puantaj').select('*').gte('tarih', startDate).lte('tarih', endDate),
         supabase.from('ayarlar').select('*').single(),
         supabase.from('sinif_defteri').select('*').or(`and(ay.eq.${ay},yil.eq.${yil}),ay.is.null`).eq('durum', 'geldi'),
-        supabase.from('tatiller').select('*').or(`okul_id.eq.${profil?.okul_id ?? 0},okul_id.is.null`)
+        supabase.from('tatiller').select('*').or(`okul_id.eq.${profilOkulId ?? 0},okul_id.is.null`)
       ])
       setPersonel(per || [])
       setPuantaj(puan || [])
@@ -49,7 +50,7 @@ export default function PuantajPage() {
       setDefter(sd || [])
       setTatiller(tat || [])
     } catch (e) { console.error(e) } finally { setLoading(false) }
-  }, [ay, yil])
+  }, [ay, yil, profilOkulId])
 
   useYukleme(load)
 
@@ -209,21 +210,6 @@ export default function PuantajPage() {
     const targetDate = `${yil}-${String(ay).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     const p = puantaj.find(x => x.personel_id === personelId && (x.tarih === targetDate || x.tarih.split('T')[0] === targetDate))
     return p?.saat !== undefined ? Number(p.saat) : 0
-  }
-
-  const updatePuantaj = async (personelId: number, day: number, value: number) => {
-    const tarih = `${yil}-${String(ay).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    setSaving(true)
-    try {
-      const payload: Record<string, unknown> = { personel_id: personelId, tarih, saat: value }
-      if (profil?.okul_id) payload.okul_id = profil.okul_id
-      const { error } = await supabase.from('puantaj').upsert(payload, { onConflict: 'personel_id,tarih' })
-      if (error) throw error
-      setPuantaj(prev => {
-        const filtered = prev.filter(x => !(x.personel_id === personelId && (x.tarih === tarih || x.tarih.startsWith(tarih))))
-        return [...filtered, { personel_id: personelId, tarih, saat: value } as Puantaj]
-      })
-    } catch (err) { console.error(err) } finally { setSaving(false) }
   }
 
   const syncFromClassNotebook = async () => setConf(true)

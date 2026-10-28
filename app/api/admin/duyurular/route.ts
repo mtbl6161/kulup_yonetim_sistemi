@@ -56,7 +56,10 @@ export async function PUT(request: NextRequest) {
   if (!caller) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
 
   const body = await request.json()
-  const { id, ...updateData } = body
+  const { id } = body
+  // Yalnızca duyurunun kendi alanları güncellenebilir
+  const updateData: Record<string, unknown> = {}
+  for (const alan of ['baslik', 'icerik', 'tur', 'aktif'] as const) if (body[alan] !== undefined) updateData[alan] = body[alan]
 
   if (!id) return NextResponse.json({ error: 'ID zorunludur' }, { status: 400 })
 

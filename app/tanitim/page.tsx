@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useEffect, useRef } from 'react'
 import {
   Users,
@@ -133,7 +134,7 @@ export default function TanitimPage() {
       <nav className="tz-nav">
         <div className="tz-nav-inner">
           <Link href="/tanitim" className="tz-brand">
-            <img src="/logo.png" alt="Klüp360" className="tz-brand-mark" />
+            <Image src="/logo.png" alt="Klüp360" width={64} height={64} className="tz-brand-mark" />
             <span className="tz-brand-name">Klüp<span className="tz-brand-360">360</span></span>
           </Link>
 
@@ -219,7 +220,7 @@ export default function TanitimPage() {
               <div className="tz-mock">
                 <aside className="tz-mock-side">
                   <div className="tz-mock-brand">
-                    <img src="/logo.png" alt="" />
+                    <Image src="/logo.png" alt="" width={64} height={64} />
                     <span>Klüp360</span>
                   </div>
                   {['Kontrol Paneli', 'Öğrenciler', 'Bordro', 'Tahsilat', 'Ders Programı', 'Raporlar'].map((m, i) => (
@@ -470,7 +471,7 @@ export default function TanitimPage() {
       <footer className="tz-footer">
         <div className="tz-container tz-footer-inner">
           <div className="tz-footer-brand">
-            <img src="/logo.png" alt="Klüp360" />
+            <Image src="/logo.png" alt="Klüp360" width={64} height={64} />
             <div>
               <div className="tz-footer-name">Klüp360</div>
               <div className="tz-footer-tag">MEB Çocuk Kulüpleri Yönetim Sistemi</div>

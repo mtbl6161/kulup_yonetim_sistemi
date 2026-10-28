@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { Home } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
@@ -20,7 +21,7 @@ export default function PublicNav() {
     <nav className="pub-nav">
       <div className="pub-nav-inner">
         <Link href="/tanitim" className="pub-brand">
-          <img src="/logo.png" alt="Klüp360" className="pub-brand-mark" />
+          <Image src="/logo.png" alt="Klüp360" width={64} height={64} className="pub-brand-mark" />
           <span className="pub-brand-name">Klüp<span className="pub-brand-360">360</span></span>
         </Link>
 

@@ -880,7 +880,7 @@ export default function SinifDefteriPage() {
           onOnayla={() => {
             if (conf.type === 'sil') finishSil(conf.id!)
             else if (conf.type === 'programdan-aktar') programdanAktarGercek()
-            else if (conf.type === 'tatil') conf.payload && directKaydetGercek(conf.payload.personelId, conf.payload.pInfo)
+            else if (conf.type === 'tatil' && conf.payload) directKaydetGercek(conf.payload.personelId, conf.payload.pInfo)
           }}
           onIptal={() => setConf(null)}
         />

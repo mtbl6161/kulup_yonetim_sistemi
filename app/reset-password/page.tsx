@@ -22,7 +22,7 @@ export default function ResetPasswordPage() {
     })
 
     // 2. Event listener (PASSWORD_RECOVERY bayrağını takip et)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && window.location.hash.includes('type=recovery'))) {
         setOturumHazir(true)
       }

@@ -102,7 +102,7 @@ export function HeroComposition({ width = 520, className }: P) {
       {[0, 1, 2, 3].map(i => <path key={i} d={`M74 ${236 + i * 22}h186`} stroke="#EEF0F3" strokeDasharray="3 4" />)}
       {[
         [84, 270, 40, 28], [112, 262, 52, 40], [140, 252, 60, 52], [168, 244, 70, 62], [196, 236, 80, 76], [224, 226, 92, 88],
-      ].map(([x, y, h1, h2], i) => (
+      ].map(([x, , h1, h2], i) => (
         <g key={i}>
           <rect x={x} y={324 - h1 + 4 - 0} width="11" height={h1 - 4} rx="2" fill={i === 5 ? '#2347D9' : '#8EA3EE'} />
           <rect x={x + 13} y={324 - h2 + 8} width="11" height={h2 - 8} rx="2" fill="#C5CAD3" />

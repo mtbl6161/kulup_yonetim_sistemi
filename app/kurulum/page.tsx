@@ -65,7 +65,8 @@ export default function KurulumPage() {
       const body = await res.json()
       if (!res.ok) { setHata(body.error ?? 'Kurulum tamamlanamadı.'); return }
       // Profil/okul bilgisinin AuthContext'e baştan yüklenmesi için tam yenileme
-      window.location.href = '/'
+      // Tam yeniden yükleme: yeni okul bilgisiyle oturum baştan kurulur
+      window.location.assign(new URL('/', window.location.origin))
     } catch {
       setHata('Bağlantı hatası. Lütfen tekrar deneyin.')
     } finally {

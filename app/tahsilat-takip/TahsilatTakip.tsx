@@ -10,13 +10,16 @@ import { ayLabel, fmtTL } from '@/lib/hesaplama'
 import { TahsilatKategori, TahsilatVeriKaynagi, TahsilatKaydi, TahsilatTaksitPlani, Ogrenci, Ayarlar, kulupOgrencisi, Birim, birimKurumAdi } from '@/lib/types'
 import ConfirmModal from '@/components/ConfirmModal'
 import { sayiCoz } from '@/components/SayiInput'
-import { taksitAcilabilir, taksitKey, anaDonem, esitBol, aylikVadeler, fmtVade, MAX_TAKSIT } from '@/lib/taksit'
+import { taksitAcilabilir, taksitKey, anaDonem, esitBol, aylikVadeler, fmtVade } from '@/lib/taksit'
 import { ClipboardList, Plus, Pencil, Trash2, Users, RefreshCw, X, Grid3x3, FolderCog, Check, FileWarning, Download, Layers, AlertTriangle } from 'lucide-react'
 import { hataMesaji } from '@/lib/hata'
 import { useYukleme } from '@/lib/useYukleme'
 import { useDegisince } from '@/lib/useDegisince'
-import { TIP_LABELS, TIP_ICON, FormState, BOS_FORM, PlanForm, TurFiltre, ucretBul, kapsamOgrencileri, planDurumu, turUygun, aramaUygun, AramaKutusu, Donem, donemGeldi, bugunISO, sayiYaz, hesaplaDonemler, badge, popKonum, overlay, modalCard, emptyBox, thStyle, tdStyle, statBox, statLabel, statVal, statAlt, TurRozet } from './yardimcilar'
+import {
+  TIP_LABELS, TIP_ICON, FormState, BOS_FORM, PlanForm, TurFiltre, ucretBul, kapsamOgrencileri, planDurumu, turUygun, aramaUygun, AramaKutusu, Donem, donemGeldi, bugunISO, sayiYaz, hesaplaDonemler, badge, popKonum, emptyBox, thStyle, tdStyle, statBox, statLabel, statVal, statAlt, TurRozet,
+} from './yardimcilar'
 import KategoriModal from '@/app/tahsilat-takip/KategoriModal'
+import PlanModal from './PlanModal'
 
 // İyimser güncellemelerde sunucu kimliği gelene kadar kullanılan geçici negatif kimlik
 let geciciSayac = 0
@@ -375,7 +378,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
     if (!q) return ogrenciler
     return ogrenciler.filter(o => `${o.ad} ${o.soyad}`.toLocaleLowerCase('tr').includes(q) || (o.sinif || '').toLocaleLowerCase('tr').includes(q))
   }, [ogrenciler, ogrenciArama])
-  function toggleOgrenci(id: number) { setSeciliOgrenci(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n }) }
+  function toggleOgrenci(id: number) { setSeciliOgrenci(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
   const otomatikKilit = form.veri_kaynagi === 'otomatik_kulup'
 
   // Izgara özeti — Kulüp/Okul filtresindeki öğrenciler (aramadan bağımsız)
@@ -996,69 +999,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
       })()}
 
       {/* Taksit planı oluştur / düzenle */}
-      {planForm && (() => {
-        const f = planForm
-        const toplamGirilen = f.tutarlar.reduce((s, t) => s + (sayiCoz(t) || 0), 0)
-        const toplamHedef = sayiCoz(f.toplam) || 0
-        const fark = Math.round((toplamGirilen - toplamHedef) * 100) / 100
-        return (
-          <div style={overlay} onClick={() => !planSaving && setPlanForm(null)}>
-            <div className="card" style={{ ...modalCard, maxWidth: 560 }} onClick={e => e.stopPropagation()}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                <div>
-                  <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 700 }}>{f.planId ? 'Taksit Planını Düzenle' : 'Taksitlendir'}</h2>
-                  <div style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 4 }}>
-                    <TurRozet okul={!kulupOgrencisi(f.o)} /> <strong>{f.o.ad} {f.o.soyad}</strong> · {seciliKategori?.ad} · {f.d.label}
-                  </div>
-                </div>
-                <button onClick={() => setPlanForm(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)' }}><X size={20} /></button>
-              </div>
-              {planMsg && <div className="alert alert-danger" style={{ marginBottom: 12 }}>{planMsg}</div>}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
-                <div>
-                  <label className="form-label">Toplam Tutar (₺)</label>
-                  <input className="form-input" type="text" inputMode="decimal" value={f.toplam} onChange={e => setPlanForm(planFormHesapla(f, { toplam: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="form-label">Taksit Sayısı</label>
-                  <select className="form-select" value={f.adet} onChange={e => setPlanForm(planFormHesapla(f, { adet: Number(e.target.value) }))}>
-                    {Array.from({ length: MAX_TAKSIT - 1 }, (_, i) => i + 2).map(n => <option key={n} value={n}>{n} taksit</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">İlk Vade</label>
-                  <input className="form-input" type="date" value={f.ilkVade} onChange={e => setPlanForm(planFormHesapla(f, { ilkVade: e.target.value }))} />
-                </div>
-              </div>
-              <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 8 }}>Tutar eşit bölünür, vadeler her ay aynı gündür. Aşağıdan tek tek değiştirebilirsiniz.</div>
-              <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-                {f.vadeler.map((v, i) => {
-                  const odendi = f.odenenNo.includes(i + 1)
-                  return (
-                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '70px 1fr 1fr', gap: 10, alignItems: 'center', padding: '8px 12px', borderBottom: i < f.vadeler.length - 1 ? '1px solid var(--border-light)' : 'none', background: odendi ? 'var(--success-light)' : undefined }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>{i + 1}. taksit{odendi && <div style={{ fontSize: 10, color: 'var(--success)', fontWeight: 600 }}>ödendi</div>}</div>
-                      <input className="form-input" type="date" value={v} onChange={e => setPlanForm({ ...f, vadeler: f.vadeler.map((x, j) => j === i ? e.target.value : x) })} />
-                      <input className="form-input" type="text" inputMode="decimal" value={f.tutarlar[i] ?? ''} onChange={e => setPlanForm({ ...f, tutarlar: f.tutarlar.map((x, j) => j === i ? e.target.value : x) })} />
-                    </div>
-                  )
-                })}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginTop: 8, color: 'var(--text2)' }}>
-                <span>Taksitler toplamı: <strong>{fmtTL(toplamGirilen)}</strong></span>
-                {fark !== 0 && toplamHedef > 0 && <span style={{ color: 'var(--danger)' }}>Toplam tutardan {fark > 0 ? 'fazla' : 'eksik'}: {fmtTL(Math.abs(fark))}</span>}
-              </div>
-              <div style={{ marginTop: 12 }}>
-                <label className="form-label">Açıklama</label>
-                <input className="form-input" value={f.aciklama} onChange={e => setPlanForm({ ...f, aciklama: e.target.value })} placeholder="Opsiyonel (ör. veli talebi)" />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-                <button className="btn btn-secondary" onClick={() => setPlanForm(null)} disabled={planSaving}>İptal</button>
-                <button className="btn btn-primary" onClick={planKaydet} disabled={planSaving}>{planSaving ? 'Kaydediliyor...' : f.planId ? 'Güncelle' : 'Planı Oluştur'}</button>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
+      {planForm && <PlanModal f={planForm} setPlanForm={setPlanForm} planFormHesapla={planFormHesapla} seciliKategori={seciliKategori} planSaving={planSaving} planMsg={planMsg} planKaydet={planKaydet} />}
 
       {planSilOnay && (
         <ConfirmModal baslik="Taksit Planını Kaldır" mesaj="Bu öğrencinin taksit planı kaldırılacak ve öğrenci bu dönem için peşin ödemeye döner. Emin misiniz?" onayMetni="Evet, Kaldır" tehlikeli onOnayla={planSil} onIptal={() => setPlanSilOnay(null)} />

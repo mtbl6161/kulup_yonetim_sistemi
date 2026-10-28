@@ -169,7 +169,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut()
-    window.location.href = '/login'
+    // Tam yeniden yükleme: çıkıştan sonra bellekte hiçbir kurum verisi kalmasın
+    window.location.assign(new URL('/login', window.location.origin))
   }
 
   return (
@@ -186,3 +187,4 @@ export function useAuth() {
   }
   return context
 }
+

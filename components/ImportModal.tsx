@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { logIslem } from '@/lib/audit'
 import { Ogrenci, Personel, OgrenciTuru } from '@/lib/types'
@@ -317,12 +317,12 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
   }
 
   // ── Sürükle bırak ─────────────────────────────────────────────
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setSurukleniyor(false)
     const file = e.dataTransfer.files[0]
     if (file) dosyaIsle(file)
-  }, [mevcutOgrenciler, mevcutPersonel])
+  }
 
   // ── Import et ─────────────────────────────────────────────────
   async function importEt() {

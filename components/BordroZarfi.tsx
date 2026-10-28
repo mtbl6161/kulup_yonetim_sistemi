@@ -157,6 +157,7 @@ export default function BordroZarfi({ row, ayarlar, ay, yil }: Props) {
           <div style={{ fontSize: 10, fontWeight: 700 }}>{ayarlar.mudur_adi}</div>
           <div style={{ fontSize: 9, color: 'var(--text3)' }}>Okul Müdürü</div>
           {ayarlar.imza_url && (
+            // eslint-disable-next-line @next/next/no-img-element -- imza, kullanıcının verdiği herhangi bir adresten gelir (next/image alan adı listesi gerektirir)
             <img src={ayarlar.imza_url} alt="imza" style={{ position: 'absolute', bottom: 5, left: '50%', transform: 'translateX(-50%)', maxHeight: 50, opacity: 0.9 }} />
           )}
         </div>

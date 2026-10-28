@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import PublicNav from './PublicNav'
 
 /**
@@ -16,7 +17,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
       <footer className="pub-footer">
         <div className="pub-container pub-footer-inner">
           <div className="pub-footer-brand">
-            <img src="/logo.png" alt="Klüp360" />
+            <Image src="/logo.png" alt="Klüp360" width={64} height={64} />
             <div>
               <div className="pub-footer-name">Klüp360</div>
               <div className="pub-footer-tag">MEB Çocuk Kulüpleri Yönetim Sistemi</div>

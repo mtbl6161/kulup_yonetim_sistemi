@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { BrandMark } from '@/components/brand/Logo'
 import { createBrowserClient } from '@supabase/ssr'
 import {
@@ -198,7 +199,7 @@ export default function SignupPage() {
         <div className="su-card">
           <Link href="/tanitim" className="su-home"><Home size={15} /> Ana Sayfa</Link>
           <div className="su-head">
-            <img src="/logo.png" alt="Klüp360" className="su-card-logo" />
+            <Image src="/logo.png" alt="Klüp360" width={64} height={64} className="su-card-logo" />
             <h1 className="su-h1">Hesap Oluştur</h1>
             <p className="su-sub">15 gün ücretsiz deneme · Kredi kartı gerekmez</p>
           </div>

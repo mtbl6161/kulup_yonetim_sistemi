@@ -67,7 +67,7 @@ export default function OdemePage() {
     setSiniflar(sin || [])
     setTatiller(tat || [])
     setLoading(false)
-  }, [ay, yil])
+  }, [ay, yil, okul?.id])
 
   useYukleme(load)
   
@@ -338,7 +338,7 @@ export default function OdemePage() {
 
       // 4. Gider hareketini ve Giderler tablosundaki karşılığını sil (Dağıtım dengesi için)
       // Önce giderler tablosundan bul ve sil (aciklama ve tutar eşleşmesiyle)
-      const { data: gid, error: gFindErr } = await supabase.from('giderler')
+      const { data: gid } = await supabase.from('giderler')
         .select('id')
         .in('aciklama', [tag, tagToplu])
         .eq('tutar', tahs.tutar)
@@ -628,7 +628,7 @@ export default function OdemePage() {
                 </tr>
               </thead>
               <tbody>
-                {filtrelenmis.map((r, i) => (
+                {filtrelenmis.map(r => (
                   <tr key={r.ogrenci.id}>
                     <td>
                       <input 

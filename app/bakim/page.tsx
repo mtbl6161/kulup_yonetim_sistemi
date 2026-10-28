@@ -40,7 +40,7 @@ export default function BakimPage() {
       </div>
 
       <button 
-        onClick={() => window.location.href = '/'}
+        onClick={() => window.location.assign(new URL('/', window.location.origin))}
         style={{
           marginTop: 24,
           padding: '12px 32px',

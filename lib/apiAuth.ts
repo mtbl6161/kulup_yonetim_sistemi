@@ -1,5 +1,5 @@
 import 'server-only'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type User } from '@supabase/supabase-js'
 import type { NextRequest } from 'next/server'
 
 // API uçlarının ortak yetki yardımcıları. İstemci, oturum anahtarını
@@ -31,4 +31,15 @@ export async function cagiraniGetir(request: NextRequest): Promise<Cagiran | nul
 export async function getCallerIfSuperAdmin(request: NextRequest) {
   const c = await cagiraniGetir(request)
   return c?.rol === 'super_admin' ? c.user : null
+}
+
+/** Tüm giriş hesapları (Supabase listUsers sayfalıdır; varsayılan 50 kayıt döner). */
+export async function tumKullanicilar(admin: ReturnType<typeof adminClient>): Promise<User[]> {
+  const users: User[] = []
+  for (let page = 1; ; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
+    if (error) throw error
+    users.push(...data.users)
+    if (data.users.length < 1000) return users
+  }
 }
