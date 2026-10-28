@@ -1,16 +1,17 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { X, Save, UserPlus, GraduationCap } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { logIslem } from '@/lib/audit'
-import { Ogrenci, Ayarlar, Personel } from '@/lib/types'
+import { Ogrenci, Ayarlar, Personel, Sinif } from '@/lib/types'
+import { useDegisince } from '@/lib/useDegisince'
 
 interface Props {
   editItem: Ogrenci | null
   ayarlar: Ayarlar | null
   profilOkulId?: number
-  siniflar: any[]
-  ogretmenListesi: any[]
+  siniflar: Pick<Sinif, 'ad'>[]
+  ogretmenListesi: Pick<Personel, 'ad' | 'gorev'>[]
   onClose: () => void
   onSaved: () => void
 }
@@ -23,17 +24,12 @@ const EMPTY: Partial<Ogrenci> = {
 }
 
 export default function OgrenciModal({ editItem, ayarlar, profilOkulId, siniflar, ogretmenListesi, onClose, onSaved }: Props) {
-  const [form, setForm] = useState<Partial<Ogrenci>>(EMPTY)
+  const [form, setForm] = useState<Partial<Ogrenci>>(() => editItem ? { ...editItem } : EMPTY)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
 
-  useEffect(() => {
-    if (editItem) {
-      setForm({ ...editItem })
-    } else {
-      setForm(EMPTY)
-    }
-  }, [editItem])
+  // Pencere açıkken başka kayıt düzenlemeye geçilirse formu o kayda göre yenile
+  useDegisince(editItem?.id ?? null, () => setForm(editItem ? { ...editItem } : EMPTY))
 
   function setF(key: keyof Ogrenci, val: unknown) {
     setForm(f => ({ ...f, [key]: val }))

@@ -23,6 +23,7 @@ import {
   Home,
   Calculator
 } from 'lucide-react'
+import { useYukleme } from '@/lib/useYukleme'
 
 const sb = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -68,7 +69,7 @@ export default function SignupPage() {
     illeriGetir()
   }, [])
 
-  useEffect(() => {
+  useYukleme(() => {
     if (!ilId) {
       setIlceler([])
       setIlceId('')
@@ -293,6 +294,10 @@ export default function SignupPage() {
                   ? <><Loader2 size={16} className="su-spin" /> Oluşturuluyor...</>
                   : <><CheckCircle size={16} /> Hesabı Oluştur</>}
               </button>
+              <p style={{ fontSize: 12, color: '#5f6876', lineHeight: 1.5, margin: '12px 0 0', textAlign: 'center' }}>
+                Hesap oluşturarak <a href="/tanitim/kullanim-kosullari" target="_blank" rel="noopener">Kullanım Koşulları</a>’nı kabul etmiş ve{' '}
+                <a href="/tanitim/kvkk-aydinlatma-metni" target="_blank" rel="noopener">KVKK Aydınlatma Metni</a>’ni okumuş olursunuz.
+              </p>
             </form>
           )}
 

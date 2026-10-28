@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Hafif Iyzico entegrasyonu sonrası özel ayara gerek kalmadı
+  // Eski kullanıcı yönetimi adresi artık yönetim konsolunun Kullanıcılar sekmesinde
+  async redirects() {
+    return [{ source: '/kullanici-yonetimi', destination: '/yonetim?sekme=kullanicilar', permanent: true }]
+  },
 };
 
 export default nextConfig;

@@ -1,31 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
+import { adminClient, getCallerIfSuperAdmin } from '@/lib/apiAuth'
 import { NextResponse, type NextRequest } from 'next/server'
 import { serverError } from '@/lib/api-error'
 import { logAudit } from '@/lib/audit.server'
 import { denemeBitisTarihi, DENEME_GUN } from '@/lib/deneme'
-
-function adminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
-
-async function getCallerIfSuperAdmin(request: NextRequest) {
-  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
-  if (!token) return null
-  const { data: { user } } = await adminClient().auth.getUser(token)
-  if (!user) return null
-
-  const { data: profil } = await adminClient()
-    .from('profiller')
-    .select('rol')
-    .eq('id', user.id)
-    .single()
-
-  if (profil?.rol !== 'super_admin') return null
-  return user
-}
 
 // Kullanıcı listesi
 export async function GET(request: NextRequest) {
@@ -49,7 +26,7 @@ export async function GET(request: NextRequest) {
   if (authError) return serverError(authError)
 
   // Okul istatistiklerini hesapla
-  const okulIds = Array.from(new Set(profiller.map((p: any) => p.okul_id).filter(Boolean)))
+  const okulIds = Array.from(new Set(profiller.map((p) => p.okul_id).filter(Boolean)))
   const okulStats: Record<number, { ogrenci: number; personel: number; bordro: number; tahsilat: number }> = {}
 
   await Promise.all(okulIds.map(async (oid) => {
@@ -83,8 +60,8 @@ export async function GET(request: NextRequest) {
   }))
 
   // Verileri birleştir
-  const birlesikListe = profiller.map((p: any) => {
-    const authUser = users.find((u: any) => u.id === p.id)
+  const birlesikListe = profiller.map((p) => {
+    const authUser = users.find((u) => u.id === p.id)
     const stats = p.okul_id ? (okulStats[p.okul_id] || { ogrenci: 0, personel: 0, bordro: 0, tahsilat: 0 }) : { ogrenci: 0, personel: 0, bordro: 0, tahsilat: 0 }
     
     return {
@@ -93,7 +70,8 @@ export async function GET(request: NextRequest) {
       last_login: authUser?.last_sign_in_at,
       banned: !!authUser?.banned_until && new Date(authUser.banned_until) > new Date(),
       okullar: p.okullar ? {
-        ...(p.okullar as any),
+        // okullar ilişkisi tekil satırdır; çıkarsanan tip dizi gösterse de nesne gelir
+        ...(p.okullar as unknown as Record<string, unknown>),
         ogrenci_sayisi: stats.ogrenci,
         personel_sayisi: stats.personel,
         bordro_sayisi: stats.bordro,
@@ -202,7 +180,7 @@ export async function PUT(request: NextRequest) {
   
   // EĞER OKUL BİLGİSİ GÜNCELLENİYORSA
   if (okulId && (lisansBitis || odemeDurumu)) {
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (lisansBitis) updateData.lisans_bitis = lisansBitis
     if (odemeDurumu) updateData.odeme_durumu = odemeDurumu
 

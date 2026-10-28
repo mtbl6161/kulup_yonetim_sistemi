@@ -1,19 +1,18 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
 import {
-  AYLAR, fmtTL, fmt, isGunuSayisi, saatUcretiHesapla,
-  tavanHesapla, gorevTavanYuzdesi, gunSayisi,
-  tahakkukDagitimHesapla, detectActiveCategories, bordroHesapla
+  AYLAR, fmtTL, fmt, isGunuSayisi, tavanHesapla, gorevTavanYuzdesi, gunSayisi, tahakkukDagitimHesapla, detectActiveCategories, bordroHesapla,
 } from '@/lib/hesaplama'
-import { Ayarlar } from '@/lib/types'
+import { Ayarlar, Tatil, Personel, Puantaj, Bordro } from '@/lib/types'
 import { FileDown } from 'lucide-react'
 import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAc, PDF_RENK, PDF_KENAR } from '@/lib/pdf'
+import { useYukleme } from '@/lib/useYukleme'
 
-const TAVAN_KATEGORILER = [
+const TAVAN_KATEGORILER: { label: string; gorev: string; sgkLi: boolean; isRetired?: boolean }[] = [
   { label: 'Başkan',                    gorev: 'Başkan',              sgkLi: false },
   { label: 'Başkan Yardımcısı',         gorev: 'Başkan Yardımcısı',   sgkLi: false },
   { label: 'Öğretmen',                  gorev: 'Öğretmen',            sgkLi: false },
@@ -34,10 +33,10 @@ export default function BilancoPage() {
   const [ogrenciSayisi, setOgrenciSayisi] = useState(0)
   const [subeSayisi, setSubeSayisi] = useState(0)
   const [toplamDersSaati, setToplamDersSaati] = useState(0)
-  const [tatiller, setTatiller] = useState<any[]>([])
-  const [personel, setPersonel] = useState<any[]>([])
-  const [puantaj, setPuantaj] = useState<any[]>([])
-  const [bordro, setBordro] = useState<any[]>([])
+  const [tatiller, setTatiller] = useState<Tatil[]>([])
+  const [personel, setPersonel] = useState<Personel[]>([])
+  const [puantaj, setPuantaj] = useState<Puantaj[]>([])
+  const [bordro, setBordro] = useState<Bordro[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -80,7 +79,7 @@ export default function BilancoPage() {
     setLoading(false)
   }, [ay, yil, okul?.id])
 
-  useEffect(() => { load() }, [load])
+  useYukleme(load)
 
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -143,7 +142,7 @@ export default function BilancoPage() {
         0, // hours
         0, // cumulative matrah
         !!kat.sgkLi,
-        !!(kat as any).isRetired,
+        !!kat.isRetired,
         kat.gorev,
         brut,
         true // vergiIstisnasi

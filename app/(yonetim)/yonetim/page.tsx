@@ -4,14 +4,20 @@ import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
 import {
-  UserPlus, Trash2, Mail, Lock, Building, AlertTriangle, CheckCircle, XCircle,
-  GraduationCap, Users, Search, ClipboardList, RefreshCw, ShieldCheck,
-  LayoutDashboard, School, Activity, CreditCard, Wallet, TrendingUp, Megaphone,
-  MapPin, Eye, ChevronRight, Compass, Moon, Sun, Star, Settings, Key, Info, User, LogOut, CalendarDays, X
+  Trash2, Lock, AlertTriangle, CheckCircle, XCircle, ClipboardList, RefreshCw, LayoutDashboard, School, Activity, CreditCard, Megaphone, MapPin, Compass, Moon, Sun, Settings, User, LogOut, CalendarDays, X,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import React, { memo } from 'react'
+import { onayla } from '@/lib/diyalog'
+import type { Tatil } from '@/lib/types'
+import { useYukleme } from '@/lib/useYukleme'
 
-const StatKart = memo(({ label, val, Icon, color, trend, yukleniyor, countUpFn, theme }: any) => {
+interface StatKartProps {
+  label: string; val: number; Icon: LucideIcon; color: string; trend?: 'up'; yukleniyor: boolean
+  countUpFn: (hedef: number) => number
+  theme: { card: React.CSSProperties; text: string; secondary: string; success: string }
+}
+const StatKart = memo(({ label, val, Icon, color, trend, yukleniyor, countUpFn, theme }: StatKartProps) => {
   const animated = countUpFn(yukleniyor ? 0 : val);
   return (
     <div style={{ ...theme.card, padding: 20 }}>
@@ -34,6 +40,14 @@ interface KullaniciSatir {
     bordro_sayisi?: number; tahsilat_sayisi?: number;
   } | null
   email?: string; last_login?: string; banned?: boolean
+  iller?: { id: number; ad: string } | null  // denetim yetkilisinin ili
+}
+interface OdemeSatir {
+  id: number; okul_id: number; tutar: number; odeme_tarihi: string; odeme_yontemi: string; aciklama?: string
+  okullar?: { ad: string } | null
+}
+interface DuyuruSatir {
+  id: number; baslik: string; icerik: string; tur: string; aktif: boolean; created_at: string
 }
 interface LogSatir {
   id: number; okul_id: number; islem: string; tablo: string
@@ -80,8 +94,14 @@ export default function YonetimDashboard() {
   const isMobile = useIsMobile()
   const [sekme, setSekme] = useState<'ozet' | 'kullanicilar' | 'loglar' | 'odemeler' | 'duyurular' | 'iller' | 'ayarlar' | 'tatiller'>('ozet')
 
+  // Bağlantıyla doğrudan bir sekmeye gelinebilir (ör. yan menüdeki Profiller → ?sekme=kullanicilar)
+  useYukleme(() => {
+    const istenen = new URLSearchParams(window.location.search).get('sekme')
+    if (istenen === 'kullanicilar' || istenen === 'loglar' || istenen === 'odemeler' || istenen === 'duyurular' || istenen === 'iller' || istenen === 'ayarlar' || istenen === 'tatiller') setSekme(istenen)
+  }, [])
+
   // ── State Tanımlamaları ────────────────────────────────
-  const [denetciTalepleri, setDenetciTalepleri] = useState<any[]>([])
+  const [denetciTalepleri, setDenetciTalepleri] = useState<unknown[]>([])
   const [talepYukleniyor, setTalepYukleniyor] = useState(false)
   const [onaylaniyorId, setOnaylaniyorId] = useState<number | null>(null)
   const [liste, setListe] = useState<KullaniciSatir[]>([])
@@ -110,7 +130,7 @@ export default function YonetimDashboard() {
   const [islemFiltre, setIslemFiltre] = useState('')
   const [tabloFiltre, setTabloFiltre] = useState('')
   const [okulFiltre, setOkulFiltre] = useState('')
-  const [odemeler, setOdemeler] = useState<any[]>([])
+  const [odemeler, setOdemeler] = useState<OdemeSatir[]>([])
   const [odemeYukleniyor, setOdemeYukleniyor] = useState(false)
   const [odemelerYuklendi, setOdemelerYuklendi] = useState(false)
   const [showOdemeModal, setShowOdemeModal] = useState(false)
@@ -119,7 +139,7 @@ export default function YonetimDashboard() {
   const [odemeAciklama, setOdemeAciklama] = useState('')
   const [odemeYontemi, setOdemeYontemi] = useState('Havale')
   const [odemeKaydediliyor, setOdemeKaydediliyor] = useState(false)
-  const [duyurular, setDuyurular] = useState<any[]>([])
+  const [duyurular, setDuyurular] = useState<DuyuruSatir[]>([])
   const [duyuruYukleniyor, setDuyuruYukleniyor] = useState(false)
   const [duyurularYuklendi, setDuyurularYuklendi] = useState(false)
   const [showDuyuruModal, setShowDuyuruModal] = useState(false)
@@ -136,10 +156,10 @@ export default function YonetimDashboard() {
   const [yeniIlAdi, setYeniIlAdi] = useState('')
   const [ilEkleniyor, setIlEkleniyor] = useState(false)
   const [okulIlMap, setOkulIlMap] = useState<Record<number, number | null>>({})
-  const [denetimListe, setDenetimListe] = useState<any[]>([])
+  const [denetimListe, setDenetimListe] = useState<KullaniciSatir[]>([])
   const [denetimYukleniyor, setDenetimYukleniyor] = useState(false)
   // Resmi tatil yönetimi (okul_id = null → tüm okullara uygulanır)
-  const [resmiTatiller, setResmiTatiller] = useState<any[]>([])
+  const [resmiTatiller, setResmiTatiller] = useState<Tatil[]>([])
   const [tatilForm, setTatilForm] = useState({ ad: '', bas: '', bit: '', tip: 'resmi' })
   const [tatilKaydediliyor, setTatilKaydediliyor] = useState(false)
   const [gorunenYil, setGorunenYil] = useState(new Date().getFullYear())
@@ -168,7 +188,7 @@ export default function YonetimDashboard() {
     }
   }, [session, apiHeaders])
 
-  useEffect(() => { listeyiGetir() }, [listeyiGetir])
+  useYukleme(listeyiGetir)
 
   const loglariGetir = useCallback(async () => {
     if (!session) return
@@ -218,7 +238,7 @@ export default function YonetimDashboard() {
       const illerData = data.iller || []
       setIller(illerData)
       const map: Record<number, number | null> = {}
-      illerData.forEach((il: any) => { (il.okullar || []).forEach((o: any) => { map[o.id] = il.id }) })
+      illerData.forEach((il: { id: number; okullar?: { id: number }[] }) => { (il.okullar || []).forEach((o) => { map[o.id] = il.id }) })
       setOkulIlMap(map)
     }
     setIllerYukleniyor(false)
@@ -244,7 +264,7 @@ export default function YonetimDashboard() {
     setTalepYukleniyor(false)
   }, [session, apiHeaders])
 
-  useEffect(() => {
+  useYukleme(() => {
     if (sekme === 'ozet') {
       bakimGetir();
       if (!loglarYuklendi) loglariGetir().then(() => setLoglarYuklendi(true));
@@ -294,7 +314,7 @@ export default function YonetimDashboard() {
   }
 
   async function resmiTatilSihirbaz() {
-    if (!confirm('2026 yılı resmi tatilleri tüm okullara eklenecek. Devam edilsin mi?')) return
+    if (!(await onayla('2026 yılı resmi tatilleri tüm okullara eklenecek. Devam edilsin mi?'))) return
     setTatilKaydediliyor(true)
     const tatiller = [
       { ad: 'Yılbaşı', bas: '2026-01-01', bit: '2026-01-01' },
@@ -345,23 +365,23 @@ export default function YonetimDashboard() {
     if (res.ok) {
       const data = await res.json()
       setUzatmaAdaylari(data.adaylar || [])
-      setUzatmaSecili((data.adaylar || []).map((a: any) => a.okul_id))
+      setUzatmaSecili((data.adaylar || []).map((a: { okul_id: number }) => a.okul_id))
     }
     setUzatmaYukleniyor(false)
   }, [session, apiHeaders])
 
-  useEffect(() => { if (sekme === 'kullanicilar') uzatmaAdaylariGetir() }, [sekme, uzatmaAdaylariGetir])
+  useYukleme(() => { if (sekme === 'kullanicilar') uzatmaAdaylariGetir() }, [sekme, uzatmaAdaylariGetir])
 
   async function handleDenemeUzat() {
     if (!uzatmaSecili.length) return
-    if (!confirm(`${uzatmaSecili.length} kuruma ${DENEME_GUN} gün ücretsiz deneme tanımlanacak ve yöneticilerine e-posta gönderilecek. Onaylıyor musunuz?`)) return
+    if (!(await onayla(`${uzatmaSecili.length} kuruma ${DENEME_GUN} gün ücretsiz deneme tanımlanacak ve yöneticilerine e-posta gönderilecek. Onaylıyor musunuz?`, { onayMetni: 'Tanımla ve gönder' }))) return
     setUzatmaGonderiliyor(true); setHata(null); setBasari(null)
     const res = await fetch('/api/admin/deneme-uzat', { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ okulIds: uzatmaSecili }) })
     const body = await res.json()
     if (!res.ok) setHata(body.error)
     else {
       setUzatmaSonuc(body.sonuclar || [])
-      const basarili = (body.sonuclar || []).filter((s: any) => s.uzatildi).length
+      const basarili = (body.sonuclar || []).filter((s: { uzatildi?: boolean }) => s.uzatildi).length
       setBasari(`${basarili} kuruma ${DENEME_GUN} gün deneme tanımlandı.`)
       uzatmaAdaylariGetir(); listeyiGetir()
     }
@@ -447,7 +467,7 @@ export default function YonetimDashboard() {
   }
 
   async function handleDuyuruSil(id: number) {
-    if (!confirm('Duyuruyu silmek istediğinize emin misiniz?')) return
+    if (!(await onayla('Duyuruyu silmek istediğinize emin misiniz?', { onayMetni: 'Evet, sil', tehlikeli: true }))) return
     const res = await fetch('/api/admin/duyurular', { method: 'DELETE', headers: apiHeaders(), body: JSON.stringify({ id }) })
     if (res.ok) duyurulariGetir()
   }
@@ -472,7 +492,7 @@ export default function YonetimDashboard() {
   const gelirGrafik = (() => {
     const aylar = []; for (let i = 5; i >= 0; i--) {
       const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i); const label = d.toLocaleDateString('tr-TR', { month: 'short', year: '2-digit' })
-      const tutar = odemeler.filter((o: any) => { const od = new Date(o.odeme_tarihi); return od.getFullYear() === d.getFullYear() && od.getMonth() === d.getMonth() }).reduce((s: number, o: any) => s + Number(o.tutar), 0)
+      const tutar = odemeler.filter((o) => { const od = new Date(o.odeme_tarihi); return od.getFullYear() === d.getFullYear() && od.getMonth() === d.getMonth() }).reduce((s: number, o) => s + Number(o.tutar), 0)
       aylar.push({ label, tutar })
     } return aylar
   })()
@@ -511,7 +531,7 @@ export default function YonetimDashboard() {
           <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: -0.5 }}>KULÜP<span style={{ color: T.primary }}>360</span></span>
         </div>
         <nav style={{ flex: 1, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {([ { id: 'ozet', label: 'Genel Bakış', icon: LayoutDashboard }, { id: 'kullanicilar', label: 'Kurum Portföyü', icon: School }, { id: 'odemeler', label: 'Tahsilat Takibi', icon: CreditCard }, { id: 'duyurular', label: 'Duyuru Yönetimi', icon: Megaphone }, { id: 'iller', label: 'Bölge Yönetimi', icon: MapPin }, { id: 'loglar', label: 'Denetim İzleri', icon: ClipboardList }, { id: 'tatiller', label: 'Tatil Takvimi', icon: CalendarDays }, { id: 'ayarlar', label: 'Sistem Ayarları', icon: Settings } ] as any[]).map(item => {
+          {([ { id: 'ozet', label: 'Genel Bakış', icon: LayoutDashboard }, { id: 'kullanicilar', label: 'Kurum Portföyü', icon: School }, { id: 'odemeler', label: 'Tahsilat Takibi', icon: CreditCard }, { id: 'duyurular', label: 'Duyuru Yönetimi', icon: Megaphone }, { id: 'iller', label: 'Bölge Yönetimi', icon: MapPin }, { id: 'loglar', label: 'Denetim İzleri', icon: ClipboardList }, { id: 'tatiller', label: 'Tatil Takvimi', icon: CalendarDays }, { id: 'ayarlar', label: 'Sistem Ayarları', icon: Settings } ] as { id: typeof sekme; label: string; icon: LucideIcon }[]).map(item => {
             const active = sekme === item.id; return (
               <button key={item.id} onClick={() => setSekme(item.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', transition: 'all 0.2s', background: active ? T.accent : 'transparent', color: active ? T.primary : T.secondary, fontWeight: active ? 700 : 600, fontSize: 13 }}><item.icon size={18} />{item.label}</button>
             )
@@ -602,9 +622,9 @@ export default function YonetimDashboard() {
                   )}
                 </div></div>
               )}
-              <div style={S.card}><div style={{ padding: 24 }}><h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 900 }}>Kurum & Yetkili Tanımlama</h3><form onSubmit={handleOlustur}><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, alignItems: 'flex-end' }}><div><label style={S.label}>Rol</label><select style={S.input} value={formRol} onChange={e => setFormRol(e.target.value as any)}><option value="okul_admin">Okul Admin</option><option value="denetim_yetkilisi">Bölge Yetkilisi</option></select></div>{formRol === 'okul_admin' && <div><label style={S.label}>Kurum Adı</label><input style={S.input} value={schoolName} onChange={e => setSchoolName(e.target.value)} /></div>}{formRol === 'denetim_yetkilisi' && <div><label style={S.label}>İl</label><select style={S.input} value={formIlId ?? ''} onChange={e => setFormIlId(e.target.value ? Number(e.target.value) : null)}><option value="">İl seçin…</option>{[...iller].sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map(il => <option key={il.id} value={il.id}>{il.ad}</option>)}</select></div>}<div><label style={S.label}>E-posta</label><input style={S.input} value={email} onChange={e => setEmail(e.target.value)} /></div><div><label style={S.label}>Şifre</label><input type="password" style={S.input} value={password} onChange={e => setPassword(e.target.value)} /></div><button disabled={olusturuluyor} style={{ ...S.btn(T.primary), height: 40, justifyContent: 'center', opacity: olusturuluyor ? 0.6 : 1 }}>{olusturuluyor ? 'Oluşturuluyor…' : 'Oluştur'}</button></div></form></div></div>
+              <div style={S.card}><div style={{ padding: 24 }}><h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 900 }}>Kurum & Yetkili Tanımlama</h3><form onSubmit={handleOlustur}><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, alignItems: 'flex-end' }}><div><label style={S.label}>Rol</label><select style={S.input} value={formRol} onChange={e => setFormRol(e.target.value as typeof formRol)}><option value="okul_admin">Okul Admin</option><option value="denetim_yetkilisi">Bölge Yetkilisi</option></select></div>{formRol === 'okul_admin' && <div><label style={S.label}>Kurum Adı</label><input style={S.input} value={schoolName} onChange={e => setSchoolName(e.target.value)} /></div>}{formRol === 'denetim_yetkilisi' && <div><label style={S.label}>İl</label><select style={S.input} value={formIlId ?? ''} onChange={e => setFormIlId(e.target.value ? Number(e.target.value) : null)}><option value="">İl seçin…</option>{[...iller].sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map(il => <option key={il.id} value={il.id}>{il.ad}</option>)}</select></div>}<div><label style={S.label}>E-posta</label><input style={S.input} value={email} onChange={e => setEmail(e.target.value)} /></div><div><label style={S.label}>Şifre</label><input type="password" style={S.input} value={password} onChange={e => setPassword(e.target.value)} /></div><button disabled={olusturuluyor} style={{ ...S.btn(T.primary), height: 40, justifyContent: 'center', opacity: olusturuluyor ? 0.6 : 1 }}>{olusturuluyor ? 'Oluşturuluyor…' : 'Oluştur'}</button></div></form></div></div>
               <div style={S.card}>
-                <div style={{ padding: '18px 24px', borderBottom: `1px solid ${T.border}`, display: 'flex', justifyContent: 'space-between' }}><div style={{ display: 'flex', background: T.muted, borderRadius: 8, padding: 2 }}>{['okullar', 'yetkililer'].map(id => ( <button key={id} onClick={() => setKisiSekme(id as any)} style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: kisiSekme === id ? T.card : 'transparent', color: kisiSekme === id ? T.primary : T.secondary, fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>{id === 'okullar' ? 'Kurumlar' : 'Yetkililer'}</button> ))}</div></div>
+                <div style={{ padding: '18px 24px', borderBottom: `1px solid ${T.border}`, display: 'flex', justifyContent: 'space-between' }}><div style={{ display: 'flex', background: T.muted, borderRadius: 8, padding: 2 }}>{['okullar', 'yetkililer'].map(id => ( <button key={id} onClick={() => setKisiSekme(id as typeof kisiSekme)} style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: kisiSekme === id ? T.card : 'transparent', color: kisiSekme === id ? T.primary : T.secondary, fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>{id === 'okullar' ? 'Kurumlar' : 'Yetkililer'}</button> ))}</div></div>
                 <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead><tr>{['Ad / E-posta', 'Bölge', 'Durum', 'İşlem'].map(h => <th key={h} style={S.th}>{h}</th>)}</tr></thead>
                   <tbody>{(kisiSekme === 'okullar' ? liste.filter(k => k.rol !== 'denetim_yetkilisi') : denetimListe).map(k => ( <tr key={k.id}><td style={S.td}><div style={{ fontWeight: 700 }}>{k.okullar?.ad || k.email}</div><div style={{ fontSize: 11, color: T.secondary }}>{k.email}</div></td><td style={S.td}>{k.iller?.ad || iller.find(i => i.id === okulIlMap[k.okullar?.id || 0])?.ad || '—'}</td><td style={S.td}><span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 5, background: k.banned ? `${T.danger}15` : `${T.success}15`, color: k.banned ? T.danger : T.success }}>{k.banned ? 'PASİF' : 'AKTİF'}</span></td><td style={S.td}><div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><button onClick={() => setSelectedUser(k)} style={{ ...S.btn(T.muted, T.secondary), padding: 8 }}><Lock size={14} /></button><button onClick={() => handleToggleBan(k)} style={{ ...S.btn(T.muted, k.banned ? T.success : T.warning), padding: 8 }}>{k.banned ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}</button></div></td></tr> ))}</tbody>

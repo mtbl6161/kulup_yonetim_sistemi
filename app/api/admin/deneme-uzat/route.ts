@@ -1,6 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
+import { adminClient, getCallerIfSuperAdmin } from '@/lib/apiAuth'
 import { NextResponse, type NextRequest } from 'next/server'
-import nodemailer from 'nodemailer'
+import { epostaGonder, htmlKacis } from '@/lib/eposta'
 import { serverError } from '@/lib/api-error'
 import { logAudit } from '@/lib/audit.server'
 import { DENEME_GUN, denemeBitisTarihi } from '@/lib/deneme'
@@ -9,33 +9,6 @@ import { DENEME_GUN, denemeBitisTarihi } from '@/lib/deneme'
 // kurum yöneticisine e-posta ile bildirir. Aynı kuruma ikinci kez verilmemesi
 // için uzatılan okul id'leri sistem_ayarlari'nda tutulur.
 const KAYIT_ANAHTARI = 'deneme_uzatma_kampanyasi'
-
-function adminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
-
-async function getCallerIfSuperAdmin(request: NextRequest) {
-  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
-  if (!token) return null
-  const { data: { user } } = await adminClient().auth.getUser(token)
-  if (!user) return null
-  const { data: profil } = await adminClient()
-    .from('profiller').select('rol').eq('id', user.id).single()
-  if (profil?.rol !== 'super_admin') return null
-  return user
-}
-
-function escape(str: unknown): string {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-}
 
 type Aday = { okul_id: number; okul_adi: string; lisans_bitis: string; email: string }
 
@@ -75,21 +48,10 @@ async function adaylariGetir(admin: ReturnType<typeof adminClient>): Promise<Ada
 }
 
 async function bilgilendirmeMailiGonder(to: string, okulAdi: string, bitis: Date) {
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 465,
-    secure: Number(process.env.SMTP_PORT) === 465,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  })
-
   const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://klup360.com'}/login`
   const bitisStr = bitis.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
 
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM || 'Klup360 <destek@klup360.com>',
+  await epostaGonder({
     to,
     subject: `Klüp360: ${DENEME_GUN} gün ücretsiz deneme hediyeniz tanımlandı`,
     html: `
@@ -98,7 +60,7 @@ async function bilgilendirmeMailiGonder(to: string, okulAdi: string, bitis: Date
           <h2 style="color: #1e3a2f; margin: 0 0 8px;">Deneme Süreniz Yenilendi</h2>
           <p style="color: #374151; margin: 0 0 16px; line-height: 1.6;">
             Merhaba,<br>
-            <strong>${escape(okulAdi)}</strong> için Klüp360 deneme süreniz sona ermişti. Sistemi rahatça
+            <strong>${htmlKacis(okulAdi)}</strong> için Klüp360 deneme süreniz sona ermişti. Sistemi rahatça
             tanıyabilmeniz için hesabınıza <strong>${DENEME_GUN} gün ücretsiz kullanım</strong> tanımladık.
           </p>
           <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">

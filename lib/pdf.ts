@@ -4,6 +4,7 @@ import type { jsPDF } from 'jspdf'
 import type { UserOptions } from 'jspdf-autotable'
 
 export type Pdf = jsPDF
+export type { RowInput, CellInput, CellHookData, UserOptions } from 'jspdf-autotable'
 type Rgb = [number, number, number]
 
 export const PDF_RENK = {

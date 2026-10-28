@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { rateLimit, getIp } from '@/lib/rate-limit'
-import nodemailer from 'nodemailer'
+import { epostaGonder, htmlKacis } from '@/lib/eposta'
 
 export async function POST(request: NextRequest) {
   const ip = getIp(request)
@@ -16,38 +16,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Lütfen zorunlu alanları doldurun.' }, { status: 400 })
     }
 
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 465,
-      secure: Number(process.env.SMTP_PORT) === 465,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    })
-
     const mailOptions = {
-      from: process.env.SMTP_FROM || 'Klüp360 <destek@klup360.com>',
       to: 'destek@klup360.com',
       replyTo: email,
-      subject: `İletişim Formu: ${konu || 'Konu Belirtilmemiş'}`,
+      subject: `İletişim Formu: ${String(konu || 'Konu Belirtilmemiş').replace(/[\r\n]+/g, ' ').slice(0, 150)}`,
       html: `
         <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
           <h2 style="color: #2347D9; border-bottom: 2px solid #2347D9; padding-bottom: 10px;">Yeni İletişim Formu Mesajı</h2>
-          <p><strong>Ad Soyad:</strong> ${ad}</p>
-          <p><strong>E-Posta:</strong> ${email}</p>
+          <p><strong>Ad Soyad:</strong> ${htmlKacis(ad)}</p>
+          <p><strong>E-Posta:</strong> ${htmlKacis(email)}</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;"/>
           <p><strong>Mesaj:</strong></p>
-          <p style="white-space: pre-wrap;">${mesaj}</p>
+          <p style="white-space: pre-wrap;">${htmlKacis(mesaj)}</p>
         </div>
       `,
     }
 
-    const info = await transporter.sendMail(mailOptions)
+    const messageId = await epostaGonder(mailOptions)
 
-    return NextResponse.json({ success: true, messageId: info.messageId })
-  } catch (err: any) {
+    return NextResponse.json({ success: true, messageId })
+  } catch (err) {
     console.error('Contact API Resend Error:', err)
-    return NextResponse.json({ error: 'Mesaj gönderilemedi.', details: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'Mesaj gönderilemedi. Lütfen daha sonra tekrar deneyin.' }, { status: 500 })
   }
 }

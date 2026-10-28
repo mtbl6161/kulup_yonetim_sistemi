@@ -1,7 +1,7 @@
 'use client'
 import React from 'react'
 import { Ayarlar, BordroSatir } from '@/lib/types'
-import { ayLabel, fmtTL, fmt } from '@/lib/hesaplama'
+import { ayLabel, fmtTL } from '@/lib/hesaplama'
 
 interface Props {
   row: BordroSatir

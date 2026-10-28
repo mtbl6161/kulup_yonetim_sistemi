@@ -24,7 +24,7 @@ export default function Page() {
           <span className="pub-badge"><span className="pub-badge-dot" /> Rehber</span>
           <h1 className="pub-h1">Çocuk Kulübü <span className="pub-grad">Yönergesi Rehberi</span></h1>
           <p className="pub-lead">
-            MEB Okul Öncesi Eğitim ve İlköğretim Kurumları Çocuk Kulüpleri Yönergesi'nin işletmeyi
+            MEB Okul Öncesi Eğitim ve İlköğretim Kurumları Çocuk Kulüpleri Yönergesi’nin işletmeyi
             ilgilendiren temel maddelerinin sade bir özeti.
           </p>
         </div>
@@ -33,7 +33,7 @@ export default function Page() {
       <section className="pub-section" style={{ paddingTop: 8 }}>
         <div className="pub-container">
           <div className="pub-prose">
-            <p className="pub-prose-meta">Bu sayfa bilgilendirme amaçlıdır. Bağlayıcı hükümler için MEB'in yayımladığı güncel yönerge metnini esas alın.</p>
+            <p className="pub-prose-meta">Bu sayfa bilgilendirme amaçlıdır. Bağlayıcı hükümler için MEB’in yayımladığı güncel yönerge metnini esas alın.</p>
 
             <h2>Çocuk kulübü nedir?</h2>
             <p>
@@ -53,7 +53,7 @@ export default function Page() {
             <p>
               Kulüpte görev alan öğretmen ve görevlilerin ücretleri, gösterge ve memur maaş katsayısına
               dayalı <strong>saat ücreti</strong> üzerinden hesaplanır. Saat ücreti; gösterge (140) × katsayı
-              ile bulunur ve azami/asgari/yemekli duruma göre 4, 6 veya 3'e bölünür.
+              ile bulunur ve azami/asgari/yemekli duruma göre 4, 6 veya 3’e bölünür.
               Güncel tutarı <Link href="/ek-ders-hesaplama">ek ders / saat ücreti hesaplama</Link> aracıyla
               bulabilirsiniz. Personel net maaşı için <Link href="/cocuk-kulubu-bordro-hesaplama">bordro
               hesaplama</Link> aracını kullanın.

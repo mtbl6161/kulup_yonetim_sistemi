@@ -1,9 +1,7 @@
 'use client'
-import { AuthProvider, useAuth } from '@/lib/AuthContext'
+import { useAuth } from '@/lib/AuthContext'
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect } from 'react'
-import { ShieldCheck, LogOut, LayoutDashboard, Users, ClipboardList } from 'lucide-react'
-import Link from 'next/link'
 
 function YonetimLayoutInner({ children }: { children: React.ReactNode }) {
   const { profil, user, loading, signOut } = useAuth()

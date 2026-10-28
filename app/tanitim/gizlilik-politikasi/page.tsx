@@ -46,7 +46,7 @@ export default function GizlilikPolitikasiPage() {
             <p>
               6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) uyarınca, veri sorumlusu sıfatıyla tarafımızla
               paylaştığınız kişisel verileriniz, işlenme amaçları ile bağlantılı, sınırlı ve ölçülü olarak
-              işlenmekte ve saklanmaktadır.
+              işlenmekte ve saklanmaktadır. Ayrıntılar için <a href="/tanitim/kvkk-aydinlatma-metni">KVKK Aydınlatma Metni</a>’ni inceleyebilirsiniz.
             </p>
 
             <h2>5. Haklarınız</h2>

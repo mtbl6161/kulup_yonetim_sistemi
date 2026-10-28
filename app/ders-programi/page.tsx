@@ -4,14 +4,18 @@ import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
 import { DersProgrami, Personel, Tatil, Sinif, Ayarlar } from '@/lib/types'
-import { GUNLER, AYLAR, gunSayisi, tatilMi, ayLabel } from '@/lib/hesaplama'
+import { AYLAR, gunSayisi, tatilMi, ayLabel } from '@/lib/hesaplama'
 import { Download, Calendar, Copy, X, Plus, Minus, Check } from 'lucide-react'
 import { ayHaftalari, varsayilanHafta, tatilAdi, ROZET, ROZET_VURGU, basHarf, bugunMu, HaftaSecici, GunBasligi, TatilBlogu, GUN_UZUN } from '@/components/HaftalikPlan'
 import Link from 'next/link'
 import Bildirim from '@/components/Bildirim'
 import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAc, PDF_RENK } from '@/lib/pdf'
+import type { RowInput, CellInput } from '@/lib/pdf'
 import React from 'react'
 import ConfirmModal from '@/components/ConfirmModal'
+import { hataMesaji } from '@/lib/hata'
+import { useYukleme } from '@/lib/useYukleme'
+import { useDegisince } from '@/lib/useDegisince'
 
 interface VisibleDay {
   day: number
@@ -19,6 +23,10 @@ interface VisibleDay {
   year: number
   isCurrentMonth: boolean
 }
+
+// İyimser güncellemelerde sunucu kimliği gelene kadar kullanılan geçici negatif kimlik
+let geciciSayac = 0
+const geciciId = () => --geciciSayac
 
 export default function DersProgramiPage() {
   const { ay, yil } = useAy()
@@ -31,7 +39,7 @@ export default function DersProgramiPage() {
   // Seçili sınıf tarayıcıda hatırlanır; ilk çizim sunucuyla aynı olsun diye açılıştan sonra okunur
   const [seciliSinif, setSeciliSinif] = useState<number | null>(null)
   const [sinifOkundu, setSinifOkundu] = useState(false)
-  useEffect(() => {
+  useYukleme(() => {
     try {
       const saved = window.localStorage.getItem('ders-programi-secili-sinif')
       if (saved && saved !== 'null') setSeciliSinif(Number(saved))
@@ -62,7 +70,7 @@ export default function DersProgramiPage() {
   const [haftaSecim, setHaftaSecim] = useState<number | null>(null)
   // Öğretmen vurgulama: seçilen öğretmenin dersleri öne çıkar, diğerleri soluklaşır
   const [vurgu, setVurgu] = useState<number | null>(null)
-  useEffect(() => { setHaftaSecim(null) }, [ay, yil])
+  useDegisince(`${ay}-${yil}`, () => setHaftaSecim(null))
 
   // --- TAKVİM HESAPLAMA ---
   const visibleDays = useMemo(() => {
@@ -112,14 +120,14 @@ export default function DersProgramiPage() {
       setTatiller(tat || [])
       setSiniflar(sin || [])
       setAyarlar(ayr || null)
-    } catch (e: any) {
-      setMsg('❌ Beklenmeyen hata: ' + (e.message || 'Bilinmiyor'))
+    } catch (e) {
+      setMsg('❌ Beklenmeyen hata: ' + (hataMesaji(e, 'Bilinmiyor')))
     } finally {
       setLoading(false)
     }
   }, [ay, yil])
 
-  useEffect(() => { load() }, [load])
+  useYukleme(load)
 
   // Sınıf seçimini hatırla
   useEffect(() => {
@@ -162,14 +170,14 @@ export default function DersProgramiPage() {
         const y = pdfBaslik(pdf, { kurum: ayarlar?.kurum_adi, baslik: `${sinif.ad} sınıfı ders programı`, alt: `${AYLAR[ay]} ${yil}` })
 
         // Tablo başlığı: Ders + her gün
-        const head: any[] = [[
+        const head: RowInput[] = [[
           'Ders',
           ...visibleDays.map(vd => `${kisaGun[new Date(vd.year, vd.month - 1, vd.day).getDay()]}\n${vd.day}`),
         ]]
 
         // Gövde: her ders saati için bir satır
         const body = DERS_SAATLERI.map(dersNo => {
-          const row: any[] = [`${dersNo}. ders`]
+          const row: CellInput[] = [`${dersNo}. ders`]
           for (const vd of visibleDays) {
             const hs = isHaftaSonu(vd.day, vd.month, vd.year)
             const t = tatilMi(vd.month, vd.day, vd.year, tatiller)
@@ -179,7 +187,7 @@ export default function DersProgramiPage() {
               row.push({ content: 'Tatil', styles: { fillColor: PDF_RENK.tatilZemin, textColor: PDF_RENK.hata, fontSize: 5 } })
             } else {
               const ders = dersGetir(sinif.ad, dersNo, vd.day, vd.month, vd.year)
-              const ogr = ders?.ogretmen as any
+              const ogr = ders?.ogretmen
               row.push(ogr?.ad ? `${ogr.ad}${ogr.aktif === false ? ' (Ayrıldı)' : ''}` : '')
             }
           }
@@ -208,9 +216,9 @@ export default function DersProgramiPage() {
 
       pdfAc(pdf, 'Ders programı')
       setMsg('✅ PDF hazırlandı.')
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      setMsg('❌ PDF hatası: ' + (err.message || 'Bilinmeyen'))
+      setMsg('❌ PDF hatası: ' + (hataMesaji(err, 'Bilinmeyen')))
     } finally {
       setTimeout(() => setMsg(''), 4000)
     }
@@ -282,7 +290,7 @@ export default function DersProgramiPage() {
       })
 
       const daysInMonth = gunSayisi(y, m)
-      const upserts: any[] = []
+      const upserts: Record<string, unknown>[] = []
       const deletes: number[] = []
 
       affectedPersonelIds.forEach(pid => {
@@ -309,7 +317,7 @@ export default function DersProgramiPage() {
         }
       })
 
-      const promises: any[] = []
+      const promises: PromiseLike<unknown>[] = []
       if (upserts.length > 0) {
         promises.push(supabase.from('puantaj').upsert(upserts, { onConflict: 'personel_id,tarih' }))
       }
@@ -354,13 +362,13 @@ export default function DersProgramiPage() {
     const oldTeacher = oldTeacherId ? personel.find(p => p.id === oldTeacherId) : null
     const oldKoordinatorId = oldTeacher?.koordinator_id
 
-    const optimisticItem: any = {
-      id: Math.random(), // Geçici ID
+    const optimisticItem = {
+      id: geciciId(),
       gun: pk.day, ay: pk.month, yil: pk.year,
       ders_no: pk.dersNo, kulup_adi: kulupAdi,
       ogretmen_id: teacherId,
       ogretmen: secilenOgretmen
-    }
+    } as DersProgrami
 
     setProgram(prev => {
       const filtered = prev.filter(p => !(p.gun === pk.day && p.ay === pk.month && p.yil === pk.year && p.kulup_adi === kulupAdi && (p.ders_no || 1) === pk.dersNo))
@@ -420,9 +428,9 @@ export default function DersProgramiPage() {
       if (oldKoordinatorId) uniquePersonelIds.add(oldKoordinatorId)
 
       await Promise.all(Array.from(uniquePersonelIds).map(pid => syncPuantajForPersonDay(pid, pk.day, pk.month, pk.year)))
-    } catch (err: any) {
+    } catch (err) {
       setProgram(oldProgram) // Hata olursa eski haline döndür
-      setMsg('❌ Kayıt hatası: ' + err.message)
+      setMsg('❌ Kayıt hatası: ' + hataMesaji(err))
       console.error(err)
     }
   }
@@ -467,10 +475,10 @@ export default function DersProgramiPage() {
       if (koordinatorId) uniquePersonelIds.add(koordinatorId)
 
       await Promise.all(Array.from(uniquePersonelIds).map(pid => syncPuantajForPersonDay(pid, silinecek.gun, silinecek.ay ?? ay, silinecek.yil ?? yil)))
-    } catch (err: any) {
+    } catch (err) {
       // Hata olursa eski haline döndür
       setProgram(oldProgram)
-      setMsg('❌ Silme hatası: ' + (err.message || 'Bilinmiyor'))
+      setMsg('❌ Silme hatası: ' + (hataMesaji(err, 'Bilinmiyor')))
       setTimeout(() => setMsg(''), 3000)
     }
   }
@@ -539,8 +547,8 @@ export default function DersProgramiPage() {
       }
 
       // 4) Şablondaki dolu slot'ları hedef günlere kopyala
-      const dpInserts: any[] = []
-      const defterInserts: any[] = []
+      const dpInserts: Record<string, unknown>[] = []
+      const defterInserts: Record<string, unknown>[] = []
 
       for (const [tGun, hedefler] of sablonHedefMap.entries()) {
         const tDersler = program.filter(p =>
@@ -586,8 +594,8 @@ export default function DersProgramiPage() {
 
       setMsg(`✅ Kopyalama tamamlandı: ${dpInserts.length} ders işlendi, boş slot'lar temizlendi.`)
       load()
-    } catch (err: any) {
-      setMsg('❌ Kopyalama hatası: ' + err.message)
+    } catch (err) {
+      setMsg('❌ Kopyalama hatası: ' + hataMesaji(err))
       console.error(err)
     } finally {
       setTimeout(() => setMsg(''), 4000)
@@ -647,7 +655,7 @@ export default function DersProgramiPage() {
       const d = dersGetir(s.ad, n, vd.day, vd.month, vd.year)
       if (d?.ogretmen_id) {
         ayAtanan++
-        const o = yukMap.get(d.ogretmen_id) || { ad: (d.ogretmen as any)?.ad || 'Bilinmiyor', saat: 0 }
+        const o = yukMap.get(d.ogretmen_id) || { ad: d.ogretmen?.ad || 'Bilinmiyor', saat: 0 }
         o.saat++; yukMap.set(d.ogretmen_id, o)
       } else bosSaatler.push({ gun: vd.day, dersNo: n, sinif: s.ad })
     }
@@ -765,7 +773,7 @@ export default function DersProgramiPage() {
                               <TatilBlogu ad={tAd} alt="Ders atanmaz" yukseklik={DERS_SAATLERI.length * HUCRE_H + (DERS_SAATLERI.length - 1) * BOSLUK} />
                             ) : DERS_SAATLERI.map(n => {
                               const ders = dersGetir(sinif.ad, n, g.day, g.month, g.year)
-                              const og = ders?.ogretmen as any
+                              const og = ders?.ogretmen
                               const vurguMu = vurgu !== null && ders?.ogretmen_id === vurgu
                               const soluk = vurgu !== null && !vurguMu
                               const r = vurguMu ? ROZET_VURGU : ROZET

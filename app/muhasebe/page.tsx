@@ -1,22 +1,23 @@
 'use client'
-import { useEffect, useState } from 'react'
-import Topbar from '@/components/Topbar'
+import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Calculator, FileText, TrendingUp, Landmark, FileDown, AlertTriangle, CheckCircle2, Download } from 'lucide-react'
 import StatCard from '@/components/StatCard'
 import { AYLAR } from '@/lib/hesaplama'
 import { useAy } from '@/lib/AyContext'
+import { uyari } from '@/lib/diyalog'
+import type { Ayarlar, Bordro, Personel } from '@/lib/types'
+import { useYukleme } from '@/lib/useYukleme'
+
+// Sorgu personel(*) ile birleştirir; her bordro satırının personeli vardır
+type MuhasebeSatir = Bordro & { personel: Personel }
 
 export default function MuhasebePage() {
   const [loading, setLoading] = useState(false)
   const { ay: activeMonth, yil: activeYear } = useAy()
 
-  const [settings, setSettings] = useState<any>(null)
-  const [payrollData, setPayrollData] = useState<any[]>([])
-
-  useEffect(() => {
-    fetchData()
-  }, [activeMonth, activeYear])
+  const [settings, setSettings] = useState<Ayarlar | null>(null)
+  const [payrollData, setPayrollData] = useState<MuhasebeSatir[]>([])
 
   const fetchData = async () => {
     setLoading(true)
@@ -28,6 +29,10 @@ export default function MuhasebePage() {
     setLoading(false)
   }
 
+  useYukleme(() => {
+    fetchData()
+  }, [activeMonth, activeYear])
+
   // Hata Denetimi
   const hatalar = payrollData.filter(b => {
     const p = b.personel
@@ -36,7 +41,7 @@ export default function MuhasebePage() {
   })
 
   const generateBankList = () => {
-    if (payrollData.length === 0) return alert('Ödeme verisi bulunamadı!')
+    if (payrollData.length === 0) return uyari('Ödeme verisi bulunamadı!')
     
     // Excel'in Türkçe karakterleri tanıması için BOM ekliyoruz
     let csv = '\uFEFFAd Soyad;IBAN;Net Odenecek;TC Kimlik No\n'
@@ -90,13 +95,13 @@ export default function MuhasebePage() {
     return summary
   })()
 
-  const totalBrut = payrollData.reduce((sum: number, b: any) => sum + (b.brut || 0), 0)
-  const totalNet = payrollData.reduce((sum: number, b: any) => sum + (b.net || 0), 0)
-  const totalGV = matrahlar.filter(m => m.kod !== '302').reduce((sum: number, m: any) => sum + m.kesinti, 0)
+  const totalBrut = payrollData.reduce((sum: number, b) => sum + (b.brut || 0), 0)
+  const totalNet = payrollData.reduce((sum: number, b) => sum + (b.net || 0), 0)
+  const totalGV = matrahlar.filter(m => m.kod !== '302').reduce((sum: number, m) => sum + m.kesinti, 0)
   const totalDV = matrahlar.find(m => m.kod === '302')?.kesinti || 0
 
   const generateXML = () => {
-    if (!settings) return alert('Ayarlar yüklenemedi!')
+    if (!settings) return uyari('Ayarlar yüklenemedi!')
     
     const xml = `<?xml version="1.0" encoding="ISO-8859-9"?>
 <beyanname kod="MUHSGK" versiyon="21">
@@ -112,7 +117,7 @@ export default function MuhasebePage() {
   </genelBilgiler>
   <muhSGK>
     <matrahVeVergiBildirimi>
-      ${matrahlar.filter((m: any) => m.gayrisafi > 0).map((m: any) => `
+      ${matrahlar.filter((m) => m.gayrisafi > 0).map((m) => `
       <tevkifatSatiri>
         <turKod>${m.kod}</turKod>
         <gayrisafiTutar>${m.gayrisafi.toFixed(2)}</gayrisafiTutar>
@@ -134,7 +139,7 @@ export default function MuhasebePage() {
       </tahakkukEdenVergiler>
     </vergiBildirimi>
     <sgkBilgileri>
-      ${payrollData.filter((b: any) => b.personel?.sgk_li).map((b: any) => `
+      ${payrollData.filter((b) => b.personel?.sgk_li).map((b) => `
       <sigortaliCalisanBilgileri>
         <tcKimlikNo>${b.personel.tc || ''}</tcKimlikNo>
         <ad>${b.personel.ad.split(' ')[0]?.toUpperCase() || ''}</ad>
@@ -162,19 +167,19 @@ export default function MuhasebePage() {
   }
 
   const generateSGKXML = () => {
-    if (!settings) return alert('Ayarlar yüklenemedi!')
-    if (!settings.sgk_sicil_no) return alert('SGK Sicil No ayarlar sayfasında tanımlanmamış!')
+    if (!settings) return uyari('Ayarlar yüklenemedi!')
+    if (!settings.sgk_sicil_no) return uyari('SGK Sicil No ayarlar sayfasında tanımlanmamış!')
 
-    const filteredEmployees = payrollData.filter((b: any) => b.personel?.sgk_li)
+    const filteredEmployees = payrollData.filter((b) => b.personel?.sgk_li)
     const daysInMonth = new Date(activeYear, activeMonth, 0).getDate()
 
-    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <AYLIKBILDIRGELER>
   <ISYERI ISYERISICIL="${settings.sgk_sicil_no}" KONTROLNO="${settings.sgk_kontrol_no || '00'}" ISYERIARACINO="${settings.sgk_araci_no || '000'}" ISYERIUNVAN="${(settings.kurum_adi || '').toUpperCase()}" ISYERIADRES="${(settings.adres || '').toUpperCase()}" ISYERIVERGINO="${settings.vergi_no}" />
   <BORDRO DONEMAY="${activeMonth}" DONEMYIL="${activeYear}" BELGEMAHIYET="A" />
   <BILDIRGELER BELGETURU="${settings.sgk_belge_turu || '01'}" KANUN="${settings.sgk_kanun_no || '05510'}">
     <SIGORTALILAR>
-      ${filteredEmployees.map((b: any, index: number) => {
+      ${filteredEmployees.map((b, index: number) => {
         const ad = (b.personel.ad.split(' ')[0] || '').toUpperCase()
         const soyad = (b.personel.ad.split(' ').slice(1).join(' ') || '').toUpperCase()
         const gun = Math.min(30, Math.round(b.toplam_saat / 7.5)) || 1
@@ -183,7 +188,7 @@ export default function MuhasebePage() {
         
         let ucret = b.brut
         let ikramiye = 0
-        if (is011 && settings.asgari_ucret) {
+        if (is011 && settings?.asgari_ucret) {
           const gunlukAsgari = settings.asgari_ucret / 30
           ucret = Math.min(b.brut, gunlukAsgari * gun)
           ikramiye = Math.max(0, b.brut - ucret)
@@ -317,8 +322,8 @@ export default function MuhasebePage() {
                     const g = (b.personel.gorev || '').toLowerCase()
                     const is011 = g.includes('temizlik') || g.includes('hizmet') || g.includes('büro') || g.includes('bakım') || g.includes('memur')
                     let u = b.brut, i = 0
-                    if (is011 && settings.asgari_ucret) {
-                      u = Math.min(b.brut, (settings.asgari_ucret / 30) * gun)
+                    if (is011 && settings?.asgari_ucret) {
+                      u = Math.min(b.brut, ((settings?.asgari_ucret ?? 0) / 30) * gun)
                       i = Math.max(0, b.brut - u)
                     }
                     return (

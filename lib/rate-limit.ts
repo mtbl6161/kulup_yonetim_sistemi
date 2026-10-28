@@ -82,6 +82,8 @@ async function upstashRateLimit(
   return { allowed: count <= limit, remaining: Math.max(0, limit - count) }
 }
 
+let uyariVerildi = false
+
 export async function rateLimit(
   key: string,
   limit: number,
@@ -97,12 +99,16 @@ export async function rateLimit(
       // Upstash erişilemezse hizmeti kesme; bellek içi yedeğe düş
       console.error('[rate-limit] Upstash hatası, bellek içi yedeğe düşülüyor:', err)
     }
+  } else if (process.env.VERCEL_ENV === 'production' && !uyariVerildi) {
+    // Canlıda bellek içi sınır örnekler arasında paylaşılmaz; günlüklerde görünür olsun
+    uyariVerildi = true
+    console.warn('[rate-limit] UPSTASH_REDIS_REST_URL / TOKEN tanımlı değil — istek sınırı canlıda etkisiz.')
   }
 
   return memoryRateLimit(key, limit, windowMs)
 }
 
 export function getIp(request: Request): string {
-  const forwarded = (request.headers as any).get?.('x-forwarded-for')
+  const forwarded = request.headers.get('x-forwarded-for')
   return (forwarded ? forwarded.split(',')[0].trim() : 'unknown')
 }

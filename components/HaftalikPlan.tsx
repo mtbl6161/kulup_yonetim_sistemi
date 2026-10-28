@@ -3,6 +3,7 @@
 // ayın iş günlerini haftalara bölme, öğretmen renkleri, hafta seçici, gün başlığı ve tatil bloğu.
 import { ChevronLeft, ChevronRight, Flag } from 'lucide-react'
 import { RESMI_TATILLER, tatilMi } from '@/lib/hesaplama'
+import type { TatilAraligi } from '@/lib/hesaplama'
 
 export interface HaftaGunu { day: number; month: number; year: number; dow: number }
 
@@ -52,7 +53,7 @@ export function gecmisMi(g: HaftaGunu) {
   return new Date(g.year, g.month - 1, g.day) < b
 }
 
-export function tatilAdi(g: HaftaGunu, tatiller: any[]): string | null {
+export function tatilAdi(g: HaftaGunu, tatiller: (TatilAraligi & { ad?: string | null })[]): string | null {
   if (!tatilMi(g.month, g.day, g.year, tatiller)) return null
   const anahtar = `${String(g.month).padStart(2, '0')}-${String(g.day).padStart(2, '0')}`
   if (RESMI_TATILLER.includes(anahtar)) return RESMI_TATIL_ADI[anahtar] || 'Resmî tatil'

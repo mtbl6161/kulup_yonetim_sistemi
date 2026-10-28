@@ -1,14 +1,17 @@
 'use client'
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { ayLabel, gunSayisi, haftaIciMi, tatilMi, fmtTL, AYLAR, fmt } from '@/lib/hesaplama'
+import { ayLabel, gunSayisi, haftaIciMi, tatilMi } from '@/lib/hesaplama'
 import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAc, PDF_RENK, PDF_KENAR } from '@/lib/pdf'
+import type { RowInput, CellInput } from '@/lib/pdf'
 import { Personel, Puantaj, Ayarlar, SinifDefteri, Tatil } from '@/lib/types'
 import ConfirmModal from '@/components/ConfirmModal'
 import { Download } from 'lucide-react'
+import { hataMesaji } from '@/lib/hata'
+import { useYukleme } from '@/lib/useYukleme'
 
 export default function PuantajPage() {
   const { ay, yil } = useAy()
@@ -48,7 +51,24 @@ export default function PuantajPage() {
     } catch (e) { console.error(e) } finally { setLoading(false) }
   }, [ay, yil])
 
-  useEffect(() => { load() }, [load])
+  useYukleme(load)
+
+  const daysInMonth = gunSayisi(yil, ay)
+  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1)
+
+  const filteredPersonel = useMemo(() => {
+    return personel.filter(p => {
+      const gorev = (p.gorev || '').toLowerCase();
+      if (gorev.includes('denetim')) return false;
+
+      const type = p.sgk_li ? 'sgk' : 'kadrolu';
+      if (type !== activeType) return false;
+
+      if (p.aktif !== false) return true;
+      const hasHours = puantaj.some(x => x.personel_id === p.id && Number(x.saat) > 0);
+      return hasHours;
+    })
+  }, [personel, activeType, puantaj])
 
   const handlePdfDownload = async () => {
     const { pdf, autoTable } = await pdfHazirla('landscape')
@@ -84,7 +104,7 @@ export default function PuantajPage() {
       return (a.ad || '').localeCompare(b.ad || '', 'tr');
     });
 
-    const ROW1: any[] = [
+    const ROW1: CellInput[] = [
       { content: 'S.N.', rowSpan: 2 },
       { content: 'ADI SOYADI', rowSpan: 2 },
       { content: 'GÖREVİ', rowSpan: 2 },
@@ -92,7 +112,7 @@ export default function PuantajPage() {
       { content: 'TOPLAM', rowSpan: 2 },
       { content: 'İMZA', rowSpan: 2 }
     ]
-    const ROW2: any[] = daysArray.map(d => ({ 
+    const ROW2: CellInput[] = daysArray.map(d => ({ 
       content: d.toString(), 
       styles: { 
         halign: 'center', 
@@ -138,7 +158,7 @@ export default function PuantajPage() {
       return sum + filteredPuan.reduce((s, x) => s + (Number(x.saat) || 0), 0)
     }, 0)
 
-    const foot: any[] = [[
+    const foot: RowInput[] = [[
       { content: `OKUTULAN TOPLAM DERS SAATİ ( ${activeType.toUpperCase()} )`, colSpan: daysInMonth + 3, styles: { halign: 'right', fontStyle: 'bold' } },
       { content: totalAggregate.toString(), styles: { halign: 'center', fontStyle: 'bold' } },
       { content: '' }
@@ -183,35 +203,6 @@ export default function PuantajPage() {
     pdfAc(pdf, 'Puantaj cetveli')
   }
 
-  const daysInMonth = gunSayisi(yil, ay)
-  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1)
-
-  const filteredPersonel = useMemo(() => {
-    return personel.filter(p => {
-      const gorev = (p.gorev || '').toLowerCase();
-      if (gorev.includes('denetim')) return false;
-
-      const type = p.sgk_li ? 'sgk' : 'kadrolu';
-      if (type !== activeType) return false;
-
-      if (p.aktif !== false) return true;
-      const hasHours = puantaj.some(x => x.personel_id === p.id && Number(x.saat) > 0);
-      return hasHours;
-    })
-  }, [personel, activeType, puantaj])
-
-  // Personel Kategorizasyonu (Yönergeye Göre)
-  const categories = useMemo(() => {
-    const cats = { egitim: [] as Personel[], yonetim: [] as Personel[], destek: [] as Personel[], diger: [] as Personel[] }
-    filteredPersonel.forEach(p => {
-      const gorev = (p.gorev || '').toLowerCase();
-      if (gorev.includes('öğretmen') || gorev.includes('usta') || gorev.includes('koordinatör')) cats.egitim.push(p)
-      else if (gorev.includes('başkan') || gorev.includes('müdür')) cats.yonetim.push(p)
-      else if (gorev.includes('muhasebe') || gorev.includes('temizlik') || gorev.includes('beslenme')) cats.destek.push(p)
-      else cats.diger.push(p)
-    })
-    return cats
-  }, [filteredPersonel])
 
   const getPuantajValue = (personelId: number, day: number) => {
     if (tatilMi(ay, day, yil, tatiller)) return 0
@@ -224,7 +215,7 @@ export default function PuantajPage() {
     const tarih = `${yil}-${String(ay).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     setSaving(true)
     try {
-      const payload: any = { personel_id: personelId, tarih, saat: value }
+      const payload: Record<string, unknown> = { personel_id: personelId, tarih, saat: value }
       if (profil?.okul_id) payload.okul_id = profil.okul_id
       const { error } = await supabase.from('puantaj').upsert(payload, { onConflict: 'personel_id,tarih' })
       if (error) throw error
@@ -261,15 +252,15 @@ export default function PuantajPage() {
         const [oid, day] = key.split('-').map(Number)
         if (day < 1 || day > daysInMonth) return null
         const tarih = `${yil}-${String(ay).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-        const row: any = { personel_id: oid, tarih, saat: hours }
+        const row: Record<string, unknown> = { personel_id: oid, tarih, saat: hours }
         if (profil?.okul_id) row.okul_id = profil.okul_id
         return row
-      }).filter(Boolean) as any[]
+      }).filter((r): r is Record<string, unknown> => r !== null)
       if (upserts.length === 0) { setMsg({ type: 'error', text: 'ℹ️ Sınıf defterinde bu ay için uygun kayıt bulunamadı.' }); return }
       const { error } = await supabase.from('puantaj').upsert(upserts, { onConflict: 'personel_id,tarih' })
       if (error) throw error
       setMsg({ type: 'success', text: `✅ ${upserts.length} adet günlük puantaj kaydı güncellendi.` }); load()
-    } catch (err: any) { setMsg({ type: 'error', text: '❌ Aktarım Hatası: ' + err.message }) } finally { setSaving(false); setTimeout(() => setMsg(null), 5000) }
+    } catch (err) { setMsg({ type: 'error', text: '❌ Aktarım Hatası: ' + hataMesaji(err) }) } finally { setSaving(false); setTimeout(() => setMsg(null), 5000) }
   }
 
   return (
@@ -331,7 +322,7 @@ export default function PuantajPage() {
               transition: 'all 0.2s'
             }}
           >
-            💳 SGK'lı Personel
+            💳 SGK’lı Personel
           </button>
         </div>
 

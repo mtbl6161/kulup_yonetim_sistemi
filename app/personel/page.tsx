@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Topbar from '@/components/Topbar'
 import Badge from '@/components/Badge'
 import ImportModal from '@/components/ImportModal'
@@ -9,10 +9,12 @@ import { useAuth } from '@/lib/AuthContext'
 import { Personel, Ayarlar } from '@/lib/types'
 import ConfirmModal from '@/components/ConfirmModal'
 import PersonelModal from '@/components/PersonelModal'
-import { Plus, Pencil, Trash2, Users, RotateCcw } from 'lucide-react'
+import { Plus, Pencil, Trash2, RotateCcw, FileSpreadsheet } from 'lucide-react'
+import { excelIndir, bugunEtiketi } from '@/lib/excel'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import { EmptyStudents } from '@/components/brand/Illustrations'
+import { useYukleme } from '@/lib/useYukleme'
 
 function PersonelIc() {
   const { profil } = useAuth()
@@ -50,7 +52,7 @@ function PersonelIc() {
     }
   }
 
-  useEffect(() => { load() }, [targetId])
+  useYukleme(load, [targetId])
 
   function duzenle(p: Personel) {
     setEditItem(p)
@@ -124,9 +126,13 @@ function PersonelIc() {
       return (a.ad || '').localeCompare(b.ad || '', 'tr');
     });
 
+  const excelAktar = () => excelIndir(`Personel_Listesi_${listeTuru === 'arsiv' ? 'Arsiv_' : ''}${bugunEtiketi()}`, 'Personel',
+    ['Sıra', 'Ad soyad', 'T.C. Kimlik No', 'Görev', 'Meslek kodu', 'Sigorta', 'Emekli', 'SGK no', 'IBAN', 'E-posta'],
+    sorted.map((p, i) => [i + 1, p.ad, p.tc, p.gorev, p.meslek_kodu, p.sgk_li ? "SGK'lı" : 'Kadrolu', p.is_retired ? 'Evet' : 'Hayır', p.sgk_no, p.iban, p.email]))
+
   return (
     <div>
-      <Topbar title="Personel Listesi" sub="Çalışan yönetimi" />
+      <Topbar title="Personel Listesi" sub="Çalışan yönetimi" actions={<button className="btn btn-secondary btn-sm" onClick={excelAktar} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileSpreadsheet size={15} /> Excel</button>} />
       <div style={{ padding: 20 }}>
         {msg && <div className={`alert ${msg.startsWith('✅') ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: 20 }}>{msg}</div>}
 
@@ -140,7 +146,7 @@ function PersonelIc() {
                 className="form-select"
                 style={{ width: 180 }}
                 value={listeTuru}
-                onChange={e => setListeTuru(e.target.value as any)}
+                onChange={e => setListeTuru(e.target.value as typeof listeTuru)}
               >
                 <option value="aktif">Aktif Personeller</option>
                 <option value="arsiv">Silinenler / Arşiv</option>

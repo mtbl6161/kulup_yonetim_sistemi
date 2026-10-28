@@ -1,23 +1,24 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
-import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAc, PDF_RENK } from '@/lib/pdf'
+import { pdfAc } from '@/lib/pdf'
 import {
-  ayLabel, fmtTL, fmt, bordroHesapla, isGunuSayisi, tavanHesapla, gunSayisi,
-  AYLAR, gvDilimiBul, tatilMi, gelirVergisiHesapla,
-  tahakkukDagitimHesapla, detectActiveCategories,
-  isOgretmen, isBaskan, isBaskanYrd, isMuhasebe, isTemizlik, isDenetim,
-  mukerrerGorevAyikla,
+  ayLabel, fmtTL, fmt, isGunuSayisi, gunSayisi, AYLAR, tatilMi, gelirVergisiHesapla, tahakkukDagitimHesapla, detectActiveCategories, isOgretmen, isBaskan, isBaskanYrd, isMuhasebe, isTemizlik, isDenetim,
 } from '@/lib/hesaplama'
-import { Personel, SinifDefteri, Ayarlar, Bordro, BordroSonuc, Tahakkuk, Puantaj, BordroSatir } from '@/lib/types'
+import { Personel, SinifDefteri, Ayarlar, Bordro, Tahakkuk, Puantaj, BordroSatir, Sinif, Tatil } from '@/lib/types'
 import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
 import { Users, Layers, Calendar, Clock, TrendingUp, Wallet, CheckCircle2, FileText, Download, Mail, Info, RotateCw, AlertTriangle, XCircle, X } from 'lucide-react'
 import { useRef } from 'react'
 import BordroZarfi from '@/components/BordroZarfi'
 import ConfirmModal from '@/components/ConfirmModal'
+import { uyari } from '@/lib/diyalog'
+import { hataMesaji } from '@/lib/hata'
+import { useYukleme } from '@/lib/useYukleme'
+import { bordroOzetPdf, bordroSirala, bordroToplamlari } from '@/lib/bordroOzet'
+import { bordroSatirlariHesapla } from '@/lib/bordroHesap'
 
 export default function BordroPage() {
   const { ay, yil } = useAy()
@@ -25,11 +26,11 @@ export default function BordroPage() {
   const [personel, setPersonel] = useState<Personel[]>([])
   const [defter, setDefter] = useState<SinifDefteri[]>([])
   const [puantajData, setPuantajData] = useState<Puantaj[]>([])
-  const [siniflar, setSiniflar] = useState<any[]>([])
+  const [siniflar, setSiniflar] = useState<Sinif[]>([])
   const [ayarlar, setAyarlar] = useState<Ayarlar | null>(null)
   const [kaydedilmis, setKaydedilmis] = useState<Bordro[]>([])
   const [tahakkuk, setTahakkuk] = useState<Tahakkuk | null>(null)
-  const [tatiller, setTatiller] = useState<any[]>([])
+  const [tatiller, setTatiller] = useState<Tatil[]>([])
   const [ogrenciSayisi, setOgrenciSayisi] = useState(0)
   const [subeSayisi, setSubeSayisi] = useState(0)
   const [satirlar, setSatirlar] = useState<BordroSatir[]>([])
@@ -141,7 +142,7 @@ export default function BordroPage() {
       // Küsürat atılır: 480,90 → 480,00
       const ogretmenBirimSaatUcreti = toplamOgretmenSaat > 0 ? Math.floor(pools.ogretmen / toplamOgretmenSaat) : 0
 
-      const satirlar: BordroSatir[] = (brd || []).map((b: any) => {
+      const satirlar: BordroSatir[] = (brd || []).map((b) => {
         const p = b.personel
         const brut = Number(b.brut)
         const sgk_kisi = Number(b.sgk_kisi)
@@ -176,7 +177,7 @@ export default function BordroPage() {
         return {
           personel: b.personel,
           toplamSaat: Number(b.toplam_saat),
-          saatUcreti: sUcretDisplay as any,
+          saatUcreti: sUcretDisplay,
           hamBrut: Number(b.brut),
           sonuc: {
             brut,
@@ -238,7 +239,7 @@ export default function BordroPage() {
     }
   }, [ay, yil])
 
-  useEffect(() => { load() }, [load])
+  useYukleme(load)
 
 
   const zarfPdfAc = async (satirlar: BordroSatir[]) => {
@@ -247,172 +248,7 @@ export default function BordroPage() {
     pdfAc(await zarfPdfUret(satirlar, ayarlar, ay, yil), 'Ücret bordro zarfı')
   }
 
-  const handlePdfDownload = async () => {
-    const { pdf, autoTable } = await pdfHazirla('landscape')
-    const M = 5 // geniş tablo (287 mm) için dar kenar
-
-    const baslangicY = pdfBaslik(pdf, {
-      kurum: ayarlar?.kurum_adi,
-      baslik: 'Bordro özeti',
-      alt: `01 ${AYLAR[ay]} ${yil} – ${sonGun} ${AYLAR[ay]} ${yil} tarihleri arası`,
-    })
-
-    // Siyah-beyaz baskıya uygun ortak tonlar
-    const C = {
-      personel:  PDF_RENK.baslikZemin,
-      vergi:     PDF_RENK.baslikZemin,
-      sgkKes:    PDF_RENK.baslikZemin,
-      kurumSgk:  PDF_RENK.baslikZemin,
-      totRow:    PDF_RENK.toplamZemin,
-      net:       [255, 255, 255] as [number, number, number],
-      header:    PDF_RENK.baslikZemin,
-    }
-
-    // ── Tablo başlıkları (2 satır) ─────────────────────────────────────────
-    const ROW1 = [
-      { content: 'PERSONEL BİLGİLERİ',               colSpan: 3, styles: { fillColor: C.personel,  textColor: [0,0,0] as [number,number,number] } },
-      { content: 'PUANTAJ & BRÜT',                    colSpan: 4, styles: { fillColor: C.personel,  textColor: [0,0,0] as [number,number,number] } },
-      { content: 'VERGİ HESAPLAMALARI (GV & DV)',      colSpan: 8, styles: { fillColor: C.vergi,     textColor: [0,0,0] as [number,number,number] } },
-      { content: 'SGK KESİNTİLERİ & NET ÜCRET',       colSpan: 4, styles: { fillColor: C.sgkKes,    textColor: [0,0,0] as [number,number,number] } },
-      { content: 'KURUM BÜTÇESİNDEN ÖDENECEK SGK',   colSpan: 6, styles: { fillColor: C.kurumSgk,  textColor: [0,0,0] as [number,number,number] } },
-    ]
-// ... (ROW2 mapping remains same)
-    const ROW2 = [
-      'S.N.',
-      'GÖREVİ',
-      'ADI SOYADI',
-      'TC KİMLİK',
-      'Ders\nSaati',
-      'Saat\nÜcreti',
-      'Brüt Ücret',
-      'GV Matrah',
-      'Oran',
-      'Hes.GV',
-      'GV İst.',
-      'GV',
-      'Hes.DV',
-      'DV İst.',
-      'DV',
-      'SGK\n%14',
-      'İşsiz\n%1',
-      'Kes.Top.',
-      'Net Öd.',
-      '%2.25\nKısaV',
-      '%20\nEmekli',
-      '%12.5\nSağlık',
-      '%3\nİşsiz',
-      'TOTAL\nSGK',
-      'İmza',
-    ]
-
-    // ── Veri satırları ─────────────────────────────────────────────────────
-    const body = sortedSatirlar.map((s, i) => [
-      i + 1,
-      s.personel.gorev,
-      s.personel.ad + (s.personel.aktif === false ? ' (Ayrıldı)' : ''),
-      s.personel.tc || '-',
-      s.toplamSaat || 0,
-      typeof s.saatUcreti === 'string' ? s.saatUcreti : fmt(Number(s.saatUcreti)),
-      fmt(s.sonuc.brut),
-      fmt(s.sonuc.gv_matrah),
-      `${fmt(s.sonuc.gv_oran * 100)}%`,
-      fmt(s.sonuc.gv_hesaplanan),
-      fmt(s.sonuc.gv_istisna),
-      fmt(s.sonuc.gv),
-      fmt(s.sonuc.dv_hesaplanan),
-      fmt(s.sonuc.dv_istisna),
-      fmt(s.sonuc.dv),
-      s.personel.sgk_li ? fmt(s.sonuc.sgk_kisi)            : '0,00',
-      s.personel.sgk_li ? fmt(s.sonuc.sgk_issizlik)        : '0,00',
-      fmt(s.sonuc.toplam_kesinti),
-      fmt(s.sonuc.net),
-      s.personel.sgk_li ? fmt(s.sonuc.sgk_detay_kisa)      : '0,00',
-      s.personel.sgk_li ? fmt(s.sonuc.sgk_detay_malulluk)  : '0,00',
-      s.personel.sgk_li ? fmt(s.sonuc.sgk_detay_saglik)    : '0,00',
-      s.personel.sgk_li ? fmt(s.sonuc.sgk_detay_issizlik)  : '0,00',
-      s.personel.sgk_li ? fmt(s.sonuc.sgk_detay_toplam)    : '0,00',
-      '',  // İmza
-    ])
-
-    // ── Toplam satırı ─────────────────────────────────────────────────────
-    const foot = [[
-      { content: 'TOPLAM', colSpan: 3, styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'left' } },
-      { content: '',                   styles: { fillColor: C.totRow } }, 
-      { content: String(toplamSaat),   styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'center' } },
-      { content: '',                   styles: { fillColor: C.totRow } }, 
-      { content: fmt(toplamBrut),      styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamGvMatrah),  styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: '',                   styles: { fillColor: C.totRow } }, 
-      { content: fmt(toplamGvHesaplanan),  styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamGvIstisna),     styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamGv),            styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamDvHesaplanan),  styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamDvIstisna),     styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamDv),            styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamSgkKisi),       styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamSgkIssiz),      styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamKesinti),       styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamNet),           styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamSgkDetayKisa),    styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamSgkDetayMalul),   styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamSgkDetaySaglik),  styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamSgkDetayIssiz),   styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: fmt(toplamSgkDetayToplam),  styles: { fontStyle: 'bold', fillColor: C.totRow, textColor: [0,0,0], halign: 'right' } },
-      { content: '',                         styles: { fillColor: C.totRow } },
-    ] as any[]]
-
-    // ── autoTable ──────────────────────────────────────────────────────────
-    autoTable(pdf, pdfTablo({
-      head: [ROW1, ROW2],
-      body,
-      foot,
-      startY: baslangicY,
-      margin: { top: 14, right: M, bottom: 14, left: M },
-      tableWidth: 'wrap',
-      styles: { fontSize: 5.0, cellPadding: 0.8, halign: 'right' },
-      headStyles: { fontSize: 5.5, cellPadding: 1.2 },
-      footStyles: { fontSize: 4.8, cellPadding: { top: 2, right: 0.5, bottom: 2, left: 0.5 }, minCellHeight: 6 },
-      columnStyles: {
-        // Toplam = 287mm = 297mm A4 landscape - (5+5)mm kenar boşluğu
-        0:  { cellWidth:  5, halign: 'center' },          // S.N.
-        1:  { cellWidth: 20, halign: 'left'   },           // GÖREVİ
-        2:  { cellWidth: 32, halign: 'left', fontStyle: 'bold' }, // ADI SOYADI (uzun isimler)
-        3:  { cellWidth: 17, halign: 'center' },           // TC KİMLİK (11 hane)
-        4:  { cellWidth:  8, halign: 'center' },           // Ders Saati
-        5:  { cellWidth:  9  },                            // Saat Ücreti
-        6:  { cellWidth: 13  },                            // Brüt Ücret
-        7:  { cellWidth: 12  },                            // GV Matrahı
-        8:  { cellWidth:  7, halign: 'center' },           // Oran
-        9:  { cellWidth:  9  },                            // Hes. GV
-        10: { cellWidth:  9  },                            // GV İst.
-        11: { cellWidth:  9  },                            // GV
-        12: { cellWidth:  9  },                            // Hes. DV
-        13: { cellWidth:  9  },                            // DV İst.
-        14: { cellWidth:  9  },                            // DV
-        15: { cellWidth: 10  },                            // SGK %14
-        16: { cellWidth:  9  },                            // İşsiz %1
-        17: { cellWidth: 11  },                            // Kes. Top.
-        18: { cellWidth: 12, fontStyle: 'bold' },          // Net Öd.
-        19: { cellWidth:  9  },                            // Kısa V %2.25
-        20: { cellWidth:  9  },                            // Emekli %20
-        21: { cellWidth:  9  },                            // Sağlık %12.5
-        22: { cellWidth:  9  },                            // İşsizlik %3
-        23: { cellWidth: 11  },                            // TOTAL SGK
-        24: { cellWidth: 21, halign: 'center' },           // İmza
-        // Kontrol: 5+20+32+17+8+9+13+12+7+9+9+9+9+9+9+10+9+11+12+9+9+9+9+11+21 = 287
-      },
-    }))
-
-    // ── Düzenleyen / Onaylayan imza blokları ───────────────────────────────
-    pdfImza(pdf, {
-      duzenleyen_adi: ayarlar?.duzenleyen_adi,
-      duzenleyen_unvani: ayarlar?.duzenleyen_unvani || 'Büro Personeli',
-      mudur_adi: ayarlar?.mudur_adi,
-      mudur_unvani: ayarlar?.mudur_unvani || 'Okul Müdürü / Kulüp Başkanı',
-    }, pdfSonY(pdf, 190))
-
-    pdfAc(pdf, 'Bordro özeti')
-  }
+  const handlePdfDownload = () => bordroOzetPdf({ satirlar: sortedSatirlar, ayarlar, ay, yil })
 
   const generateSlipPdfBase64 = async (row: BordroSatir) => {
     if (!ayarlar) return null
@@ -422,7 +258,7 @@ export default function BordroPage() {
 
   const tekMailGonder = async (row: BordroSatir) => {
     if (!row.personel.email) {
-      alert('Bu personelin e-posta adresi kayıtlı değil!')
+      uyari('Bu personelin e-posta adresi kayıtlı değil!')
       return
     }
     setConfirmModal({ isOpen: true, type: 'single', row })
@@ -457,9 +293,9 @@ export default function BordroPage() {
       if (data.error) throw new Error(data.details || data.error)
 
       setMsg(`✅ Mail başarıyla gönderildi: ${row.personel.ad}`)
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      setMsg(`❌ Mail gönderim hatası: ${err.message}`)
+      setMsg(`❌ Mail gönderim hatası: ${hataMesaji(err)}`)
     } finally {
       setMailing(false)
       setTimeout(() => setMsg(''), 5000)
@@ -469,7 +305,7 @@ export default function BordroPage() {
   const topluMailGonder = async () => {
     const mailliPersoneller = sortedSatirlar.filter(s => s.personel.email)
     if (mailliPersoneller.length === 0) {
-      alert('E-posta adresi kayıtlı personel bulunamadı!')
+      uyari('E-posta adresi kayıtlı personel bulunamadı!')
       return
     }
 
@@ -586,139 +422,9 @@ export default function BordroPage() {
         setMsg(prev => prev + ' ⚠️ Uyarı: Havuz "0" olarak hesaplandı. Lütfen tahsilatları kontrol edin.')
       }
 
-      const effectiveTavan = ayarlar.tavan_katsayi || 13184.78
-
-      const isWorking = (p: Personel) => {
-        const hasSavedBordro = kaydedilmis.some(b => b.personel_id === p.id)
-        if (hasSavedBordro) return true
-
-        if (p.aktif !== false) {
-          if (isBaskan(p.gorev) || isBaskanYrd(p.gorev) || isMuhasebe(p.gorev) || isTemizlik(p.gorev) || isDenetim(p.gorev)) {
-            return true
-          }
-          const hasPuantaj = puantajData.some(pu => pu.personel_id === p.id && Number(pu.saat) > 0)
-          return hasPuantaj
-        }
-
-        const hasPuantaj = puantajData.some(pu => pu.personel_id === p.id && Number(pu.saat) > 0)
-        if (hasPuantaj) return true
-
-        return false
-      }
-
-      const activeCategories = detectActiveCategories(aktifPersonelListesi, puantajData, kaydedilmis)
-      const dagitim = tahakkukDagitimHesapla(finalGelir, ayarlar, activeCategories)
-
-      const pools = {
-        ogretmen:  dagitim.ogretmen_havuzu,
-        baskan:    dagitim.baskan,
-        baskanYrd: dagitim.baskan_yrd,
-        muhasebe:  dagitim.muhasebe,
-        temizlik:  dagitim.temizlik,
-        denetim:   dagitim.denetim,
-      }
-
-      // Öğretmen türündeki personel ve saatleri
-      const ogretmenler = aktifPersonelListesi.filter(p => isOgretmen(p.gorev))
-      const ogretmenSaatMap = new Map<number, number>()
-      ogretmenler.forEach(p => {
-        const pSaatler = puantajData.filter(x => x.personel_id === p.id)
-        const toplamSaat = pSaatler.filter(x => {
-          const d = Number(x.tarih.split('T')[0].split('-')[2])
-          return !tatilMi(ay, d, yil, tatiller)
-        }).reduce((sum, x) => sum + (Number(x.saat) || 0), 0)
-        ogretmenSaatMap.set(p.id, toplamSaat)
+      const { yeniSatirlar, elenenGorevler } = bordroSatirlariHesapla({
+        ayarlar, personel: aktifPersonelListesi, kaydedilmis, puantaj: puantajData, tatiller, ay, yil, gelir: finalGelir,
       })
-      const toplamOgretmenSaat = ogretmenler.reduce((s, p) => s + (ogretmenSaatMap.get(p.id) || 0), 0)
-
-      const ogretmenBrutMap = new Map<number, number>()
-      let ogretmenBirimSaatUcreti = 0
-      if (toplamOgretmenSaat > 0) {
-        // Kullanıcı manuel ücret girmemişse havuzu saatlere böl (Dinamik), girmişse onu kullan (Manuel)
-        ogretmenBirimSaatUcreti = (ayarlar.ogretmen_saat_ucreti && ayarlar.ogretmen_saat_ucreti > 0) 
-          ? ayarlar.ogretmen_saat_ucreti 
-          : Math.floor(pools.ogretmen / toplamOgretmenSaat) // küsürat atılır: 480,90 → 480,00
-        
-        ogretmenler.forEach(p => {
-          const saat = ogretmenSaatMap.get(p.id) || 0
-          let pay = ogretmenBirimSaatUcreti * saat
-          const tavan = tavanHesapla(p.gorev, effectiveTavan, !!p.sgk_li)
-          if (pay > tavan) pay = tavan
-          ogretmenBrutMap.set(p.id, Math.round(pay * 100) / 100)
-        })
-      }
-
-      // Sadece aktif personeller üzerinden dağıtım yap (Excel mantığı)
-      const aktifPersonel = aktifPersonelListesi.filter(isWorking)
-      const baskanSayisi = aktifPersonel.filter(p => isBaskan(p.gorev)).length || 1
-      const baskanYrdSay = aktifPersonel.filter(p => isBaskanYrd(p.gorev)).length || 1
-      const muhasebeSay  = aktifPersonel.filter(p => isMuhasebe(p.gorev)).length || 1
-      const temizlikSay  = aktifPersonel.filter(p => isTemizlik(p.gorev)).length || 1
-      const denetimSay   = aktifPersonel.filter(p => isDenetim(p.gorev)).length || 1
-
-      const hesapAyarlar: Ayarlar = { ...ayarlar, tavan_katsayi: effectiveTavan }
-
-      const tumSatirlar: BordroSatir[] = aktifPersonelListesi.map(p => {
-        const pSaat = ogretmenSaatMap.get(p.id) || 0
-        let havuzBrut: number
-        if (isOgretmen(p.gorev)) havuzBrut = ogretmenBrutMap.get(p.id) || 0
-        else if (isBaskan(p.gorev)) havuzBrut = Math.round(pools.baskan / baskanSayisi * 100) / 100
-        else if (isBaskanYrd(p.gorev)) havuzBrut = Math.round(pools.baskanYrd / baskanYrdSay * 100) / 100
-        else if (isMuhasebe(p.gorev)) havuzBrut = Math.round(pools.muhasebe / muhasebeSay * 100) / 100
-        else if (isTemizlik(p.gorev)) havuzBrut = Math.round(pools.temizlik / temizlikSay * 100) / 100
-        else if (isDenetim(p.gorev)) havuzBrut = Math.round(pools.denetim / denetimSay * 100) / 100
-        else havuzBrut = 0
-
-        const hamBrut = havuzBrut
-        const mevcut = kaydedilmis.find(b => b.personel_id === p.id)
-        const sonuc = bordroHesapla(hesapAyarlar, pSaat, Number(p.yillik_matrah || 0), !!p.sgk_li, !!p.is_retired, p.gorev, havuzBrut, p.vergi_istisnasi,
-          p.vergi_istisna_tipi === 'tutar' ? { gv: Number(p.istisna_gv_tutari || 0), dv: Number(p.istisna_dv_tutari || 0) } : undefined)
-        
-        // Excel uyumlu "Saat Ücreti" gösterim metni (display string)
-        let sUcretDisplay: string
-        if (isOgretmen(p.gorev)) {
-          sUcretDisplay = fmt(ogretmenBirimSaatUcreti)
-        } else if (isBaskan(p.gorev)) {
-          sUcretDisplay = `%${dagitim.pct_baskan}`
-        } else if (isBaskanYrd(p.gorev)) {
-          sUcretDisplay = `%${dagitim.pct_baskan_yrd}`
-        } else if (isMuhasebe(p.gorev)) {
-          sUcretDisplay = `%${dagitim.pct_muhasebe}`
-        } else if (isTemizlik(p.gorev)) {
-          sUcretDisplay = `%${dagitim.pct_temizlik} / ${temizlikSay}`
-        } else if (isDenetim(p.gorev)) {
-          sUcretDisplay = `%${dagitim.pct_denetim}`
-        } else {
-          sUcretDisplay = "0"
-        }
-
-        if (isDenetim(p.gorev)) {
-          // Denetim Yetkilisi: Brüt = Net (Excel standardı)
-          sonuc.brut = havuzBrut
-          sonuc.gv_matrah = 0
-          sonuc.gv_hesaplanan = 0; sonuc.gv_istisna = 0; sonuc.gv = 0
-          sonuc.dv_hesaplanan = 0; sonuc.dv_istisna = 0; sonuc.dv = 0
-          sonuc.sgk_kisi = 0; sonuc.sgk_issizlik = 0; sonuc.toplam_kesinti = 0
-          sonuc.sgk_isveren = 0
-          sonuc.sgk_detay_kisa = 0; sonuc.sgk_detay_malulluk = 0
-          sonuc.sgk_detay_saglik = 0; sonuc.sgk_detay_issizlik = 0
-          sonuc.sgk_detay_toplam = 0
-          sonuc.net = havuzBrut
-        }
-
-        return {
-          personel: p,
-          toplamSaat: pSaat,
-          saatUcreti: sUcretDisplay as any,
-          hamBrut,
-          sonuc,
-          odendi: !!mevcut?.odendi,
-          bordroId: mevcut?.id
-        }
-      })
-
-      // Aynı kişi birden fazla görevdeyse yalnızca yüksek ücretli görev ödenir; diğerinin payı okulda kalır
-      const { kalan: yeniSatirlar, elenen: elenenGorevler } = mukerrerGorevAyikla(tumSatirlar)
 
       setSatirlar(yeniSatirlar)
       setHesaplandi(true)
@@ -775,9 +481,9 @@ export default function BordroPage() {
         ? ` İkinci görev ücreti ödenmedi (okulda kaldı): ${elenenGorevler.map(s => `${s.personel.ad} – ${s.personel.gorev} ${fmt(s.sonuc.brut)} TL`).join(', ')}`
         : ''))
       await load() // Verileri tekrar çekerek DB ile senkronize et
-    } catch (err: any) {
+    } catch (err) {
       console.error('❌ Bordro hesaplama hatası:', err)
-      setMsg('❌ Hata: ' + (err.message || JSON.stringify(err)))
+      setMsg('❌ Hata: ' + (hataMesaji(err) || JSON.stringify(err)))
     } finally {
       setLoading(false)
       setTimeout(() => setMsg(''), 8000)  // 8 saniye göster - hata okunabilsin
@@ -788,7 +494,8 @@ export default function BordroPage() {
 
 
   async function odemeIsaretle(bordroId: number, odendi: boolean) {
-    await supabase.from('bordro').update({ odendi }).eq('id', bordroId)
+    const { error } = await supabase.from('bordro').update({ odendi }).eq('id', bordroId)
+    if (error) return // ekrandaki durum değişmez; hata alt bildirimde gösterilir
     if (odendi) {
       const satir = satirlar.find(x => x.bordroId === bordroId)
       if (satir) logIslem({ islem: 'ode', tablo: 'bordro', kayit_id: bordroId, aciklama: `${satir.personel.ad} maaşı ödendi (${ayLabel(ay, yil)})` })
@@ -797,44 +504,9 @@ export default function BordroPage() {
   }
 
   // Tüm personeli tek tabloda sıralı göster
-  const sortedSatirlar = [...satirlar].sort((a, b) => {
-    const getPriority = (gorev: string = '') => {
-      const g = gorev.toLowerCase()
-      if (g.includes('başkan') && !g.includes('yardımcısı') && !g.includes('yrd')) return 1
-      if (g.includes('koordinatör')) return 2
-      if (g.includes('öğretmen') && !g.includes('usta')) return 3
-      if (g.includes('usta')) return 4
-      if (g.includes('yardımcı') || g.includes('yrd')) return 5
-      if (g.includes('muhasebe') || g.includes('memur')) return 6
-      if (g.includes('temizlik') || g.includes('hizmet')) return 7
-      if (g.includes('denetim')) return 8
-      return 9
-    }
-    const p1 = getPriority(a.personel.gorev)
-    const p2 = getPriority(b.personel.gorev)
-    if (p1 !== p2) return p1 - p2
-    return (a.personel.ad || '').localeCompare(b.personel.ad || '', 'tr')
-  })
+  const sortedSatirlar = bordroSirala(satirlar)
 
-  const toplamBrut           = Math.round(sortedSatirlar.reduce((s, r) => s + r.sonuc.brut, 0) * 100) / 100
-  const toplamGvMatrah        = Math.round(sortedSatirlar.reduce((s, r) => s + r.sonuc.gv_matrah, 0) * 100) / 100
-  const toplamGvHesaplanan    = Math.round(sortedSatirlar.reduce((s, r) => s + r.sonuc.gv_hesaplanan, 0) * 100) / 100
-  const toplamGvIstisna       = Math.round(sortedSatirlar.reduce((s, r) => s + r.sonuc.gv_istisna, 0) * 100) / 100
-  const toplamGv              = Math.round(sortedSatirlar.reduce((s, r) => s + r.sonuc.gv, 0) * 100) / 100
-  const toplamDvHesaplanan    = Math.round(sortedSatirlar.reduce((s, r) => s + r.sonuc.dv_hesaplanan, 0) * 100) / 100
-  const toplamDvIstisna       = Math.round(sortedSatirlar.reduce((s, r) => s + r.sonuc.dv_istisna, 0) * 100) / 100
-  const toplamDv              = Math.round(sortedSatirlar.reduce((s, r) => s + r.sonuc.dv, 0) * 100) / 100
-  const toplamSgkKisi         = Math.round(sortedSatirlar.reduce((s, r) => s + r.sonuc.sgk_kisi, 0) * 100) / 100
-  const toplamSgkIssiz        = Math.round(sortedSatirlar.reduce((s, r) => s + r.sonuc.sgk_issizlik, 0) * 100) / 100
-  const toplamKesinti         = Math.round(sortedSatirlar.reduce((s, r) => s + r.sonuc.toplam_kesinti, 0) * 100) / 100
-  const toplamNet             = Math.round(sortedSatirlar.reduce((s, r) => s + r.sonuc.net, 0) * 100) / 100
-  const toplamSgkIsv          = Math.round(sortedSatirlar.reduce((s, r) => s + r.sonuc.sgk_isveren, 0) * 100) / 100
-  const toplamSaat            = sortedSatirlar.reduce((s, r) => s + r.toplamSaat, 0)
-  const toplamSgkDetayKisa    = Math.round(sortedSatirlar.reduce((s, r) => s + (r.personel.sgk_li ? r.sonuc.sgk_detay_kisa : 0), 0) * 100) / 100
-  const toplamSgkDetayMalul   = Math.round(sortedSatirlar.reduce((s, r) => s + (r.personel.sgk_li ? r.sonuc.sgk_detay_malulluk : 0), 0) * 100) / 100
-  const toplamSgkDetaySaglik  = Math.round(sortedSatirlar.reduce((s, r) => s + (r.personel.sgk_li ? r.sonuc.sgk_detay_saglik : 0), 0) * 100) / 100
-  const toplamSgkDetayIssiz   = Math.round(sortedSatirlar.reduce((s, r) => s + (r.personel.sgk_li ? r.sonuc.sgk_detay_issizlik : 0), 0) * 100) / 100
-  const toplamSgkDetayToplam  = Math.round(sortedSatirlar.reduce((s, r) => s + (r.personel.sgk_li ? r.sonuc.sgk_detay_toplam : 0), 0) * 100) / 100
+  const { toplamBrut, toplamGvMatrah, toplamGvHesaplanan, toplamGvIstisna, toplamGv, toplamDvHesaplanan, toplamDvIstisna, toplamDv, toplamSgkKisi, toplamSgkIssiz, toplamKesinti, toplamNet, toplamSgkIsv, toplamSaat, toplamSgkDetayKisa, toplamSgkDetayMalul, toplamSgkDetaySaglik, toplamSgkDetayIssiz, toplamSgkDetayToplam } = bordroToplamlari(sortedSatirlar)
   
   // Bordro henüz hesaplanmadıysa puantaj verilerinden toplamı çek
   const sistemToplamSaat = puantajData.reduce((sum, x) => {

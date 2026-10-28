@@ -81,7 +81,7 @@ export default function BordroContent() {
           <div className="bd-checks">
             <label className="bd-check">
               <input type="checkbox" checked={sgkli} onChange={e => setSgkli(e.target.checked)} />
-              <span>SGK'lı çalışan</span>
+              <span>SGK’lı çalışan</span>
             </label>
             <label className="bd-check">
               <input type="checkbox" checked={emekli} onChange={e => setEmekli(e.target.checked)} />

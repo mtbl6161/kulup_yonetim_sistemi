@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import Topbar from '@/components/Topbar'
 import ImportModal from '@/components/ImportModal'
 import ConfirmModal from '@/components/ConfirmModal'
@@ -7,8 +7,10 @@ import { supabase } from '@/lib/supabase'
 import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
 import { Ogrenci, kulupOgrencisi } from '@/lib/types'
-import { Plus, Search, Pencil, Trash2, School, RotateCcw, X, Save, Info } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, RotateCcw, X, Save, Info, FileSpreadsheet } from 'lucide-react'
+import { excelIndir, bugunEtiketi } from '@/lib/excel'
 import { EmptyStudents } from '@/components/brand/Illustrations'
+import { useYukleme } from '@/lib/useYukleme'
 
 // Okul öğrencisi = kulübe kayıtlı olmayan, sadece okul tahsilatlarında (Kırtasiye, Etkinlik vb.) yer alan öğrenci.
 // Aynı `ogrenciler` tablosunda ogrenci_turu = 'okul' olarak tutulur; kulüp ekranlarında görünmez.
@@ -42,7 +44,7 @@ export default function OkulOgrencileriPage() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useYukleme(load)
 
   function bilgi(text: string, sure = 3000) { setMsg(text); if (sure) setTimeout(() => setMsg(''), sure) }
 
@@ -125,9 +127,13 @@ export default function OkulOgrencileriPage() {
     load()
   }
 
+  const excelAktar = () => excelIndir(`Okul_Ogrencileri_${bugunEtiketi()}`, 'Okul öğrencileri',
+    ['Sıra', 'Ad', 'Soyad', 'T.C. Kimlik No', 'Sınıf', 'Öğretmen', 'Veli', 'Telefon'],
+    liste.map((o, i) => [i + 1, o.ad, o.soyad, o.tc, o.sinif, o.ogretmen, o.veli_ad, o.anne_tel]))
+
   return (
     <div>
-      <Topbar title="Okul Öğrencileri" sub="Kulübe kayıtlı olmayan okul öğrencileri" />
+      <Topbar title="Okul Öğrencileri" sub="Kulübe kayıtlı olmayan okul öğrencileri" actions={<button className="btn btn-secondary btn-sm" onClick={excelAktar} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileSpreadsheet size={15} /> Excel</button>} />
       <div style={{ padding: 28 }}>
         {msg && <div className={`alert ${msg.startsWith('✅') ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: 16 }}>{msg}</div>}
 

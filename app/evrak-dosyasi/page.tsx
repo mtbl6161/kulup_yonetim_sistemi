@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import Topbar from '@/components/Topbar'
 import ConfirmModal from '@/components/ConfirmModal'
 import { useAy } from '@/lib/AyContext'
@@ -12,6 +12,7 @@ import {
 } from '@/lib/denetimDosyasi'
 import { FolderCheck, Upload, Eye, Download, Trash2, Send, FileArchive, ListChecks, AlertTriangle } from 'lucide-react'
 import MaddeEtiketleri from '@/components/MaddeEtiketleri'
+import { useYukleme } from '@/lib/useYukleme'
 
 const DURUM_RENK: Record<string, string> = {
   taslak: 'badge-gray', gonderildi: 'badge-blue', onaylandi: 'badge-green', iade: 'badge-red',
@@ -59,7 +60,7 @@ export default function DenetimDosyasiPage() {
     }
   }, [okulId, yil, ay])
 
-  useEffect(() => { load() }, [load])
+  useYukleme(load)
 
   const maddeBelgeleri = (m: DenetimMadde) => belgeler.filter(b => b.madde_id === m.id && belgeDonemde(b, m, yil, ay))
 

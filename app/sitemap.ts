@@ -97,6 +97,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.3,
     },
     {
+      url: `${baseUrl}/tanitim/kvkk-aydinlatma-metni`,
+      lastModified: new Date(),
+      changeFrequency: 'yearly',
+      priority: 0.3,
+    },
+    {
       url: `${baseUrl}/tanitim/kullanim-kosullari`,
       lastModified: new Date(),
       changeFrequency: 'yearly',

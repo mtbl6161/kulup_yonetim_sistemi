@@ -30,10 +30,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
 
-  const refresh = async () => {
-    if (user) await loadProfile(user.id, true)
-  }
-
   // Realtime listener for school updates
   useEffect(() => {
     if (!okul?.id) return
@@ -165,6 +161,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const refresh = async () => {
+    if (user) await loadProfile(user.id, true)
   }
 
   const signOut = async () => {

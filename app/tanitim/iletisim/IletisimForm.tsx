@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Mail, MapPin, CheckCircle2 } from 'lucide-react'
+import { uyari } from '@/lib/diyalog'
 
 export default function IletisimForm() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
@@ -22,12 +23,12 @@ export default function IletisimForm() {
         setFormData({ name: '', email: '', institution: '', message: '' })
       } else {
         const errorData = await response.json().catch(() => ({}))
-        alert(errorData.error || 'Bir hata oluştu. Lütfen tekrar deneyin.')
+        uyari(errorData.error || 'Bir hata oluştu. Lütfen tekrar deneyin.')
         setStatus('error')
       }
     } catch (err) {
       console.error('Submission error:', err)
-      alert('Bağlantı hatası oluştu.')
+      uyari('Bağlantı hatası oluştu.')
       setStatus('error')
     }
   }

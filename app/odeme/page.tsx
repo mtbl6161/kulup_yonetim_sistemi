@@ -1,26 +1,30 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import Topbar from '@/components/Topbar'
 import Badge from '@/components/Badge'
 import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
 import { fmtTL, ayLabel, isGunuSayisi, tarihFmt } from '@/lib/hesaplama'
-import { Ogrenci, Tahsilat, Ayarlar, kulupOgrencisi } from '@/lib/types'
+import { Ogrenci, Tahsilat, Ayarlar, kulupOgrencisi, Sinif, Tatil } from '@/lib/types'
 import { logIslem } from '@/lib/audit'
+import { excelIndir } from '@/lib/excel'
 import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAc, PDF_RENK } from '@/lib/pdf'
 import { useAuth } from '@/lib/AuthContext'
 import ConfirmModal from '@/components/ConfirmModal'
-import { FileDown, Wallet, History, Save, Loader2, CreditCard, Trash2, CheckCircle2, X } from 'lucide-react'
+import { FileDown, FileSpreadsheet, Wallet, History, Save, Loader2, Trash2, CheckCircle2, X } from 'lucide-react'
 import { EmptyPayments } from '@/components/brand/Illustrations'
+import { hataMesaji } from '@/lib/hata'
+import { useYukleme } from '@/lib/useYukleme'
+import { useDegisince } from '@/lib/useDegisince'
 
 export default function OdemePage() {
   const { ay, yil } = useAy()
   const { okul, profil } = useAuth()
   const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
   const [tahsilatlar, setTahsilatlar] = useState<Tahsilat[]>([])
-  const [siniflar, setSiniflar] = useState<any[]>([])
+  const [siniflar, setSiniflar] = useState<Sinif[]>([])
   const [ayarlar, setAyarlar] = useState<Ayarlar | null>(null)
-  const [tatiller, setTatiller] = useState<any[]>([])
+  const [tatiller, setTatiller] = useState<Tatil[]>([])
   const [secilenler, setSecilenler] = useState<number[]>([])
   const [showHistory, setShowHistory] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -30,7 +34,11 @@ export default function OdemePage() {
   // Form
   const [ogrenciId, setOgrenciId] = useState('')
   const [tutar, setTutar] = useState('')
-  const [tarih, setTarih] = useState(new Date().toISOString().split('T')[0])
+  // Seçili ay bu ay ise bugün, değilse o ayın 1'i
+  const [tarih, setTarih] = useState(() => {
+    const t = new Date()
+    return t.getMonth() + 1 === ay && t.getFullYear() === yil ? t.toISOString().split('T')[0] : `${yil}-${String(ay).padStart(2, '0')}-01`
+  })
   const [aciklama, setAciklama] = useState('')
   const [dekont, setDekont] = useState('')
   const [saving, setSaving] = useState(false)
@@ -61,10 +69,10 @@ export default function OdemePage() {
     setLoading(false)
   }, [ay, yil])
 
-  useEffect(() => { load() }, [load])
+  useYukleme(load)
   
   // Seçili ay değiştiğinde tarih alanını o aya göre güncelle
-  useEffect(() => {
+  useDegisince(`${ay}-${yil}`, () => {
     const today = new Date()
     const isCurrentMonth = today.getMonth() + 1 === ay && today.getFullYear() === yil
     if (isCurrentMonth) {
@@ -73,7 +81,7 @@ export default function OdemePage() {
       // Değilse seçili ayın 1. gününe ayarla
       setTarih(`${yil}-${String(ay).padStart(2, '0')}-01`)
     }
-  }, [ay, yil])
+  })
 
   const isGunu = isGunuSayisi(yil, ay, tatiller)
 
@@ -290,8 +298,8 @@ export default function OdemePage() {
       setSecilenler([])
       load()
       tahakkukGuncelle()
-    } catch (err: any) {
-      setMsg('❌ Hata: ' + err.message)
+    } catch (err) {
+      setMsg('❌ Hata: ' + hataMesaji(err))
     } finally {
       setSaving(false)
       setProgress(null)
@@ -348,8 +356,8 @@ export default function OdemePage() {
       setMsg('✅ Ödeme ve tüm dağıtım kayıtları başarıyla silindi.')
       load()
       tahakkukGuncelle()
-    } catch (err: any) {
-      setMsg('❌ Hata: ' + (err.message || 'Silme işlemi tamamlanamadı'))
+    } catch (err) {
+      setMsg('❌ Hata: ' + (hataMesaji(err, 'Silme işlemi tamamlanamadı')))
     }
     
     setTimeout(() => setMsg(''), 4000)
@@ -418,12 +426,18 @@ export default function OdemePage() {
     pdfAc(pdf, 'Ödeme durumu')
   }
 
+  const excelAktar = () => excelIndir(`Odeme_Durumu_${ayLabel(ay, yil).replace(/\s+/g, '_')}`, 'Ödeme durumu',
+    ['Sıra', 'Ad', 'Soyad', 'Sınıf', 'Gereken (TL)', 'Ödenen (TL)', 'Kalan (TL)', 'Durum'],
+    filtrelenmis.map((r, i) => [i + 1, r.ogrenci.ad, r.ogrenci.soyad, r.ogrenci.sinif, Math.round(r.gereken * 100) / 100, Math.round(r.odenen * 100) / 100, Math.round(Math.max(r.kalan, 0) * 100) / 100,
+      r.ogrenci.ucretsiz_mi ? 'Ücretsiz' : r.durum === 'tam' ? 'Ödendi' : r.durum === 'kismi' ? 'Kısmi' : 'Ödenmedi']))
+
   return (
     <div>
       <Topbar
         title="Ödeme Takibi"
         sub={`${ayLabel(ay, yil)} — Aylık tahsilat`}
         actions={
+          <>
           <button 
             className="btn btn-secondary btn-sm no-print" 
             onClick={handlePdf}
@@ -433,6 +447,11 @@ export default function OdemePage() {
             <FileDown size={16} />
             <span>PDF</span>
           </button>
+          <button className="btn btn-secondary btn-sm no-print" onClick={excelAktar} disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <FileSpreadsheet size={16} />
+            <span>Excel</span>
+          </button>
+          </>
         }
       />
       <div style={{ padding: 28 }}>

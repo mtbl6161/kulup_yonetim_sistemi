@@ -8,6 +8,7 @@ import {
 } from '@/lib/denetimDosyasi'
 import { Download, FileArchive, ListChecks, CheckCircle2, Undo2, X, ExternalLink, FileSearch, FileText, FileSpreadsheet, FileImage, File, Eye, ChevronRight } from 'lucide-react'
 import MaddeEtiketleri from '@/components/MaddeEtiketleri'
+import { useYukleme } from '@/lib/useYukleme'
 
 const RENK: Record<string, { bg: string; fg: string }> = {
   taslak: { bg: 'var(--surface2)', fg: 'var(--text2)' },
@@ -88,7 +89,7 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
     } finally { setYukleniyor(false) }
   }, [okulId, yil, ay])
 
-  useEffect(() => { load() }, [load])
+  useYukleme(load)
   useEffect(() => () => { if (blobUrl.current) URL.revokeObjectURL(blobUrl.current) }, [])
 
   const hata = (e: unknown) => setMsg({ tip: 'hata', text: '❌ ' + ((e as Error)?.message || String(e)) })

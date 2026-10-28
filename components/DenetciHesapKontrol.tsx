@@ -1,12 +1,13 @@
 'use client'
 // Denetçi: bir okulun aylık bordrosunu otomatik denetleyen kontrol ekranı
 // ("Kulüp Denetim Programı" Excel'indeki KONTROL EKRANI'nın sistem verisiyle çalışan karşılığı)
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { fmt } from '@/lib/hesaplama'
 import { hesapKontrolEt, BANKA_TARIH_TOLERANSI, HesapKontrolSonuc, KontrolBulgu, KontrolDurum, KontrolBordro, KisiKontrol } from '@/lib/hesapKontrol'
 import { Ayarlar, Personel } from '@/lib/types'
 import { AlertTriangle, CheckCircle2, XCircle, Info, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react'
+import { useYukleme } from '@/lib/useYukleme'
 
 const RENK: Record<KontrolDurum, { bg: string; fg: string; border: string; ad: string }> = {
   ok: { bg: 'var(--success-light)', fg: '#1a6b34', border: 'var(--success-border)', ad: 'Uygun' },
@@ -162,7 +163,7 @@ export function useHesapKontrol(okulId: number, yil: number, ay: number): HesapK
     }
   }, [okulId, yil, ay])
 
-  useEffect(() => { yukle() }, [yukle])
+  useYukleme(yukle)
 
   return { sonuc, hataMsg, yukleniyor, yukle }
 }

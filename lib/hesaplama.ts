@@ -1,7 +1,10 @@
 // ============================================================
 // MEB Çocuk Kulüpleri Yönergesi - İş Mantığı Hesaplamaları
 // ============================================================
-import { Ayarlar, BordroSonuc, VergiDilimi } from './types'
+import { Ayarlar, BordroSonuc, VergiDilimi, Tatil } from './types'
+
+/** Tatil hesaplarında yalnızca tarih aralığı gerekir */
+export type TatilAraligi = Pick<Tatil, 'baslangic_tarihi' | 'bitis_tarihi'>
 
 export const AYLAR = [
   '', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
@@ -37,7 +40,7 @@ export function haftaIciMi(yil: number, ay: number, gun: number): boolean {
  * @param gun Gün
  * @param customTatiller Veritabanından gelen özel tatil listesi
  */
-export function tatilMi(ay: number, gun: number, yil?: number, customTatiller?: any[]): boolean {
+export function tatilMi(ay: number, gun: number, yil?: number, customTatiller?: TatilAraligi[]): boolean {
   // 1. Sabit resmi tatil kontrolü (ay-gün bazlı)
   const str = `${String(ay).padStart(2, '0')}-${String(gun).padStart(2, '0')}`
   if (RESMI_TATILLER.includes(str)) return true
@@ -47,8 +50,8 @@ export function tatilMi(ay: number, gun: number, yil?: number, customTatiller?: 
     const d = new Date(yil, ay - 1, gun, 12, 0, 0)
     for (const t of customTatiller) {
       // "2026-05-26" formatını UTC değil yerel saat olarak parse et
-      const [basY, basM, basD] = (t.baslangic_tarihi as string).split('T')[0].split('-').map(Number)
-      const [bitY, bitM, bitD] = (t.bitis_tarihi as string).split('T')[0].split('-').map(Number)
+      const [basY, basM, basD] = t.baslangic_tarihi.split('T')[0].split('-').map(Number)
+      const [bitY, bitM, bitD] = t.bitis_tarihi.split('T')[0].split('-').map(Number)
       const bas = new Date(basY, basM - 1, basD, 0, 0, 0)
       const bit = new Date(bitY, bitM - 1, bitD, 23, 59, 59, 999)
       if (d >= bas && d <= bit) return true
@@ -72,7 +75,7 @@ export function gunEkle(iso: string, gun: number): string {
 }
 
 /** Aydaki iş günü sayısı (haftasonu + tatil hariç) */
-export function isGunuSayisi(yil: number, ay: number, customTatiller?: any[]): number {
+export function isGunuSayisi(yil: number, ay: number, customTatiller?: TatilAraligi[]): number {
   const toplam = gunSayisi(yil, ay)
   let sayac = 0
   for (let g = 1; g <= toplam; g++) {
@@ -104,7 +107,7 @@ export function ogrenciUcretiHesapla(
   yil: number,
   ay: number,
   kardesIndirimi: boolean,
-  customTatiller?: any[],
+  customTatiller?: TatilAraligi[],
   toplamSaatOverride?: number
 ): number {
   if (toplamSaatOverride != null && toplamSaatOverride > 0) {
@@ -421,11 +424,11 @@ export interface ActiveCategories {
 }
 
 export function detectActiveCategories(
-  personelList: any[],
-  puantajList: any[],
-  bordroList: any[]
+  personelList: { id: number; gorev?: string | null; aktif?: boolean | null }[],
+  puantajList: { personel_id: number; saat: number | string }[],
+  bordroList: { personel_id: number }[]
 ): ActiveCategories {
-  const hasWorked = (p: any) => {
+  const hasWorked = (p: { id: number; gorev?: string | null; aktif?: boolean | null }) => {
     // If they have a saved bordro, they worked.
     const hasSavedBordro = bordroList.some(b => b.personel_id === p.id)
     if (hasSavedBordro) return true

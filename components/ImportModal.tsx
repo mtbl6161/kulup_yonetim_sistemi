@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { logIslem } from '@/lib/audit'
 import { Ogrenci, Personel, OgrenciTuru } from '@/lib/types'
 import { Upload, Download, X, CheckCircle, AlertTriangle, FileSpreadsheet, Copy } from 'lucide-react'
+import { uyari } from '@/lib/diyalog'
 
 type Tip = 'ogrenci' | 'personel'
 type Adim = 'yukle' | 'onizleme' | 'sonuc'
@@ -279,7 +280,7 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
           .map(r => Object.fromEntries(Object.entries(r).map(([k, v]) => [k.trim(), String(v ?? '').trim()])))
 
         if (rows.length === 0) {
-          alert('Dosya boş veya okunamadı.')
+          uyari('Dosya boş veya okunamadı.')
           return
         }
 
@@ -309,7 +310,7 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
         setSatirlar(parsed)
         setAdim('onizleme')
       } catch {
-        alert('Dosya okunamadı. Lütfen geçerli bir Excel (.xlsx) veya CSV dosyası yükleyin.')
+        uyari('Dosya okunamadı. Lütfen geçerli bir Excel (.xlsx) veya CSV dosyası yükleyin.')
       }
     }
     reader.readAsArrayBuffer(file)
@@ -349,7 +350,7 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
 
     setYukleniyor(false)
     if (error) {
-      alert(error.code === '23505' && /tc/i.test(error.message)
+      uyari(error.code === '23505' && /tc/i.test(error.message)
         ? 'Kayıt hatası: Dosyadaki TC\'lerden biri sistemde zaten kayıtlı (başka bir kurumda veya görünmeyen bir kayıtta olabilir). Hiçbir satır eklenmedi.'
         : 'Kayıt hatası: ' + error.message)
       return
@@ -460,8 +461,8 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
                       e.stopPropagation();
                       const text = kolonlar.join('\t');
                       navigator.clipboard.writeText(text)
-                        .then(() => alert('Sütun başlıkları Excel\'e yapıştırılmak üzere panoya kopyalandı!'))
-                        .catch(() => alert('Kopyalama başarısız oldu.'));
+                        .then(() => uyari('Sütun başlıkları Excel\'e yapıştırılmak üzere panoya kopyalandı!'))
+                        .catch(() => uyari('Kopyalama başarısız oldu.'));
                     }}
                     style={{
                       background: 'none',

@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { rateLimit } from '@/lib/rate-limit'
-import { Resend } from 'resend'
+import { epostaGonder } from '@/lib/eposta'
+import { hataMesaji } from '@/lib/hata'
 
 function escape(str: unknown): string {
   return String(str ?? '')
@@ -55,10 +56,9 @@ export async function POST(request: NextRequest) {
     const safeFilename = `Bordro_${simpleAd}_${safeAy}_${safeYil}.pdf`
     const base64Data   = pdfBase64.replace(/^data:application\/pdf;base64,/, '')
 
-    const resend = new Resend(process.env.RESEND_API_KEY)
-
-    const { data, error } = await resend.emails.send({
-      from: process.env.RESEND_FROM || 'Klüp360 <destek@klup360.com>',
+    let messageId: string | undefined
+    try {
+      messageId = await epostaGonder({
       to: email,
       subject: subject || `${safeAy} ${safeYil} Maaş Bordrosu`,
       html,
@@ -66,16 +66,15 @@ export async function POST(request: NextRequest) {
         filename: safeFilename,
         content: base64Data,
       }],
-    })
-
-    if (error) {
+      })
+    } catch (error) {
       console.error('❌ Resend Error:', error)
-      return NextResponse.json({ error: 'Mail gönderilemedi', details: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Mail gönderilemedi' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, remaining, messageId: data?.id })
-  } catch (err: any) {
+    return NextResponse.json({ success: true, remaining, messageId })
+  } catch (err) {
     console.error('❌ Send Email Error:', err)
-    return NextResponse.json({ error: 'Sistem hatası', details: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'Sistem hatası', details: hataMesaji(err) }, { status: 500 })
   }
 }

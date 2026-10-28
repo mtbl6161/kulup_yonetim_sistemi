@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Topbar from '@/components/Topbar'
 import Badge from '@/components/Badge'
 import ImportModal from '@/components/ImportModal'
@@ -7,12 +7,14 @@ import ConfirmModal from '@/components/ConfirmModal'
 import { supabase } from '@/lib/supabase'
 import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
-import { Ogrenci, Ayarlar, Personel, kulupOgrencisi } from '@/lib/types'
+import { Ogrenci, Ayarlar, Personel, kulupOgrencisi, Sinif } from '@/lib/types'
 import OgrenciModal from '@/components/OgrenciModal'
-import { Plus, Search, Pencil, Trash2, GraduationCap, RotateCcw } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, RotateCcw, FileSpreadsheet } from 'lucide-react'
+import { excelIndir, bugunEtiketi } from '@/lib/excel'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import { EmptyStudents } from '@/components/brand/Illustrations'
+import { useYukleme } from '@/lib/useYukleme'
 
 function OgrencilerIc() {
   const { profil } = useAuth()
@@ -22,7 +24,7 @@ function OgrencilerIc() {
   const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
   const [tumOgrenciler, setTumOgrenciler] = useState<Ogrenci[]>([]) // mükerrer kontrolü için (okul öğrencileri dahil)
   const [personel, setPersonel] = useState<Personel[]>([])
-  const [siniflar, setSiniflar] = useState<any[]>([])
+  const [siniflar, setSiniflar] = useState<Sinif[]>([])
   const [editItem, setEditItem] = useState<Ogrenci | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [silOnayId, setSilOnayId] = useState<number | null>(null)
@@ -62,7 +64,7 @@ function OgrencilerIc() {
     }
   }
 
-  useEffect(() => { load() }, [targetId])
+  useYukleme(load, [targetId])
 
   // Hiyerarşik Sıralama ve Filtreleme Mantığı
   const ogretmenListesi = personel
@@ -147,9 +149,14 @@ function OgrencilerIc() {
     return nameA.localeCompare(nameB, 'tr')
   })
 
+  // Ekrandaki (filtrelenmiş) liste
+  const excelAktar = () => excelIndir(`Ogrenci_Listesi_${listeTuru === 'arsiv' ? 'Arsiv_' : ''}${bugunEtiketi()}`, 'Öğrenciler',
+    ['Sıra', 'Ad', 'Soyad', 'T.C. Kimlik No', 'Sınıf', 'Öğretmen', 'Kardeş indirimi', 'Ücretsiz', 'Anne adı', 'Anne telefonu'],
+    liste.map((o, i) => [i + 1, o.ad, o.soyad, o.tc, o.sinif, o.ogretmen, o.kardes_indirimi ? 'Evet' : 'Hayır', o.ucretsiz_mi ? 'Evet' : 'Hayır', o.anne_adi, o.anne_tel]))
+
   return (
     <div>
-      <Topbar title="Öğrenci Listesi" sub="Kayıt ve yönetim" />
+      <Topbar title="Öğrenci Listesi" sub="Kayıt ve yönetim" actions={<button className="btn btn-secondary btn-sm" onClick={excelAktar} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileSpreadsheet size={15} /> Excel</button>} />
       <div style={{ padding: 28 }}>
         {msg && <div className={`alert ${msg.startsWith('✅') ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: 20 }}>{msg}</div>}
 
@@ -164,7 +171,7 @@ function OgrencilerIc() {
                 className="form-select"
                 style={{ width: 180 }}
                 value={listeTuru}
-                onChange={e => setListeTuru(e.target.value as any)}
+                onChange={e => setListeTuru(e.target.value as typeof listeTuru)}
               >
                 <option value="aktif">Aktif Öğrenciler</option>
                 <option value="arsiv">Silinenler / Arşiv</option>

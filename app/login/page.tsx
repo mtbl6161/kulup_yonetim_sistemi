@@ -7,6 +7,7 @@ import { Mail, Lock, AlertTriangle, CheckCircle, ArrowLeft, UserPlus, ShieldChec
 import Link from 'next/link'
 import { BrandMark } from '@/components/brand/Logo'
 import { HeroComposition } from '@/components/brand/Illustrations'
+import { hataMesaji } from '@/lib/hata'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -43,8 +44,8 @@ export default function LoginPage() {
           }
         }, 1000)
       }
-    } catch (err: any) {
-      setError('Sistem Hatası: ' + err.message)
+    } catch (err) {
+      setError('Sistem Hatası: ' + hataMesaji(err))
       setLoading(false)
     }
   }

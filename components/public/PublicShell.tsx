@@ -27,6 +27,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
             <Link href="/fiyatlandirma">Fiyatlandırma</Link>
             <Link href="/tanitim/kullanim-kosullari">Kullanım Koşulları</Link>
             <Link href="/tanitim/gizlilik-politikasi">Gizlilik</Link>
+            <Link href="/tanitim/kvkk-aydinlatma-metni">KVKK</Link>
             <Link href="/tanitim/iade-politikasi">İade</Link>
             <Link href="/tanitim/iletisim">İletişim</Link>
             <Link href="/login">Giriş</Link>

@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
 import { pdfHazirla, pdfBaslik, pdfTablo, pdfAc, PDF_RENK, PDF_KENAR } from '@/lib/pdf'
+import type { RowInput, UserOptions } from '@/lib/pdf'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { ayLabel, fmtTL, tarihFmt, AYLAR } from '@/lib/hesaplama'
@@ -10,100 +11,14 @@ import { IsletmeHareket, IsletmeTur, Ayarlar, Ogrenci, TahsilatKategori, kulupOg
 import { taksitAcilabilir, taksitKey, taksitCoz } from '@/lib/taksit'
 import { aciklamayiAyristir, ogrenciEslestir } from '@/lib/ekstreEslesme'
 import ConfirmModal from '@/components/ConfirmModal'
-import { BookText, BookOpen, Pencil, Trash2, TrendingUp, TrendingDown, Scale, Save, X, ArrowDownCircle, ArrowUpCircle, ListChecks, LayoutList, Download, FileSpreadsheet, CheckCircle2, AlertTriangle, UserCheck, ChevronDown, ChevronUp, Circle } from 'lucide-react'
-
-const bugunISO = () => new Date().toISOString().split('T')[0]
-
-type OdemeTipi = 'kulup' | 'kirtasiye'
-interface ParsedRow {
-  tarih: string; tutar: number; tur: IsletmeTur; aciklama: string; belge: string; gecerli: boolean
-  odemeTipi: OdemeTipi | null
-  ogrenciId: number | null
-  ayIpucu: number | null
-  isaretle: boolean
-}
-
-// Türk formatındaki tutarı sayıya çevir ("1.234,56" -> 1234.56). İşaret ayrı ele alınır.
-function parseTutar(s: string): number {
-  if (!s) return NaN
-  const t = s.replace(/[^\d.,-]/g, '').trim()
-  if (!t || t === '-') return NaN
-  const neg = t.startsWith('-')
-  const dec = Math.max(t.lastIndexOf(','), t.lastIndexOf('.'))
-  if (dec === -1) { const n = parseFloat(t.replace(/[^\d]/g, '')); return neg ? -n : n }
-  const intp = t.slice(0, dec).replace(/[^\d]/g, '')
-  const frac = t.slice(dec + 1).replace(/[^\d]/g, '')
-  const v = parseFloat(`${intp || '0'}.${frac || '0'}`)
-  return neg ? -v : v
-}
-
-// Tarihi ISO'ya çevir (dd.mm.yyyy / yyyy-mm-dd destekli)
-function parseTarih(s: string): string {
-  if (!s) return ''
-  const t = s.trim()
-  let m = t.match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/)
-  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`
-  m = t.match(/(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})/)
-  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
-  return ''
-}
-
-// Excel hücresini düz metne çevir (tarih -> dd.mm.yyyy, sayı -> ondalık)
-function cellStr(v: any): string {
-  if (v == null) return ''
-  if (v instanceof Date) return `${String(v.getDate()).padStart(2, '0')}.${String(v.getMonth() + 1).padStart(2, '0')}.${v.getFullYear()}`
-  return String(v).trim()
-}
-
-// Ekstredeki gerçek tablo başlığını bul: "tarih" ve "tutar/miktar" kelimelerini aynı satırda
-// içeren ilk satır. Banka ekstrelerinde tablo öncesinde hesap bilgisi bloğu (Şube, IBAN,
-// Bakiye vb.) yer alabilir; bu blok tabloya dahil edilmeden atlanır. Böyle bir başlık
-// bulunamazsa (ör. dosya zaten ilk satırdan tablo) hiçbir şey değişmez.
-function ekstreBasligiBul(rows: string[][]): number {
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i].map(c => (c || '').toLocaleLowerCase('tr'))
-    if (r.some(c => c.includes('tarih')) && r.some(c => c.includes('tutar') || c.includes('miktar'))) return i
-  }
-  return -1
-}
-
-interface ColMap { tarih: number; tutar: number; yon: number; aciklama: number; belge: number }
-
-// Excel/CSV sütunlarını otomatik tanı (banka bağımsız: başlık adı + içerik desenine göre)
-function autoDetect(rows: string[][], hasHeader: boolean): ColMap {
-  const n = rows.reduce((m, r) => Math.max(m, r.length), 0)
-  const header = hasHeader && rows[0] ? rows[0].map(h => (h || '').toLocaleLowerCase('tr')) : []
-  const data = hasHeader ? rows.slice(1) : rows
-  const findHead = (kw: string[]) => header.findIndex(h => kw.some(k => h.includes(k)))
-  const colScore = (test: (s: string) => boolean, skip: number[] = []) => {
-    let best = -1, bestOk = 0
-    for (let c = 0; c < n; c++) {
-      if (skip.includes(c)) continue
-      let ok = 0, tot = 0
-      for (const r of data.slice(0, 25)) { const v = r[c]; if (v && v.trim()) { tot++; if (test(v)) ok++ } }
-      if (tot && ok / tot > 0.6 && ok > bestOk) { bestOk = ok; best = c }
-    }
-    return best
-  }
-  let tarih = findHead(['tarih']); if (tarih < 0) tarih = colScore(s => !!parseTarih(s))
-  if (tarih < 0) tarih = 0
-  let tutar = findHead(['işlem tutar', 'islem tutar', 'tutar', 'miktar', 'tutarı'])
-  if (tutar < 0) tutar = colScore(s => { const x = parseTutar(s); return !isNaN(x) && x !== 0 }, [tarih])
-  if (tutar < 0) tutar = Math.min(2, n - 1)
-  const yon = findHead(['(+/-)', '+/-', 'borç/alacak', 'g/ç', 'işlem türü', 'islem türü'])
-  const aciklama = findHead(['açıklama', 'aciklama', 'detay', 'ad soyad', 'gönderen', 'gonderen'])
-  const belge = findHead(['dekont', 'belge', 'referans', 'fiş', 'fis', 'işlem no', 'islem no'])
-  return { tarih, tutar, yon, aciklama, belge }
-}
-
-interface FormState {
-  tarih: string
-  tur: IsletmeTur
-  tutar: string
-  belge_no: string
-  aciklama: string
-}
-const bosForm = (tarih: string): FormState => ({ tarih, tur: 'gelir', tutar: '', belge_no: '', aciklama: '' })
+import {
+  BookText, BookOpen, Pencil, Trash2, TrendingUp, TrendingDown, Scale, Save, X, ArrowDownCircle, ArrowUpCircle, ListChecks, LayoutList, Download, FileSpreadsheet,
+} from 'lucide-react'
+import { hataMesaji } from '@/lib/hata'
+import { useYukleme } from '@/lib/useYukleme'
+import { useDegisince } from '@/lib/useDegisince'
+import { bugunISO, OdemeTipi, ParsedRow, parseTutar, parseTarih, cellStr, ekstreBasligiBul, ColMap, autoDetect, FormState, bosForm, DefterTablo, turBtn } from './yardimcilar'
+import EkstreModal from '@/app/isletme-defteri/EkstreModal'
 
 export default function IsletmeDefteri({ birim }: { birim: Birim }) {
   const { ay, yil } = useAy()
@@ -165,13 +80,10 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
     setLoading(false)
   }, [yil, birim])
 
-  useEffect(() => { load() }, [load])
+  useYukleme(load)
 
   // Ay değişince form tarihini güncelle (düzenleme yokken)
-  useEffect(() => {
-    if (editId == null) setForm(f => ({ ...f, tarih: varsayilanTarih() }))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ay, yil])
+  useDegisince(`${ay}-${yil}`, () => { if (editId == null) setForm(f => ({ ...f, tarih: varsayilanTarih() })) })
 
   function bilgi(text: string, sure = 3000) { setMsg(text); if (sure) setTimeout(() => setMsg(''), sure) }
 
@@ -265,7 +177,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
 
       const wSira = 16, wTarih = 24, wNo = 22, wTutar = 32
       const wAcik = usable - (wSira + wTarih + wNo + wTutar)
-      const colStyles: any = {
+      const colStyles: UserOptions['columnStyles'] = {
         0: { cellWidth: wSira, halign: 'center' },
         1: { cellWidth: wTarih, halign: 'center' },
         2: { cellWidth: wNo, halign: 'center' },
@@ -277,7 +189,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
       const giderler = hareketler.filter(h => h.tur === 'gider').sort(asc)
       const gelirler = hareketler.filter(h => h.tur === 'gelir').sort(asc)
 
-      function headFor(title: 'GİDER' | 'GELİR'): any {
+      function headFor(title: 'GİDER' | 'GELİR'): RowInput[] {
         return [
           [
             { content: 'Sıra No', rowSpan: 2 },
@@ -312,7 +224,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
           pdf.text(String(p + 1), PW - M, 15, { align: 'right' })
 
           const slice = t.rows.slice(p * RPP, (p + 1) * RPP)
-          const body: any[] = []
+          const body: RowInput[] = []
           body.push([{ content: 'Nakli Toplam', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold' } }, { content: fmtTL(t.run), styles: { halign: 'right', fontStyle: 'bold' } }])
           for (const r of slice) { t.sira++; t.run += Number(r.tutar || 0); body.push([t.sira, tarihFmt(r.tarih), r.belge_no || '-', r.aciklama || '', fmtTL(Number(r.tutar))]) }
           // Boş satırlar: karşılıklı sayfalar aynı boyda, elle yazmaya uygun cetvel
@@ -334,8 +246,8 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
       // Resmî defter: sayfa altında üretim bilgisi basılmaz
       pdfAc(pdf, 'İşletme hesabı defteri', false)
       bilgi('✅ Defter PDF hazırlandı.')
-    } catch (err: any) {
-      bilgi('❌ PDF hatası: ' + (err.message || 'Bilinmiyor'), 5000)
+    } catch (err) {
+      bilgi('❌ PDF hatası: ' + (hataMesaji(err, 'Bilinmiyor')), 5000)
     }
   }
 
@@ -374,8 +286,8 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
       // Kaydedilen yıl seçili yıldan farklıysa uyar
       if (payload.yil !== yil) bilgi(`✅ Kaydedildi. (Not: ${payload.yil} yılına işlendi, listede görmek için yılı değiştirin.)`, 5000)
       load()
-    } catch (err: any) {
-      bilgi('❌ Kayıt hatası: ' + (err.message || 'Bilinmiyor'), 5000)
+    } catch (err) {
+      bilgi('❌ Kayıt hatası: ' + (hataMesaji(err, 'Bilinmiyor')), 5000)
     } finally { setSaving(false) }
   }
 
@@ -440,22 +352,22 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
       const buf = await file.arrayBuffer()
       const wb = XLSX.read(buf, { cellDates: true })
       const ws = wb.Sheets[wb.SheetNames[0]]
-      const aoa: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: false })
+      const aoa: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: false })
       const tumSatirlar = aoa.map(r => (r || []).map(cellStr)).filter(r => r.some(c => c && c.trim()))
       if (!tumSatirlar.length) { bilgi('⚠️ Dosyada veri bulunamadı.'); setImportReading(false); return }
       const basIdx = ekstreBasligiBul(tumSatirlar)
       const rows = basIdx > 0 ? tumSatirlar.slice(basIdx) : tumSatirlar
       setImportRows(rows)
       setColMap(autoDetect(rows, basSatirAtla))
-    } catch (err: any) {
-      bilgi('❌ Dosya okunamadı: ' + (err.message || 'Bilinmiyor'), 5000)
+    } catch (err) {
+      bilgi('❌ Dosya okunamadı: ' + (hataMesaji(err, 'Bilinmiyor')), 5000)
     } finally {
       setImportReading(false)
     }
   }
 
   // Dosya / eşleme / başlık değişince önizlemeyi canlı üret
-  useEffect(() => {
+  useDegisince([importRows, colMap, basSatirAtla, ogrencilerSirali, kirtasiyeKategori, birim], () => {
     if (!importRows.length) { setOnizleme(null); return }
     const data = basSatirAtla ? importRows.slice(1) : importRows
     const rows: ParsedRow[] = data.map(c => {
@@ -495,7 +407,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
       return { tarih, tutar, tur, aciklama, belge, gecerli, odemeTipi, ogrenciId, ayIpucu, isaretle }
     })
     setOnizleme(rows)
-  }, [importRows, colMap, basSatirAtla, ogrencilerSirali, kirtasiyeKategori, birim])
+  })
 
   async function importKaydet() {
     if (!onizleme || !okulId) { bilgi('❌ Oturum bilgisi eksik, sayfayı yenileyin.'); return }
@@ -613,7 +525,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
               <div style={{ flex: 1, minWidth: 240 }}>
                 <div className="card-title" style={{ marginBottom: 6 }}>Devreden Tutar — {yil}</div>
                 <div style={{ fontSize: 12.5, color: 'var(--text3)', lineHeight: 1.5, maxWidth: 460 }}>
-                  Önceki yıldan bu yıla devreden banka bakiyesi. Aylık "Bankada Kalan" bu tutardan başlayarak yürür.
+                  Önceki yıldan bu yıla devreden banka bakiyesi. Aylık “Bankada Kalan” bu tutardan başlayarak yürür.
                 </div>
               </div>
               <div style={{ width: 180 }}>
@@ -763,11 +675,11 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
             <div className="card-title" style={{ marginBottom: 0 }}>Hareketler</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <select className="form-select" style={{ width: 130 }} value={kapsam} onChange={e => setKapsam(e.target.value as any)}>
+              <select className="form-select" style={{ width: 130 }} value={kapsam} onChange={e => setKapsam(e.target.value as typeof kapsam)}>
                 <option value="ay">Bu Ay</option>
                 <option value="yil">Tüm Yıl</option>
               </select>
-              <select className="form-select" style={{ width: 130 }} value={turFiltre} onChange={e => setTurFiltre(e.target.value as any)}>
+              <select className="form-select" style={{ width: 130 }} value={turFiltre} onChange={e => setTurFiltre(e.target.value as typeof turFiltre)}>
                 <option value="hepsi">Tümü</option>
                 <option value="gelir">Gelir</option>
                 <option value="gider">Gider</option>
@@ -831,175 +743,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
         )}
       </div>
 
-      {importOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(26,26,20,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} onClick={() => !importSaving && setImportOpen(false)}>
-          <div className="card" style={{ width: '100%', maxWidth: 960, maxHeight: '92vh', overflowY: 'auto', padding: '22px 24px', marginBottom: 0 }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <FileSpreadsheet size={20} style={{ color: 'var(--accent)' }} /> Banka Ekstresi Aktar
-              </h2>
-              <button onClick={() => setImportOpen(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)' }}><X size={20} /></button>
-            </div>
-            <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--text3)', lineHeight: 1.5 }}>
-              Bankadan indirdiğiniz ekstre dosyasını (.xlsx / .xls / .csv) yükleyin — sütunlar otomatik tanınır.
-            </p>
-
-            {/* Dosya seçimi */}
-            {!importFileName && !importReading ? (
-              <div style={{ border: '1.5px dashed var(--border)', borderRadius: 10, padding: '18px', textAlign: 'center', background: 'var(--bg)' }}>
-                <label className="btn btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <FileSpreadsheet size={15} /> Dosya Seç
-                  <input type="file" accept=".xlsx,.xls,.csv" onChange={dosyaSec} style={{ display: 'none' }} />
-                </label>
-                <div style={{ marginTop: 9, fontSize: 12.5, color: 'var(--text3)' }}>Excel / CSV dosyası (.xlsx, .xls, .csv)</div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg)', fontSize: 12.5 }}>
-                <FileSpreadsheet size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {importReading ? 'Dosya okunuyor…' : <><strong>{importFileName}</strong> — {importRows.length} satır</>}
-                </span>
-                <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', flexShrink: 0 }}>
-                  Değiştir
-                  <input type="file" accept=".xlsx,.xls,.csv" onChange={dosyaSec} style={{ display: 'none' }} />
-                </label>
-              </div>
-            )}
-
-            {/* Gelişmiş: sütun eşleştirme (varsayılan kapalı — otomatik tanıma genelde yeterli) */}
-            {colCount > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <button type="button" onClick={() => setGelismisAcik(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 11.5, fontWeight: 600, padding: '4px 0' }}>
-                  {gelismisAcik ? <ChevronUp size={14} /> : <ChevronDown size={14} />} Sütun eşleştirmeyi göster
-                </button>
-                {gelismisAcik && (
-                  <div style={{ marginTop: 8, padding: 12, background: 'var(--bg)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                      {([['tarih', 'Tarih *'], ['tutar', 'Tutar *'], ['yon', 'Yön / Borç-Alacak'], ['aciklama', 'Açıklama'], ['belge', 'Belge No']] as const).map(([key, label]) => (
-                        <div key={key} style={{ width: 150 }}>
-                          <label className="form-label">{label}</label>
-                          <select className="form-select" value={(colMap as any)[key]} onChange={e => setColMap(m => ({ ...m, [key]: Number(e.target.value) }))}>
-                            {(key === 'yon' || key === 'aciklama' || key === 'belge') && <option value={-1}>Yok</option>}
-                            {sutunSecenekleri.map(i => {
-                              const baslik = basSatirAtla && importRows[0] ? importRows[0][i] : ''
-                              return <option key={i} value={i}>{baslik ? `${i + 1}. ${baslik}` : `Sütun ${i + 1}`}</option>
-                            })}
-                          </select>
-                        </div>
-                      ))}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--text2)', paddingBottom: 8 }}>
-                        <input type="checkbox" checked={basSatirAtla} onChange={e => setBasSatirAtla(e.target.checked)} /> İlk satır başlık
-                      </label>
-                    </div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 8 }}>
-                      Gelir/gider &ldquo;Yön&rdquo; sütunundan (+/−, Borç/Alacak) belirlenir; yoksa tutarın işaretine göre.
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {onizleme && (() => {
-              const gecerli = onizleme.filter(r => r.gecerli)
-              const gImp = gecerli.filter(r => r.tur === 'gelir').reduce((s, r) => s + r.tutar, 0)
-              const gdImp = gecerli.filter(r => r.tur === 'gider').reduce((s, r) => s + r.tutar, 0)
-              const atlanacak = onizleme.length - gecerli.length
-              const isaretliSayisi = onizleme.filter(r => r.isaretle).length
-              return (
-                <div style={{ marginTop: 16 }}>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-                    <StatPil label="Satır" value={`${gecerli.length}/${onizleme.length}`} />
-                    <StatPil label="Gelir" value={fmtTL(gImp)} color="var(--success)" />
-                    <StatPil label="Gider" value={fmtTL(gdImp)} color="var(--danger)" />
-                    {atlanacak > 0 && <StatPil label="Atlanacak" value={String(atlanacak)} color="var(--warn)" />}
-                    {isaretliSayisi > 0 && <StatPil label="Ödeme Takip" value={String(isaretliSayisi)} color="var(--accent)" />}
-                  </div>
-                  {ogrencilerSirali.length > 0 && (
-                    <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.5 }}>
-                      Açıklamadan tahmin edilen öğrenci ödemeleri sağdaki rozette görünür — tıklayıp düzeltebilir veya kaldırabilirsiniz. Sadece işaretli satırlar Ödeme Takip&rsquo;e yazılır.
-                    </div>
-                  )}
-                  <div style={{ maxHeight: 340, overflowY: 'auto', overflowX: 'hidden', border: '1px solid var(--border)', borderRadius: 8 }}>
-                    <table className="data-table" style={{ width: '100%', tableLayout: 'fixed' }}>
-                      <colgroup>
-                        <col style={{ width: 30 }} />
-                        <col style={{ width: 78 }} />
-                        <col style={{ width: 60 }} />
-                        <col />
-                        <col style={{ width: 88 }} />
-                        <col style={{ width: 150 }} />
-                        <col style={{ width: 30 }} />
-                      </colgroup>
-                      <thead><tr>
-                        <th style={{ padding: '9px 4px' }}></th>
-                        <th style={{ padding: '9px 6px' }}>Tarih</th>
-                        <th style={{ textAlign: 'center', padding: '9px 4px' }}>Tür</th>
-                        <th>Açıklama</th>
-                        <th className="td-num" style={{ padding: '9px 6px' }}>Tutar (₺)</th>
-                        <th style={{ padding: '9px 6px' }}>Ödeme Takip</th>
-                        <th style={{ padding: '9px 4px' }}></th>
-                      </tr></thead>
-                      <tbody>
-                        {onizleme.map((r, idx) => (
-                          <tr key={idx} style={r.gecerli ? undefined : { background: 'var(--warn-light)' }}>
-                            <td style={{ textAlign: 'center', padding: '9px 4px' }}>{r.gecerli ? <CheckCircle2 size={15} color="var(--success)" /> : <AlertTriangle size={15} color="var(--warn)" />}</td>
-                            <td style={{ fontSize: 12, padding: '9px 6px' }}>{r.tarih ? tarihFmt(r.tarih) : <span style={{ color: 'var(--danger)', fontSize: 11 }}>geçersiz</span>}</td>
-                            <td style={{ textAlign: 'center', padding: '9px 4px' }}>
-                              <button
-                                onClick={() => setOnizleme(o => o ? o.map((x, i) => i === idx ? { ...x, tur: x.tur === 'gelir' ? 'gider' : 'gelir' } : x) : o)}
-                                className={`badge ${r.tur === 'gelir' ? 'badge-green' : 'badge-red'}`}
-                                style={{ border: 'none', cursor: 'pointer', padding: '2px 6px', fontSize: 10.5 }}
-                                title="Gelir/Gider değiştir"
-                              >{r.tur === 'gelir' ? 'Gelir' : 'Gider'}</button>
-                            </td>
-                            <td style={{ fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word', padding: '8px 6px' }}>
-                              <div>{r.aciklama || '—'}</div>
-                              {r.belge && <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>Belge: {r.belge}</div>}
-                            </td>
-                            <td className="td-num" style={{ fontSize: 12, padding: '9px 6px' }}>{isNaN(r.tutar) ? '—' : fmtTL(r.tutar)}</td>
-                            <td style={{ padding: '6px', textAlign: 'center' }}>
-                              {r.tur !== 'gelir' ? (
-                                <span style={{ color: 'var(--text3)', fontSize: 11 }}>—</span>
-                              ) : (
-                                <button
-                                  onClick={e => setEslesmePop({ idx, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() })}
-                                  style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: 5, maxWidth: '100%',
-                                    padding: '4px 9px', borderRadius: 20, fontSize: 10.5, fontWeight: 600, cursor: 'pointer',
-                                    border: `1px solid ${r.ogrenciId ? (r.isaretle ? 'var(--success-border)' : 'var(--border)') : 'var(--border)'}`,
-                                    background: r.ogrenciId ? (r.isaretle ? 'var(--success-light)' : 'var(--surface2)') : 'var(--surface)',
-                                    color: r.ogrenciId ? (r.isaretle ? '#1a7a3a' : 'var(--text2)') : 'var(--text3)',
-                                  }}
-                                  title="Öğrenci eşleştirmesini düzenle"
-                                >
-                                  {r.ogrenciId ? (r.isaretle ? <CheckCircle2 size={12} /> : <Circle size={12} />) : <UserCheck size={12} />}
-                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 118 }}>
-                                    {r.ogrenciId ? (ogrenciAdMap.get(r.ogrenciId) || '—') : 'Eşleştir'}
-                                  </span>
-                                </button>
-                              )}
-                            </td>
-                            <td style={{ textAlign: 'center', padding: '9px 4px' }}>
-                              <button onClick={() => { setOnizleme(o => o ? o.filter((_, i) => i !== idx) : o); setEslesmePop(null) }} title="Satırı çıkar" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)' }}><X size={14} /></button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )
-            })()}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-              <button className="btn btn-secondary" onClick={() => setImportOpen(false)} disabled={importSaving}>İptal</button>
-              <button className="btn btn-primary" onClick={importKaydet} disabled={importSaving || !onizleme || !onizleme.some(r => r.gecerli)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <Save size={15} /> {importSaving ? 'Kaydediliyor...' : 'İçe Aktar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {importOpen && <EkstreModal setImportOpen={setImportOpen} importFileName={importFileName} importReading={importReading} dosyaSec={dosyaSec} importRows={importRows} colCount={colCount} gelismisAcik={gelismisAcik} setGelismisAcik={setGelismisAcik} colMap={colMap} setColMap={setColMap} sutunSecenekleri={sutunSecenekleri} basSatirAtla={basSatirAtla} setBasSatirAtla={setBasSatirAtla} onizleme={onizleme} setOnizleme={setOnizleme} setEslesmePop={setEslesmePop} ogrencilerSirali={ogrencilerSirali} ogrenciAdMap={ogrenciAdMap} importSaving={importSaving} importKaydet={importKaydet} />}
 
       {/* Ödeme Takip eşleştirme popover */}
       {eslesmePop && onizleme && onizleme[eslesmePop.idx] && (() => {
@@ -1074,74 +818,4 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
       `}</style>
     </div>
   )
-}
-
-function DefterTablo({ title, rows, nakli, toplam, sira0 }: { title: 'GİDER' | 'GELİR'; rows: IsletmeHareket[]; nakli: number; toplam: number; sira0: number }) {
-  const gelir = title === 'GELİR'
-  return (
-    <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 0 }}>
-      <div style={{ padding: '10px 16px', textAlign: 'center', fontWeight: 800, letterSpacing: 1.5, fontSize: 14, borderBottom: '1px solid var(--border)', background: gelir ? 'var(--accent-lighter)' : 'var(--danger-light)', color: gelir ? 'var(--accent)' : 'var(--danger)' }}>
-        {title}
-      </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table className="data-table" style={{ width: '100%' }}>
-          <thead>
-            <tr>
-              <th rowSpan={2} style={{ width: 64, textAlign: 'center', verticalAlign: 'middle' }}>Sıra No</th>
-              <th colSpan={2} style={{ textAlign: 'center' }}>{gelir ? 'Alındı Belgesi veya Banka Dekontunun' : 'Alınan Fatura veya Belgenin'}</th>
-              <th rowSpan={2} style={{ verticalAlign: 'middle' }}>Açıklama</th>
-              <th rowSpan={2} className="td-num" style={{ width: 150, verticalAlign: 'middle' }}>Miktarı / Tutarı (₺)</th>
-            </tr>
-            <tr>
-              <th style={{ width: 100, textAlign: 'center' }}>Tarihi</th>
-              <th style={{ width: 100, textAlign: 'center' }}>{gelir ? 'Sıra No' : "No'su"}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr style={{ background: 'var(--surface2)' }}>
-              <td colSpan={4} style={{ textAlign: 'center', fontWeight: 700 }}>Nakli Toplam</td>
-              <td className="td-num" style={{ fontWeight: 600 }}>{fmtTL(nakli)}</td>
-            </tr>
-            {rows.length === 0 ? (
-              <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text3)', padding: 22 }}>Bu ay {gelir ? 'gelir' : 'gider'} kaydı yok.</td></tr>
-            ) : rows.map((r, idx) => (
-              <tr key={r.id}>
-                <td style={{ textAlign: 'center' }}>{sira0 + idx + 1}</td>
-                <td style={{ textAlign: 'center' }}>{tarihFmt(r.tarih)}</td>
-                <td style={{ textAlign: 'center', fontSize: 12 }}>{r.belge_no || '-'}</td>
-                <td>{r.aciklama || <span style={{ color: 'var(--text3)' }}>—</span>}</td>
-                <td className="td-num">{fmtTL(Number(r.tutar))}</td>
-              </tr>
-            ))}
-            <tr className="sum-row">
-              <td colSpan={4} style={{ textAlign: 'center', fontWeight: 700 }}>Toplam</td>
-              <td className="td-num" style={{ fontWeight: 700 }}>{fmtTL(toplam)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-function StatPil({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, padding: '6px 12px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', minWidth: 64 }}>
-      <span style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text3)', fontWeight: 600 }}>{label}</span>
-      <span style={{ fontSize: 13, fontWeight: 700, color: color || 'var(--text)' }}>{value}</span>
-    </div>
-  )
-}
-
-function turBtn(active: boolean, tur: IsletmeTur): React.CSSProperties {
-  const renk = tur === 'gelir' ? 'var(--success)' : 'var(--danger)'
-  return {
-    flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-    padding: '10px 12px', borderRadius: 9, fontSize: 13.5, fontWeight: 700, cursor: 'pointer',
-    border: `1.5px solid ${active ? renk : 'var(--border)'}`,
-    background: active ? renk : 'var(--surface)',
-    color: active ? '#fff' : 'var(--text2)',
-    boxShadow: active ? '0 2px 8px rgba(0,0,0,0.12)' : 'none',
-    transition: 'all 0.15s',
-  }
 }

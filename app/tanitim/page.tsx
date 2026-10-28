@@ -166,7 +166,7 @@ export default function TanitimPage() {
         <div className="tz-container tz-hero-inner">
           <span className="tz-badge">
             <span className="tz-badge-dot" />
-            MEB Çocuk Kulüpleri Yönergesi'ne %100 uyumlu
+            MEB Çocuk Kulüpleri Yönergesi’ne %100 uyumlu
           </span>
 
           <h1 className="tz-h1">
@@ -481,6 +481,7 @@ export default function TanitimPage() {
             <Link href="/fiyatlandirma">Fiyatlandırma</Link>
             <Link href="/tanitim/kullanim-kosullari">Kullanım Koşulları</Link>
             <Link href="/tanitim/gizlilik-politikasi">Gizlilik</Link>
+            <Link href="/tanitim/kvkk-aydinlatma-metni">KVKK</Link>
             <Link href="/tanitim/iade-politikasi">İade</Link>
             <Link href="/tanitim/iletisim">İletişim</Link>
             <Link href="/login">Giriş</Link>

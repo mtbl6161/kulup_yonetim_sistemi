@@ -1,19 +1,7 @@
 'use client'
 import { useState, useMemo } from 'react'
 import Topbar from '@/components/Topbar'
-import {
-  BookOpen,
-  Settings,
-  HelpCircle,
-  Percent,
-  Calculator,
-  Clock,
-  GraduationCap,
-  AlertTriangle,
-  CheckCircle2,
-  Info,
-  DollarSign
-} from 'lucide-react'
+import { BookOpen, Settings, Percent, Calculator, Clock, GraduationCap, AlertTriangle, CheckCircle2, Info } from 'lucide-react'
 
 // Sıkça Sorulan Sorular / Bilgi Kartları Verisi
 const GUIDES = [
@@ -43,11 +31,11 @@ const GUIDES = [
     content: (
       <div>
         <p style={{ margin: '0 0 10px 0', lineHeight: '1.5' }}>
-          Öğretmenlerin günlük ders saatlerini tek tek girmek yerine, Sınıf Defteri'ndeki verileri tek tıkla puantaja aktarabilirsiniz.
+          Öğretmenlerin günlük ders saatlerini tek tek girmek yerine, Sınıf Defteri’ndeki verileri tek tıkla puantaja aktarabilirsiniz.
         </p>
         <ol style={{ paddingLeft: '20px', margin: '0 0 10px 0', lineHeight: '1.6' }}>
-          <li>Öğretmenler günlük derslerini işleyip <strong>"Geldi"</strong> olarak işaretler.</li>
-          <li>Puantaj sayfasındaki <strong>"Sınıf Defterinden Getir"</strong> butonuna tıklanır.</li>
+          <li>Öğretmenler günlük derslerini işleyip <strong>“Geldi”</strong> olarak işaretler.</li>
+          <li>Puantaj sayfasındaki <strong>“Sınıf Defterinden Getir”</strong> butonuna tıklanır.</li>
           <li>Sistem, ders programındaki <strong>Etkinlik Saatlerini</strong> baz alarak öğretmenlerin günlük toplam çalışma saatlerini hesaplar ve resmi tatiller ile hafta sonlarını ayıklayarak otomatik puantaj tablosunu doldurur.</li>
         </ol>
       </div>
@@ -64,7 +52,7 @@ const GUIDES = [
         </p>
         <ul style={{ paddingLeft: '20px', margin: '0 0 10px 0', lineHeight: '1.6' }}>
           <li><strong>Kümülatif Matrah:</strong> Gelir vergisi dilimleri, personelin o yıla ait kümülatif matrahı üzerinden dilim atlamalı (kademeli) olarak hesaplanır.</li>
-          <li><strong>Vergi İstisnası:</strong> Personel kartında "Vergi İstisnası" aktif edildiğinde, asgari ücrete denk gelen gelir ve damga vergisi tutarları hesaplanan vergilerden otomatik düşülür (istisna tutarı hesaplanan vergiyi aşamaz).</li>
+          <li><strong>Vergi İstisnası:</strong> Personel kartında “Vergi İstisnası” aktif edildiğinde, asgari ücrete denk gelen gelir ve damga vergisi tutarları hesaplanan vergilerden otomatik düşülür (istisna tutarı hesaplanan vergiyi aşamaz).</li>
         </ul>
       </div>
     )
@@ -76,7 +64,7 @@ const GUIDES = [
     content: (
       <div>
         <p style={{ margin: '0 0 10px 0', lineHeight: '1.5' }}>
-          MEB Çocuk Kulüpleri Yönergesi gereği hiçbir personele <strong>En Yüksek Devlet Memuru Brüt Aylığı</strong>'nın belirli bir yüzdesinden fazla brüt ödeme yapılamaz.
+          MEB Çocuk Kulüpleri Yönergesi gereği hiçbir personele <strong>En Yüksek Devlet Memuru Brüt Aylığı</strong>’nın belirli bir yüzdesinden fazla brüt ödeme yapılamaz.
         </p>
         <div style={{ background: 'var(--surface2)', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', lineHeight: '1.5' }}>
           <strong>Görev Limitleri:</strong>

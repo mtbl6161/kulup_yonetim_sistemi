@@ -4,7 +4,7 @@ import Topbar from '@/components/Topbar'
 import SayiInput from '@/components/SayiInput'
 import { supabase } from '@/lib/supabase'
 import { Ayarlar, VergiDilimi, Tatil } from '@/lib/types'
-import { AYLAR, isGunuSayisi, gunEkle, KULUP_BASLANGIC_TATIL_AD } from '@/lib/hesaplama'
+import { gunEkle, KULUP_BASLANGIC_TATIL_AD } from '@/lib/hesaplama'
 import {
   Building2,
   Search,
@@ -18,24 +18,23 @@ import {
   Mail,
   MapPin,
   User,
-  Hash,
   Calculator,
   Trash2,
   Plus,
-  Lock,
   CreditCard,
   CheckCircle2,
-  Globe,
-  AlertTriangle,
-  Key,
-  Clock,
   Loader2,
   FileCode2,
   Download
 } from 'lucide-react'
 import ConfirmModal from '@/components/ConfirmModal'
-import { createCheckoutLink } from '@/lib/lemonsqueezy'
 import { Okul } from '@/lib/types'
+import { uyari, onayla } from '@/lib/diyalog'
+import { hataMesaji } from '@/lib/hata'
+import { useDegisince } from '@/lib/useDegisince'
+import LisansSekmesi from '@/components/ayarlar/LisansSekmesi'
+import GuvenlikSekmesi from '@/components/ayarlar/GuvenlikSekmesi'
+import TatilSekmesi from '@/components/ayarlar/TatilSekmesi'
 
 const DEFAULT_AYARLAR: Partial<Ayarlar> = {
   kurum_adi: '',
@@ -100,9 +99,8 @@ export default function AyarlarPage() {
   const [kbTarih, setKbTarih] = useState('')
   const [kbSaving, setKbSaving] = useState(false)
   const kbMevcut = tatiller.find(t => t.okul_id !== null && t.ad === KULUP_BASLANGIC_TATIL_AD && t.baslangic_tarihi.startsWith(`${kbYil}-09-01`))
-  useEffect(() => {
-    setKbTarih(kbMevcut ? gunEkle(kbMevcut.bitis_tarihi.split('T')[0], 1) : '')
-  }, [kbMevcut?.id, kbYil]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Yıl ya da kayıtlı başlangıç değişince tarih kutusunu kayıtlı değere getir
+  useDegisince(`${kbMevcut?.id ?? ''}|${kbYil}`, () => setKbTarih(kbMevcut ? gunEkle(kbMevcut.bitis_tarihi.split('T')[0], 1) : ''))
 
   async function tatilleriYenile() {
     const { data } = await supabase.from('tatiller').select('*').or(`okul_id.eq.${okulData?.id ?? 0},okul_id.is.null`).order('baslangic_tarihi', { ascending: true })
@@ -197,16 +195,17 @@ export default function AyarlarPage() {
     if (!okulData) return
     setCheckoutLoading(true)
     try {
+      const { data: { session: oturum } } = await supabase.auth.getSession()
       const res = await fetch('/api/lemonsqueezy/create-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${oturum?.access_token ?? ''}` },
         body: JSON.stringify({ okulId: okulData.id, variantId, interval })
       })
       const data = await res.json()
       if (data.url) window.location.href = data.url
       else throw new Error(data.error || 'Bağlantı oluşturulamadı')
-    } catch (err: any) {
-      alert("Hata: " + err.message)
+    } catch (err) {
+      uyari("Ödeme bağlantısı oluşturulamadı: " + hataMesaji(err), "Hata")
     } finally {
       setCheckoutLoading(false)
     }
@@ -471,7 +470,7 @@ export default function AyarlarPage() {
                   role="tab"
                   aria-selected={aktif}
                   title={t.desc}
-                  onClick={() => setActiveTab(t.id as any)}
+                  onClick={() => setActiveTab(t.id as typeof activeTab)}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', marginBottom: -1, border: 'none', borderBottom: '2px solid ' + (aktif ? 'var(--accent)' : 'transparent'), background: 'none', cursor: 'pointer', fontSize: 14, fontWeight: aktif ? 600 : 500, color: aktif ? 'var(--text)' : 'var(--text3)', whiteSpace: 'nowrap' }}
                 >
                   <span style={{ display: 'flex', color: aktif ? 'var(--accent)' : 'var(--text3)' }}>{t.icon}</span>
@@ -497,7 +496,7 @@ export default function AyarlarPage() {
             <span style={{ fontWeight: 600 }}>Kurulum {kurulumTamam}/{kurulum.length}</span>
             <span>Eksik bilgiler:</span>
             {kurulum.filter(k => !k.ok).map(k => (
-              <button key={k.label} onClick={() => setActiveTab(k.tab as any)} style={{ border: '1px solid #c9d4fa', background: '#fff', color: 'var(--accent-dark)', borderRadius: 99, padding: '2px 10px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>{k.label} →</button>
+              <button key={k.label} onClick={() => setActiveTab(k.tab as typeof activeTab)} style={{ border: '1px solid #c9d4fa', background: '#fff', color: 'var(--accent-dark)', borderRadius: 99, padding: '2px 10px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>{k.label} →</button>
             ))}
           </div>
         )}
@@ -524,7 +523,7 @@ export default function AyarlarPage() {
                       <Building2 size={16} style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text3)' }} />
                       <input id="ay-oab-adi" className="form-input" style={{ paddingLeft: 34 }} value={form.oab_adi || ''} onChange={e => setF('oab_adi', e.target.value)} placeholder={`${okulData?.ad || 'Okul adı'} Okul Aile Birliği`} />
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>OAB tahsilat listesi ve işletme defteri çıktılarının başlığında yazar. Boş bırakılırsa okul adının sonuna "Okul Aile Birliği" eklenir.</div>
+                    <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>OAB tahsilat listesi ve işletme defteri çıktılarının başlığında yazar. Boş bırakılırsa okul adının sonuna “Okul Aile Birliği” eklenir.</div>
                   </div>
 
                   <div>
@@ -724,8 +723,8 @@ export default function AyarlarPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                   <div className="card-title" style={{ margin: 0 }}><Scale size={20} color="var(--accent2)" /> Yıllık Gelir Vergisi Dilimleri</div>
                   <div style={{ display: 'flex', gap: 10 }}>
-                    <button className="btn btn-secondary btn-sm" onClick={() => {
-                      if (confirm('2026 yılı resmi vergi dilimleri yüklenecektir. Mevcut dilimleriniz silinebilir. Devam edilsin mi?')) {
+                    <button className="btn btn-secondary btn-sm" onClick={async () => {
+                      if (await onayla('2026 yılı resmi vergi dilimleri yüklenecektir. Mevcut dilimleriniz silinebilir. Devam edilsin mi?')) {
                         setForm(f => ({
                           ...f,
                           vergi_dilimleri: [
@@ -805,326 +804,13 @@ export default function AyarlarPage() {
             )}
 
             {/* TAB 4: TATİL YÖNETİMİ */}
-            {activeTab === 'tatil' && (
-              <>
-              <div className="card" style={{ margin: '0 0 20px' }}>
-                <div className="card-title"><Calendar size={20} color="var(--accent)" /> Kulüp Başlangıç Tarihi</div>
-                <p style={{ fontSize: 12.5, color: 'var(--text2)', margin: '0 0 14px', lineHeight: 1.6 }}>
-                  Kulüp eğitim yılına geç başladıysa başlangıç tarihini girin. Bu tarihten önceki günler iş günü sayılmaz: aylık iş günü, öğrenci aidatı, puantaj, ders programı ve sınıf defteri buna göre hesaplanır.
-                </p>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                  <div>
-                    <label className="form-label">Eğitim Yılı</label>
-                    <select className="form-select" style={{ width: 140 }} value={kbYil} onChange={e => setKbYil(Number(e.target.value))}>
-                      {[varsayilanEgitimYili - 1, varsayilanEgitimYili, varsayilanEgitimYili + 1].map(y => <option key={y} value={y}>{y}-{y + 1}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label">Kulübün Başladığı Gün</label>
-                    <input className="form-input" type="date" style={{ width: 180 }} min={`${kbYil}-09-01`} max={`${kbYil + 1}-08-31`} value={kbTarih} onChange={e => setKbTarih(e.target.value)} />
-                  </div>
-                  <button className="btn btn-primary btn-sm" disabled={kbSaving} onClick={() => kulupBaslangicKaydet()}>{kbSaving ? 'Kaydediliyor...' : 'Kaydet'}</button>
-                  {kbMevcut && <button className="btn btn-secondary btn-sm" disabled={kbSaving} onClick={() => kulupBaslangicKaydet(true)}>Kaldır</button>}
-                </div>
-                {kbMevcut && (
-                  <div className="alert alert-info" style={{ marginTop: 14, marginBottom: 0 }}>
-                    <Info size={16} />
-                    <span>
-                      {new Date(kbMevcut.baslangic_tarihi).toLocaleDateString('tr-TR')} – {new Date(kbMevcut.bitis_tarihi).toLocaleDateString('tr-TR')} arası kulüp kapalı sayılıyor.
-                      {' '}{AYLAR[Number(kbTarih.slice(5, 7))]} ayı iş günü: <strong>{isGunuSayisi(Number(kbTarih.slice(0, 4)), Number(kbTarih.slice(5, 7)), tatiller)}</strong>
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="card" style={{ margin: 0 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
-
-                  {/* SOL: Global tatiller */}
-                  <div style={{ borderRight: '1px solid var(--border)', paddingRight: 24 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                      <Calendar size={16} color="var(--accent)" />
-                      <span style={{ fontWeight: 700, fontSize: 13 }}>Resmi &amp; İdari Tatiller</span>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', background: 'var(--surface2)', padding: '2px 7px', borderRadius: 20, whiteSpace: 'nowrap' }}>
-                        Yönetimden
-                      </span>
-                    </div>
-                    <div style={{ maxHeight: 420, overflowY: 'auto' }}>
-                      {tatiller.filter(t => t.okul_id === null).length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text3)', fontSize: 12 }}>
-                          Henüz eklenmemiş.
-                        </div>
-                      ) : (
-                        tatiller.filter(t => t.okul_id === null).map(t => (
-                          <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-light)' }}>
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: 13 }}>{t.ad}</div>
-                              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
-                                {new Date(t.baslangic_tarihi).toLocaleDateString('tr-TR')}
-                                {t.baslangic_tarihi !== t.bitis_tarihi && ` – ${new Date(t.bitis_tarihi).toLocaleDateString('tr-TR')}`}
-                              </div>
-                            </div>
-                            <span className={`badge ${t.tip === 'resmi' ? 'badge-blue' : 'badge-orange'}`} style={{ fontSize: 10, whiteSpace: 'nowrap' }}>
-                              {t.tip === 'resmi' ? 'Resmi' : 'İdari'}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* SAĞ: Okula özel tatiller */}
-                  <div style={{ paddingLeft: 24 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Plus size={16} color="var(--accent)" />
-                        <span style={{ fontWeight: 700, fontSize: 13 }}>Okula Özel Tatiller</span>
-                      </div>
-                      <button className="btn btn-primary btn-sm" onClick={() => { setTatilForm({ ad: '', bas: '', bit: '', tip: 'ozel' }); setTatilEkleAcik(true) }}>
-                        <Plus size={13} /> Ekle
-                      </button>
-                    </div>
-                    <div style={{ maxHeight: 420, overflowY: 'auto' }}>
-                      {tatiller.filter(t => t.okul_id !== null).length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text3)', fontSize: 12 }}>
-                          Henüz okula özel tatil eklenmemiş.
-                        </div>
-                      ) : (
-                        tatiller.filter(t => t.okul_id !== null).map(t => (
-                          <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-light)' }}>
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: 13 }}>{t.ad}</div>
-                              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
-                                {new Date(t.baslangic_tarihi).toLocaleDateString('tr-TR')}
-                                {t.baslangic_tarihi !== t.bitis_tarihi && ` – ${new Date(t.bitis_tarihi).toLocaleDateString('tr-TR')}`}
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                              <span className={`badge ${t.tip === 'idari' ? 'badge-orange' : 'badge-green'}`} style={{ fontSize: 10 }}>
-                                {t.tip === 'idari' ? 'İdari' : 'Özel'}
-                              </span>
-                              <button className="btn btn-outline-danger btn-icon" title="Sil" style={{ width: 28, height: 28, minHeight: 28 }} onClick={() => tatilSil(t.id)}><Trash2 size={11} /></button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-              </>
-            )}
+            {activeTab === 'tatil' && <TatilSekmesi tatiller={tatiller} kbMevcut={kbMevcut} kbYil={kbYil} setKbYil={setKbYil} kbTarih={kbTarih} setKbTarih={setKbTarih} kbSaving={kbSaving} kulupBaslangicKaydet={kulupBaslangicKaydet} varsayilanEgitimYili={varsayilanEgitimYili} setTatilEkleAcik={setTatilEkleAcik} setTatilForm={setTatilForm} tatilSil={tatilSil} />}
 
             {/* TAB 6: LİSANS & ÖDEME */}
-            {activeTab === 'lisans' && (
-              <div className="card" style={{ margin: 0, maxWidth: 600 }}>
-                <div className="card-title"><CreditCard size={20} color="var(--accent)" /> Sistem Lisans Durumu</div>
-                
-                <div style={{ padding: '24px', background: 'var(--bg2)', borderRadius: 16, marginBottom: 24 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-                    <div>
-                      <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 4 }}>Lisans Durumu</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: okulData?.odeme_durumu === 'aktif' ? '#10b981' : '#f59e0b' }}></div>
-                        <span style={{ fontWeight: 700, textTransform: 'uppercase' }}>{okulData?.odeme_durumu || 'Deneme'}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 4 }}>Bitiş Tarihi</div>
-                      <div style={{ fontWeight: 700 }}>
-                        {okulData?.lisans_bitis ? new Date(okulData.lisans_bitis).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Belirlenmedi'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="alert alert-info" style={{ marginBottom: 24 }}>
-                  <Info size={18} />
-                  <span>Sistem lisansınız <strong>{secilenPeriod === 'month' ? 'aylık' : 'yıllık'}</strong> olarak yenilenir. Ödeme yapıldığında süreniz otomatik olarak <strong>{secilenPeriod === 'month' ? '1 ay' : '1 yıl'}</strong> uzatılacaktır.</span>
-                </div>
-
-                {/* Paket Seçici Toggle */}
-                <div style={{ 
-                  display: 'flex', background: 'var(--surface2)', padding: 4, borderRadius: 12, 
-                  gap: 4, marginBottom: 20, border: '1px solid var(--border-light)', marginTop: 20 
-                }}>
-                  {(['month', 'year'] as const).map(d => (
-                    <button 
-                      key={d} 
-                      onClick={() => setSecilenPeriod(d)} 
-                      style={{
-                        flex: 1, padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 700,
-                        border: 'none', cursor: 'pointer', transition: 'all 0.2s',
-                        background: secilenPeriod === d ? 'var(--accent)' : 'transparent',
-                        color: secilenPeriod === d ? '#fff' : 'var(--text2)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
-                      }}
-                    >
-                      {d === 'month' ? 'Aylık Ödeme' : 'Yıllık Ödeme'}
-                      {d === 'year' && <span style={{ fontSize: 9, background: '#fbbf24', color: '#000', padding: '1px 6px', borderRadius: 4 }}>%20 İNDİRİM</span>}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Fiyat Bilgisi ve Özellikler */}
-                <div style={{ background: 'var(--surface2)', borderRadius: 16, padding: '24px', border: '1px solid var(--border-light)', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                    {secilenPeriod === 'year' && (
-                      <span style={{ fontSize: 16, color: 'var(--text3)', textDecoration: 'line-through', marginBottom: -8 }}>₺9.000</span>
-                    )}
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                      <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>₺</span>
-                      <span style={{ fontSize: 42, fontWeight: 800, color: 'var(--text)' }}>{secilenPeriod === 'month' ? '750' : '7.500'}</span>
-                      <span style={{ fontSize: 14, color: 'var(--text2)' }}>/ {secilenPeriod === 'month' ? 'ay' : 'yıl'}</span>
-                    </div>
-                  </div>
-                  
-                  <div style={{ height: 1, background: 'var(--border)', margin: '20px 0', opacity: 0.5 }} />
-                  
-                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px', textAlign: 'left', display: 'inline-block' }}>
-                    {[
-                      'Sınırsız Öğrenci ve Personel Kaydı',
-                      'Otomatik Bordro ve Puantaj Takibi',
-                      'Dijital Sınıf Defteri ve Yoklama',
-                      'Ödeme ve Aidat Otomasyonu',
-                      '7/24 Teknik Destek ve Güncellemeler'
-                    ].map((f, i) => (
-                      <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text2)', marginBottom: 10 }}>
-                        <CheckCircle2 size={14} color="var(--success)" /> {f}
-                      </li>
-                    ))}
-                  </ul>
-
-                  {lisansGecerli ? (
-                    <div className="flex flex-col gap-4">
-                      <div style={{ 
-                        background: 'rgba(39, 174, 96, 0.1)', 
-                        border: '1px solid var(--success-border)',
-                        padding: '16px', borderRadius: 12, textAlign: 'center'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: 'var(--success)', fontWeight: 700, fontSize: 15 }}>
-                          <CheckCircle2 size={18} />
-                          Lisansınız Aktif
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
-                          {okulData?.odeme_durumu === 'deneme' ? 'Deneme süreniz devam ediyor.' : 'Abonelik süreniz devam ediyor.'}
-                        </div>
-                      </div>
-
-                      <button 
-                        onClick={() => handlePayment(secilenPeriod === 'month' ? '1581329' : '1581465', secilenPeriod)}
-                        disabled={checkoutLoading || !okulData}
-                        style={{
-                          width: '100%',
-                          background: 'white',
-                          color: 'var(--accent)',
-                          padding: '14px',
-                          borderRadius: '12px',
-                          fontSize: '14px',
-                          fontWeight: '700',
-                          border: '2px solid var(--accent)',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = '#fff' }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = 'var(--accent)' }}
-                      >
-                        {checkoutLoading ? 'Hazırlanıyor...' : (
-                          okulData?.odeme_durumu === 'deneme' ? 'Şimdi Lisans Al' : 
-                          (secilenPeriod === 'year' ? 'Yıllık Pakete Yükselt (%20 İndirim)' : 'Abonelik Süresini Uzat')
-                        )}
-                      </button>
-                    </div>
-                  ) : (
-                    <button 
-                      onClick={() => handlePayment(secilenPeriod === 'month' ? '1581329' : '1581465', secilenPeriod)}
-                      disabled={checkoutLoading || !okulData}
-                      style={{
-                        width: '100%',
-                        background: 'var(--accent)',
-                        color: '#fff',
-                        padding: '16px',
-                        borderRadius: '12px',
-                        fontSize: '16px',
-                        fontWeight: '700',
-                        border: 'none',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        boxShadow: '0 4px 12px rgba(35,71,217, 0.2)'
-                      }}
-                    >
-                      {checkoutLoading ? 'Bağlantı Hazırlanıyor...' : 'Hemen Güvenli Öde'}
-                    </button>
-                  )}
-                </div>
-                
-                <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text3)', marginTop: 16 }}>
-                  Ödemeleriniz Lemon Squeezy güvencesiyle 256-bit SSL ile korunmaktadır.
-                </p>
-              </div>
-            )}
+            {activeTab === 'lisans' && <LisansSekmesi okulData={okulData} lisansGecerli={lisansGecerli} secilenPeriod={secilenPeriod} setSecilenPeriod={setSecilenPeriod} checkoutLoading={checkoutLoading} handlePayment={handlePayment} />}
 
             {/* TAB 5: GÜVENLİK & PROFİL */}
-            {activeTab === 'guvenlik' && (
-              <div className="card" style={{ margin: 0, maxWidth: 500 }}>
-                <div className="card-title"><ShieldCheck size={20} color="var(--accent)" /> Güvenlik Ayarları</div>
-                <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 24 }}>Hesap güvenliğiniz için şifrenizi buradan güncelleyebilirsiniz.</p>
-                
-                <form onSubmit={sifreGuncelle} className="flex flex-col gap-5">
-                  <div>
-                    <label htmlFor="new-p" className="form-label">Yeni Şifre</label>
-                    <div style={{ position: 'relative' }}>
-                      <Lock size={16} style={{ position: 'absolute', left: 12, top: 12, color: '#999' }} />
-                      <input 
-                        id="new-p"
-                        type="password" 
-                        required 
-                        minLength={6}
-                        className="form-input" 
-                        style={{ paddingLeft: 38 }}
-                        placeholder="Minimum 6 karakter"
-                        value={passForm.newP}
-                        onChange={e => setPassForm({ ...passForm, newP: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="confirm-p" className="form-label">Yeni Şifre (Tekrar)</label>
-                    <div style={{ position: 'relative' }}>
-                      <Lock size={16} style={{ position: 'absolute', left: 12, top: 12, color: '#999' }} />
-                      <input 
-                        id="confirm-p"
-                        type="password" 
-                        required 
-                        minLength={6}
-                        className="form-input" 
-                        style={{ paddingLeft: 38 }}
-                        placeholder="Şifreyi onaylayın"
-                        value={passForm.confirmP}
-                        onChange={e => setPassForm({ ...passForm, confirmP: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <button 
-                    type="submit" 
-                    className="btn btn-primary" 
-                    style={{ marginTop: 8, height: 46 }}
-                    disabled={passSaving}
-                  >
-                    {passSaving ? 'Güncelleniyor...' : 'Şifreyi Güncelle'}
-                  </button>
-                </form>
-
-                <div style={{ marginTop: 24, padding: 16, background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 12, display: 'flex', gap: 12 }}>
-                  <Info size={18} color="#d97706" style={{ flexShrink: 0 }} />
-                  <p style={{ fontSize: 12, color: '#92400e', margin: 0 }}>
-                    <b>Dikkat:</b> Şifrenizi değiştirdikten sonra tüm cihazlarınızda oturumunuz açık kalmaya devam edebilir ancak bir sonraki girişte yeni şifreniz istenecektir.
-                  </p>
-                </div>
-              </div>
-            )}
+            {activeTab === 'guvenlik' && <GuvenlikSekmesi passForm={passForm} setPassForm={setPassForm} passSaving={passSaving} sifreGuncelle={sifreGuncelle} />}
           </div>
 
           {/* SİDEBAR SUMMARY (Özellikle Mali Sekmesinde Aktif) */}

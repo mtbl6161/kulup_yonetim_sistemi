@@ -71,7 +71,7 @@ export default function Page() {
               Gelir-gider takibi, bordro, puantaj ve tahakkuk için kayıt düzeni kurulur. Tutulması gereken
               belgeler için <Link href="/rehber/tutulacak-defterler">tutulacak defterler</Link> sayfasına
               bakın. Bordro ve tahakkuku otomatik yönetmek için
-              <Link href="/signup"> Klüp360'ı ücretsiz deneyebilirsiniz</Link>.
+              <Link href="/signup"> Klüp360’ı ücretsiz deneyebilirsiniz</Link>.
             </p>
 
             <h2>Gerekli temel evraklar</h2>

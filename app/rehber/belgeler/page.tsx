@@ -68,7 +68,7 @@ export default function Page() {
           <p className="dl-note">
             Şablonlar bilgilendirme amaçlı örneklerdir; kurumunuzun ve güncel mevzuatın gerekliliklerine
             göre uyarlayın. Tüm belgeleri otomatik üretmek için{' '}
-            <Link href="/signup">Klüp360'ı ücretsiz deneyin</Link>. İlgili{' '}
+            <Link href="/signup">Klüp360’ı ücretsiz deneyin</Link>. İlgili{' '}
             <Link href="/rehber">rehber ve araçlar</Link>.
           </p>
         </div>

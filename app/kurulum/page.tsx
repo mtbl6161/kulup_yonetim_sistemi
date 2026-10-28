@@ -5,6 +5,7 @@ import { Loader2, LogOut, School } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { DENEME_GUN } from '@/lib/deneme'
+import { useYukleme } from '@/lib/useYukleme'
 
 // Auth hesabı açılmış ama okul/profil kaydı yarım kalmış kullanıcılar buraya
 // yönlenir; formu doldurunca ücretsiz deneme ile okulları oluşturulur.
@@ -32,7 +33,7 @@ export default function KurulumPage() {
     supabase.from('iller').select('id, ad').order('ad').then(({ data }) => setIller(data ?? []))
   }, [])
 
-  useEffect(() => {
+  useYukleme(() => {
     setIlceId('')
     if (!ilId) { setIlceler([]); return }
     supabase.from('ilceler').select('id, ad').eq('il_id', ilId).order('ad').then(({ data }) => setIlceler(data ?? []))

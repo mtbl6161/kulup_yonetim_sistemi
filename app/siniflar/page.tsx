@@ -1,11 +1,13 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import Topbar from '@/components/Topbar'
 import { supabase } from '@/lib/supabase'
 import { Sinif, Personel, Ayarlar } from '@/lib/types'
 import { fmtTL } from '@/lib/hesaplama'
 import ConfirmModal from '@/components/ConfirmModal'
 import { Pencil, Plus, Save, Loader2, Trash2, School } from 'lucide-react'
+import { hataMesaji } from '@/lib/hata'
+import { useYukleme } from '@/lib/useYukleme'
 
 const BOŞ: Omit<Sinif, 'id' | 'created_at'> = {
   ad: '', ogretmen: '', kapasite: 15, aylik_ucret: 0,
@@ -34,12 +36,12 @@ export default function SiniflarPage() {
       setSiniflar(sin || [])
       setPersonel(per || [])
       setAyarlar(ayr || null)
-    } catch (err: any) {
-      setMsg('❌ Veri yükleme hatası: ' + err.message)
+    } catch (err) {
+      setMsg('❌ Veri yükleme hatası: ' + hataMesaji(err))
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useYukleme(load)
 
   // Hiyerarşik Sıralama ve Filtreleme Mantığı
   const ogretmenListesi = personel
@@ -105,13 +107,13 @@ export default function SiniflarPage() {
 
   async function silGercek(id: number) {
     setConf(null)
-    await supabase.from('siniflar').delete().eq('id', id)
-    load()
+    const { error } = await supabase.from('siniflar').delete().eq('id', id)
+    if (!error) load()
   }
 
   async function aktifDegistir(s: Sinif) {
-    await supabase.from('siniflar').update({ aktif: !s.aktif }).eq('id', s.id)
-    load()
+    const { error } = await supabase.from('siniflar').update({ aktif: !s.aktif }).eq('id', s.id)
+    if (!error) load()
   }
 
   return (

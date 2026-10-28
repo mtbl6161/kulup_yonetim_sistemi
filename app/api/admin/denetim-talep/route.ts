@@ -1,49 +1,22 @@
-import { createClient } from '@supabase/supabase-js'
+import { adminClient, getCallerIfSuperAdmin } from '@/lib/apiAuth'
 import { NextResponse, type NextRequest } from 'next/server'
+import { hataMesaji } from '@/lib/hata'
 import { serverError } from '@/lib/api-error'
 import { logAudit } from '@/lib/audit.server'
-import nodemailer from 'nodemailer'
-
-function adminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
-
-async function getCallerIfSuperAdmin(request: NextRequest) {
-  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
-  if (!token) return null
-  const { data: { user } } = await adminClient().auth.getUser(token)
-  if (!user) return null
-  const { data: profil } = await adminClient()
-    .from('profiller').select('rol').eq('id', user.id).single()
-  if (profil?.rol !== 'super_admin') return null
-  return user
-}
+import { epostaGonder, htmlKacis } from '@/lib/eposta'
+import { randomInt } from 'crypto'
 
 function randomPassword() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
   let pwd = ''
-  for (let i = 0; i < 10; i++) pwd += chars[Math.floor(Math.random() * chars.length)]
+  for (let i = 0; i < 10; i++) pwd += chars[randomInt(chars.length)]
   return pwd + '!'
 }
 
 async function sendKrediBilgisiEmail(to: string, adSoyad: string, ilAdi: string, password: string) {
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 465,
-    secure: Number(process.env.SMTP_PORT) === 465,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  })
-
   const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://klup360.com'}/login`
 
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM || 'Klup360 <destek@klup360.com>',
+  await epostaGonder({
     to,
     subject: 'Klup360 Denetçi Paneliniz Aktif Edildi',
     html: `
@@ -51,12 +24,12 @@ async function sendKrediBilgisiEmail(to: string, adSoyad: string, ilAdi: string,
         <div style="background: white; border-radius: 12px; padding: 32px; border: 1px solid #e5e7eb;">
           <h2 style="color: #1e3a2f; margin: 0 0 8px;">Denetçi Paneliniz Hazır</h2>
           <p style="color: #6b7280; margin: 0 0 24px;">
-            Sayın <strong>${adSoyad}</strong>,<br>
-            <strong>${ilAdi}</strong> iline ait Klüp360 denetçi paneliniz aktif edilmiştir.
+            Sayın <strong>${htmlKacis(adSoyad)}</strong>,<br>
+            <strong>${htmlKacis(ilAdi)}</strong> iline ait Klüp360 denetçi paneliniz aktif edilmiştir.
           </p>
           <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
             <p style="margin: 0 0 8px; font-size: 13px; color: #374151; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Giriş Bilgileriniz</p>
-            <p style="margin: 0 0 6px; color: #111827;"><strong>E-posta:</strong> ${to}</p>
+            <p style="margin: 0 0 6px; color: #111827;"><strong>E-posta:</strong> ${htmlKacis(to)}</p>
             <p style="margin: 0; color: #111827;"><strong>Geçici Şifre:</strong> <span style="font-family: monospace; background: #e5e7eb; padding: 2px 8px; border-radius: 4px;">${password}</span></p>
           </div>
           <p style="color: #6b7280; font-size: 13px; margin: 0 0 20px;">İlk girişinizden sonra şifrenizi değiştirmenizi tavsiye ederiz.</p>
@@ -148,7 +121,7 @@ export async function PATCH(request: NextRequest) {
   const adStr = adParcalari.length > 1 ? adParcalari.slice(0, -1).join(' ') : talep.ad_soyad || ''
   const soyadStr = adParcalari.length > 1 ? adParcalari.slice(-1)[0] : ''
 
-  const profilData: Record<string, any> = { id: userData.user.id, il_id: ilId, rol: 'denetim_yetkilisi' }
+  const profilData: Record<string, unknown> = { id: userData.user.id, il_id: ilId, rol: 'denetim_yetkilisi' }
   if (adStr) profilData.ad = adStr
   if (soyadStr) profilData.soyad = soyadStr
 
@@ -187,8 +160,8 @@ export async function PATCH(request: NextRequest) {
   try {
     await sendKrediBilgisiEmail(email, talep.ad_soyad || 'Denetçi', ilAdi, password)
     emailSent = true
-  } catch (mailErr: any) {
-    emailError = mailErr?.message || 'Resend hatası'
+  } catch (mailErr) {
+    emailError = hataMesaji(mailErr, 'Resend hatası')
     console.error('Denetçi e-postası gönderilemedi:', mailErr)
   }
 

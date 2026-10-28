@@ -58,6 +58,8 @@ export interface Ayarlar {
   tel: string
   email: string
   vergi_dairesi: string
+  vergi_dairesi_kodu?: string      // Muhtasar beyanname XML'i
+  beyanname_damga_vergisi?: number // Beyanname damga vergisi tutarı
   vergi_no: string
   sgk_no: string
   ssk_sube?: string
@@ -452,7 +454,7 @@ export interface OdemeOzet {
 export interface BordroSatir {
   personel: Personel
   toplamSaat: number
-  saatUcreti: number
+  saatUcreti: number | string   // yönetici paylarında "%7" gibi metin
   hamBrut: number
   sonuc: BordroSonuc
   odendi: boolean

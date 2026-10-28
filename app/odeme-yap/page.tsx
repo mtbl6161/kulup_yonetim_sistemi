@@ -1,17 +1,10 @@
 'use client'
 import { useState, Suspense } from 'react'
+import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { useAuth } from '@/lib/AuthContext'
-import {
-  CreditCard,
-  CheckCircle2,
-  ShieldCheck,
-  ArrowRight,
-  Globe,
-  Lock,
-  LogOut,
-  Loader2
-} from 'lucide-react'
+import { CreditCard, CheckCircle2, ShieldCheck, ArrowRight, Lock, LogOut, Loader2 } from 'lucide-react'
+import { hataMesaji } from '@/lib/hata'
 
 const AYLIK = 750
 const YILLIK = 7500
@@ -24,8 +17,9 @@ function OdemeYapIc() {
   
   const tutar = secDonem === 'year' ? YILLIK : AYLIK
 
+  const [simdi] = useState(() => Date.now())
   const denemeKalanGun = okul?.odeme_durumu === 'deneme' && okul.lisans_bitis
-    ? Math.ceil((new Date(okul.lisans_bitis).getTime() - Date.now()) / 86400000)
+    ? Math.ceil((new Date(okul.lisans_bitis).getTime() - simdi) / 86400000)
     : 0
 
   const handleOnlineOdeme = async () => {
@@ -33,9 +27,10 @@ function OdemeYapIc() {
     setLoading(true)
     setError(null)
     try {
+      const { data: { session: oturum } } = await supabase.auth.getSession()
       const res = await fetch('/api/lemonsqueezy/create-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${oturum?.access_token ?? ''}` },
         body: JSON.stringify({ 
           okulId: okul.id, 
           variantId: secDonem === 'month' ? "1588063" : "1588065",
@@ -45,8 +40,8 @@ function OdemeYapIc() {
       const data = await res.json()
       if (data.url) window.location.href = data.url
       else throw new Error(data.error || 'Bağlantı oluşturulamadı')
-    } catch (e: any) {
-      setError(e.message || 'Bağlantı hatası oluştu.')
+    } catch (e) {
+      setError(hataMesaji(e, 'Bağlantı hatası oluştu.'))
     } finally {
       setLoading(false)
     }

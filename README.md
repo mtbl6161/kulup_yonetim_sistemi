@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Klüp360
 
-## Getting Started
+MEB çocuk kulüpleri ve okullar için yönetim yazılımı: öğrenci kaydı, ders programı, sınıf defteri,
+puantaj, bordro, tahsilat takibi, işletme defteri, okul aile birliği muhasebesi ve il / ilçe denetimi.
 
-First, run the development server:
+## Teknoloji
+
+- **Next.js 16** (App Router, Turbopack) ve **React 19**. Bu sürümde API ve dosya kuralları eski sürümlerden farklıdır;
+  kod yazmadan önce `node_modules/next/dist/docs/` altındaki ilgili belgeye bakın (bkz. `AGENTS.md`).
+- **Supabase**: veritabanı, kimlik doğrulama ve dosya deposu. Okul verisi satır düzeyi güvenlikle (RLS) ayrılır.
+- **Resend** (e-posta), **Lemon Squeezy** (abonelik ödemesi), **Upstash Redis** (istek sınırlama).
+- PDF çıktıları `jspdf` + `jspdf-autotable` ile istemcide üretilir (`lib/pdf.ts` ortak stil).
+
+## Kurulum
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # değerleri doldurun
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Veritabanı kurulumu için `supabase/README.md` dosyasına bakın.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Komutlar
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Komut | Açıklama |
+| --- | --- |
+| `npm run dev` | Geliştirme sunucusu |
+| `npm run build` | Üretim derlemesi (tip denetimi dahil) |
+| `npm test` | Hesaplama testleri (bordro, vergi, SGK, tavan, tahakkuk) |
+| `npm run lint` | ESLint |
 
-## Learn More
+İlk süper yönetici hesabı: `SUPABASE_SERVICE_ROLE_KEY="…" node scripts/create-admin.mjs <eposta> <şifre>`
 
-To learn more about Next.js, take a look at the following resources:
+## Klasörler
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `app/` — sayfalar ve API uçları (`app/api/*`). Yönetici uçları `lib/apiAuth.ts` ile yetki denetler.
+- `components/` — ortak bileşenler (yan menü, üst çubuk, modallar, bildirimler).
+- `lib/` — iş kuralları: `hesaplama.ts` (bordro, vergi, tahakkuk), `pdf.ts`, `excel.ts`, `supabase.ts`, `eposta.ts`.
+- `supabase/` — SQL geçiş betikleri.
+- `public/` — logo, yazı tipleri (PDF için NotoSans).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Notlar
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Kişisel veri işlendiği için (T.C. kimlik, IBAN) `.env*`, Excel dosyaları ve `scratch/`, `worksheets/` klasörleri depoya alınmaz.
+- Başarısız veritabanı yazmaları `lib/supabase.ts` üzerinden yakalanıp ekranın altında kullanıcıya bildirilir.

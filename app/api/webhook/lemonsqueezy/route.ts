@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { supabase } from '@/lib/supabase'
+import { hataMesaji } from '@/lib/hata'
 
 export async function POST(req: NextRequest) {
   const body = await req.text()
@@ -100,8 +100,8 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ received: true })
-  } catch (error: any) {
-    console.error('❌ Webhook Hatası:', error.message)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch (error) {
+    console.error('❌ Webhook Hatası:', hataMesaji(error))
+    return NextResponse.json({ error: hataMesaji(error) }, { status: 500 })
   }
 }

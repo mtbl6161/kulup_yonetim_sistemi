@@ -6,7 +6,7 @@ import {
   fmtTL, AYLAR, tarihFmt, tahakkukDagitimHesapla,
   isBaskan, isBaskanYrd, isMuhasebe, isTemizlik, isDenetim
 } from '@/lib/hesaplama'
-import { HesapHareketi, Ayarlar } from '@/lib/types'
+import { HesapHareketi, Ayarlar, Personel } from '@/lib/types'
 import StatCard from '@/components/StatCard'
 import { pdfHazirla, pdfBaslik, pdfTablo, pdfAc, PDF_RENK } from '@/lib/pdf'
 import { FileDown, Calendar, ArrowUpRight, ArrowDownRight, Percent } from 'lucide-react'
@@ -16,7 +16,7 @@ interface AylikOzet { ay: number; yil: number; gelir: number; gider: number; net
 export default function GelirGiderPage() {
   const [hareketler, setHareketler] = useState<HesapHareketi[]>([])
   const [ayarlar, setAyarlar] = useState<Ayarlar | null>(null)
-  const [personel, setPersonel] = useState<any[]>([])
+  const [personel, setPersonel] = useState<Personel[]>([])
   const [aktifTab, setAktifTab] = useState<'aylik' | 'gelirler' | 'giderler' | 'tahakkuk'>('aylik')
   const [loading, setLoading] = useState(true)
 

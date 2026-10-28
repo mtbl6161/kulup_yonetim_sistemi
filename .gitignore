@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -52,3 +53,11 @@ worksheets/
 
 # PDF dosyalar
 *.pdf
+
+# Gerçek kurum verileri, tek seferlik betikler
+*.xlsx
+*.xls
+*.xlsm
+tmp/
+scripts/*
+!scripts/create-admin.mjs

@@ -1,12 +1,13 @@
 import { supabase } from './supabase'
+import { hataMesaji } from '@/lib/hata'
 
 interface AuditOptions {
   islem: string
   tablo: string
   aciklama: string
-  okul_id?: any
-  kullanici_id?: any
-  kayit_id?: any
+  okul_id?: number | string | null
+  kullanici_id?: string | null
+  kayit_id?: number | string | null
   basarili?: boolean
   req?: Request  // server-side çağrılar için kabul edilir, kullanılmaz
 }
@@ -40,9 +41,9 @@ export async function logAudit({
     }
 
     return { success: true }
-  } catch (err: any) {
-    console.error(`[Audit Critical] ${err.message}`)
-    return { success: false, error: err.message }
+  } catch (err) {
+    console.error(`[Audit Critical] ${hataMesaji(err)}`)
+    return { success: false, error: hataMesaji(err) }
   }
 }
 

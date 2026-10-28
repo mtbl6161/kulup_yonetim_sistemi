@@ -4,13 +4,17 @@ import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
 import { SinifDefteri, Personel, Tatil, Sinif, Ayarlar } from '@/lib/types'
-import { GUNLER, AYLAR, gunSayisi, tatilMi, ayLabel, haftaIciMi } from '@/lib/hesaplama'
-import { Download, RefreshCw, Calendar, Grid, Info, School, UserCog, Plus, Check, X } from 'lucide-react'
+import { AYLAR, gunSayisi, tatilMi, ayLabel, haftaIciMi } from '@/lib/hesaplama'
+import { Download, RefreshCw, Calendar, School, UserCog, Plus, Check, X } from 'lucide-react'
 import Bildirim from '@/components/Bildirim'
 import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAc, PDF_RENK, PDF_KENAR } from '@/lib/pdf'
+import type { CellHookData } from '@/lib/pdf'
 import { ayHaftalari, varsayilanHafta, tatilAdi, bugunMu, basHarf, gecmisMi, HaftaSecici, GunBasligi, TatilBlogu, GUN_UZUN, HaftaGunu } from '@/components/HaftalikPlan'
 import React from 'react'
 import ConfirmModal from '@/components/ConfirmModal'
+import { hataMesaji } from '@/lib/hata'
+import { useYukleme } from '@/lib/useYukleme'
+import { useDegisince } from '@/lib/useDegisince'
 
 interface VisibleDay {
   day: number
@@ -35,7 +39,7 @@ export default function SinifDefteriPage() {
     open: boolean, 
     type: 'sil' | 'kopyala' | 'tatil' | 'programdan-aktar', 
     id?: number, 
-    payload?: any,
+    payload?: { personelId: number; pInfo: { day: number; month: number; year: number; sinifId: number; dersNo: number } },
     title: string,
     message: string
   } | null>(null)
@@ -45,7 +49,7 @@ export default function SinifDefteriPage() {
   const [haftaSecim, setHaftaSecim] = useState<number | null>(null)
   // Öğretmen vurgulama: seçilen öğretmenin dersleri öne çıkar, diğerleri soluklaşır
   const [vurgu, setVurgu] = useState<number | null>(null)
-  useEffect(() => { setHaftaSecim(null) }, [ay, yil])
+  useDegisince(`${ay}-${yil}`, () => setHaftaSecim(null))
 
   // --- TAKVİM HESAPLAMA ---
   const visibleDays = useMemo(() => {
@@ -113,7 +117,7 @@ export default function SinifDefteriPage() {
                 seans: p.seans || 'sabah', etkinlik_saati: p.etkinlik_saati || 1,
                 durum: 'geldi', okul_id: currentOkulId
               })
-              const ogr = perList.find((x: any) => x.id === p.ogretmen_id)
+              const ogr = perList.find((x) => x.id === p.ogretmen_id)
               if (ogr?.koordinator_id) {
                 const kDersNo = (p.ders_no || 1) + 10
                 uniquePayload.set(`${p.gun}-${p.ay}-${p.yil}-${p.kulup_adi}-${kDersNo}`, {
@@ -143,12 +147,12 @@ export default function SinifDefteriPage() {
       setTatiller(tat || [])
       setSiniflar(sin || [])
       setAyarlar(ayr || null)
-    } catch (e: any) {
-      setMsg('❌ Beklenmeyen hata: ' + (e.message || 'Bilinmiyor'))
+    } catch (e) {
+      setMsg('❌ Beklenmeyen hata: ' + (hataMesaji(e, 'Bilinmiyor')))
     }
   }, [ay, yil])
 
-  useEffect(() => { load() }, [load])
+  useYukleme(load)
 
   useEffect(() => {
     if (!picker) return
@@ -242,8 +246,8 @@ export default function SinifDefteriPage() {
 
       setMsg('✅ Program başarıyla aktarıldı.')
       load()
-    } catch (err: any) {
-      setMsg('❌ Aktarım hatası: ' + err.message)
+    } catch (err) {
+      setMsg('❌ Aktarım hatası: ' + hataMesaji(err))
     } finally {
       setPickerSaving(false)
       setTimeout(() => setMsg(''), 5000)
@@ -312,7 +316,7 @@ export default function SinifDefteriPage() {
       })
 
       const daysInMonth = gunSayisi(y, m)
-      const upserts: any[] = []
+      const upserts: Record<string, unknown>[] = []
       const deletes: number[] = []
 
       affectedPersonelIds.forEach(pid => {
@@ -339,7 +343,7 @@ export default function SinifDefteriPage() {
         }
       })
 
-      const promises: any[] = []
+      const promises: PromiseLike<unknown>[] = []
       if (upserts.length > 0) {
         promises.push(supabase.from('puantaj').upsert(upserts, { onConflict: 'personel_id,tarih' }))
       }
@@ -380,10 +384,10 @@ export default function SinifDefteriPage() {
         .filter((d): d is SinifDefteri => !!d)
         .map(d => ({ personelId: d.ogretmen_id, gun: d.gun, ay: d.ay, yil: d.yil }))
       await Promise.all(etkilenenKisiler.map(k => puantajGuncelle(yeniDefter, k.personelId!, k.gun, k.ay, k.yil)))
-    } catch (err: any) {
+    } catch (err) {
       // Hata durumunda orijinal state'e dön
       setDefter(defter.map(d => guncellenenIdler.has(d.id) ? ({ ...d, durum: mevcutDurum } as SinifDefteri) : d))
-      setMsg('❌ Durum güncelleme hatası: ' + err.message)
+      setMsg('❌ Durum güncelleme hatası: ' + hataMesaji(err))
     }
   }
 
@@ -425,7 +429,7 @@ export default function SinifDefteriPage() {
       const { data: profil } = await supabase.from('profiller').select('okul_id').eq('id', user?.id).single()
       const okulId = profil?.okul_id
 
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         gun: pInfo.day,
         ay: pInfo.month,
         yil: pInfo.year,
@@ -475,8 +479,8 @@ export default function SinifDefteriPage() {
       await Promise.all(Array.from(uniquePersonelIds).map(pid => syncPuantajForPersonDay(pid, pInfo.day, pInfo.month, pInfo.year)))
 
       load()
-    } catch (err: any) {
-      setMsg('❌ Kayıt hatası: ' + err.message)
+    } catch (err) {
+      setMsg('❌ Kayıt hatası: ' + hataMesaji(err))
     } finally {
       setPickerSaving(false)
     }
@@ -522,8 +526,8 @@ export default function SinifDefteriPage() {
       }
 
       load()
-    } catch (err: any) {
-      setMsg('❌ Silme hatası: ' + err.message)
+    } catch (err) {
+      setMsg('❌ Silme hatası: ' + hataMesaji(err))
     } finally {
       setPickerSaving(false)
     }
@@ -550,10 +554,10 @@ export default function SinifDefteriPage() {
     const kapali = (d: number, m: number, y: number) => { const g = new Date(y, m - 1, d, 12).getDay(); return g === 0 || g === 6 || tatilMi(m, d, y, tatiller) }
     const hucre = (ders: SinifDefteri | null) => {
       if (!ders) return ''
-      const ogr = ders.ogretmen as any
+      const ogr = ders.ogretmen
       return `${ogr?.ad || ''}${ogr?.aktif === false ? ' (Ayrıldı)' : ''}\n${ders.durum === 'geldi' ? 'Geldi' : 'GELMEDİ'}`
     }
-    const boya = (kapaliMi: boolean) => (data: any) => {
+    const boya = (kapaliMi: boolean) => (data: CellHookData) => {
       if (data.column.index === 0) return
       if (kapaliMi) { data.cell.styles.fillColor = PDF_RENK.kapaliZemin; if (data.section === 'head') data.cell.styles.textColor = PDF_RENK.kapaliMetin }
       if (data.section === 'body' && data.cell.text.some((t: string) => t.includes('GELMEDİ'))) data.cell.styles.textColor = PDF_RENK.hata
@@ -647,7 +651,7 @@ export default function SinifDefteriPage() {
     for (const s of gorunenSiniflar) for (const n of saatler) {
       const d = dersGetir(s.ad, n, g.day, g.month, g.year)
       if (!d?.ogretmen_id) continue
-      const ad = (d.ogretmen as any)?.ad || 'Bilinmiyor'
+      const ad = d.ogretmen?.ad || 'Bilinmiyor'
       const o = ozetMap.get(d.ogretmen_id) || { ad, geldi: 0, gelmedi: 0 }
       if (d.durum === 'geldi') o.geldi++; else { o.gelmedi++; gelinmeyen.push({ gun: g.day, dersNo: n > 10 ? n - 10 : n, ad, sinif: s.ad }) }
       ozetMap.set(d.ogretmen_id, o)
@@ -738,7 +742,7 @@ export default function SinifDefteriPage() {
                             <TatilBlogu ad={tAd} alt="Yoklama alınmaz" yukseklik={saatler.length * HUCRE_H + (saatler.length - 1) * BOSLUK} />
                           ) : saatler.map(n => {
                             const ders = dersGetir(sinif.ad, n, g.day, g.month, g.year)
-                            const og = ders?.ogretmen as any
+                            const og = ders?.ogretmen
                             const vurguMu = vurgu !== null && ders?.ogretmen_id === vurgu
                             const soluk = vurgu !== null && !vurguMu
                             if (!ders) {
@@ -876,7 +880,7 @@ export default function SinifDefteriPage() {
           onOnayla={() => {
             if (conf.type === 'sil') finishSil(conf.id!)
             else if (conf.type === 'programdan-aktar') programdanAktarGercek()
-            else if (conf.type === 'tatil') directKaydetGercek(conf.payload.personelId, conf.payload.pInfo)
+            else if (conf.type === 'tatil') conf.payload && directKaydetGercek(conf.payload.personelId, conf.payload.pInfo)
           }}
           onIptal={() => setConf(null)}
         />

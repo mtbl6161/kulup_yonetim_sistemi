@@ -7,12 +7,15 @@ import { useAy } from '@/lib/AyContext'
 import { useAuth } from '@/lib/AuthContext'
 import { LogOut, User, LayoutDashboard, Users, Calendar, BookOpen, Clock, BarChart3, Wallet, Landmark, TrendingUp, FileText, Settings, GraduationCap, School, ChevronDown, ClipboardList, Activity, Calculator, Globe, BookText, FolderCheck, Search, ChevronsLeft, X, Handshake } from 'lucide-react'
 import Logo, { BrandMark } from '@/components/brand/Logo'
+import { useDegisince } from '@/lib/useDegisince'
+import { useYukleme } from '@/lib/useYukleme'
 
 type Alan = 'kulup' | 'okul' | 'oab'
+type NavItem = { href: string; label: string; sub?: string; tags?: string; icon: React.ReactNode }
 
 // alan: 'kulup' | 'okul' | 'oab' → yalnızca o sekmede görünür; alan yoksa tüm sekmelerde görünür
 // altMenu: true → ana menüde değil, alt satırdaki simge düğmelerinde görünür
-const NAV: { baslik: string; id: string; alan?: Alan; adminOnly?: boolean; superAdminOnly?: boolean; altMenu?: boolean; items: any[] }[] = [
+const NAV: { baslik: string; id: string; alan?: Alan; adminOnly?: boolean; superAdminOnly?: boolean; altMenu?: boolean; items: NavItem[] }[] = [
   {
     baslik: 'Kayıtlar',
     id: 'kayit',
@@ -95,14 +98,14 @@ const NAV: { baslik: string; id: string; alan?: Alan; adminOnly?: boolean; super
     superAdminOnly: true,
     items: [
       { href: '/yonetim', label: 'Yönetim Konsolu', sub: 'Okul ve lisans yönetimi', tags: 'admin, lisans, okul', icon: <Activity size={17} /> },
-      { href: '/kullanici-yonetimi', label: 'Profiller', sub: 'Kullanıcı yetki ve girişleri', tags: 'şifre, yetki, profil', icon: <User size={17} /> },
+      { href: '/yonetim?sekme=kullanicilar', label: 'Profiller', sub: 'Kullanıcı yetki ve girişleri', tags: 'şifre, yetki, profil', icon: <User size={17} /> },
     ],
   },
 ]
 
 const ROL_ADI: Record<string, string> = { admin: 'Yönetici', super_admin: 'Sistem yöneticisi', denetim_yetkilisi: 'Denetçi', ogretmen: 'Öğretmen' }
 
-export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolean, setCollapsed: (val: boolean) => void }) {
+export default function Sidebar({ collapsed, setCollapsed, mobilAcik = false, onMobilKapat }: { collapsed: boolean, setCollapsed: (val: boolean) => void, mobilAcik?: boolean, onMobilKapat?: () => void }) {
   const pathname = usePathname()
   const { okul, user, profil, signOut } = useAuth()
   const { ay, yil, setAy, setYil } = useAy()
@@ -116,7 +119,7 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
   const isSuperAdmin = profil?.rol === 'super_admin'
 
   // Kaydedilmiş alan tercihini yükle
-  useEffect(() => {
+  useYukleme(() => {
     try {
       const kayitli = localStorage.getItem('sidebar_alan')
       if (kayitli === 'kulup' || kayitli === 'okul' || kayitli === 'oab') setAlan(kayitli)
@@ -124,10 +127,10 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
   }, [])
 
   // Açılan sayfa başka alana aitse o alana geç
-  useEffect(() => {
+  useDegisince(pathname, () => {
     const bolum = NAV.find(s => s.items.some(i => i.href === pathname))
     if (bolum?.alan) setAlan(bolum.alan)
-  }, [pathname])
+  })
 
   useEffect(() => { if (aramaAcik) aramaRef.current?.focus() }, [aramaAcik])
 
@@ -187,7 +190,7 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
     if (section.adminOnly && isSuperAdmin) return null
     if (section.altMenu) return null
     if (!q && section.alan && section.alan !== alan) return null
-    const items = section.items.filter((item: any) => {
+    const items = section.items.filter(item => {
       if (!q) return true
       return (item.label + item.sub + (item.tags || '')).toLowerCase().includes(q)
     })
@@ -198,7 +201,8 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
 
   return (
     <aside
-      className="main-sidebar"
+      className={`main-sidebar${mobilAcik ? ' acik' : ''}`}
+      aria-hidden={onMobilKapat && !mobilAcik ? true : undefined}
       style={{
         width: W,
         height: '100vh',
@@ -227,9 +231,15 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
               <button onClick={() => setAramaAcik(a => !a)} title="Menüde ara" aria-label="Menüde ara" aria-pressed={aramaAcik} style={{ ...simgeDugme, border: '1px solid transparent', background: aramaAcik ? 'var(--accent-lighter)' : 'transparent', color: aramaAcik ? 'var(--accent)' : 'var(--text3)' }}>
                 <Search size={16} />
               </button>
-              <button onClick={() => setCollapsed(true)} title="Menüyü daralt" aria-label="Menüyü daralt" style={{ ...simgeDugme, border: '1px solid transparent', background: 'transparent', color: 'var(--text3)' }}>
-                <ChevronsLeft size={16} />
-              </button>
+              {onMobilKapat ? (
+                <button onClick={onMobilKapat} title="Menüyü kapat" aria-label="Menüyü kapat" style={{ ...simgeDugme, border: '1px solid transparent', background: 'transparent', color: 'var(--text3)' }}>
+                  <X size={18} />
+                </button>
+              ) : (
+                <button onClick={() => setCollapsed(true)} title="Menüyü daralt" aria-label="Menüyü daralt" style={{ ...simgeDugme, border: '1px solid transparent', background: 'transparent', color: 'var(--text3)' }}>
+                  <ChevronsLeft size={16} />
+                </button>
+              )}
             </div>
           </>
         )}
@@ -328,7 +338,7 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
                 {section.baslik}
               </div>
             )}
-            {section.items.map((item: any) => renderLink(item.href, item.label, item.icon, item.sub))}
+            {section.items.map(item => renderLink(item.href, item.label, item.icon, item.sub))}
           </div>
         ))}
         {q && bolumler.length === 0 && (
@@ -350,7 +360,7 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
           </div>
         )}
         <div style={{ display: 'flex', flexDirection: collapsed ? 'column' : 'row', gap: 6 }}>
-          {altItems.map((item: any) => (
+          {altItems.map(item => (
             <Link key={item.href} href={item.href} title={item.label} aria-label={item.label} style={{ ...simgeDugme, color: pathname === item.href ? 'var(--accent)' : 'var(--text2)', background: pathname === item.href ? 'var(--accent-lighter)' : 'var(--surface)' }}>
               {item.icon}
             </Link>

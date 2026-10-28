@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import Topbar from '@/components/Topbar'
 import StatCard from '@/components/StatCard'
 import { useAuth } from '@/lib/AuthContext'
@@ -8,8 +8,9 @@ import { supabase } from '@/lib/supabase'
 import { fmtTL, tarihFmt } from '@/lib/hesaplama'
 import { HesapHareketi } from '@/lib/types'
 import ConfirmModal from '@/components/ConfirmModal'
-import { FileDown, TrendingUp, Landmark, Trash2 } from 'lucide-react'
+import { FileDown, TrendingUp, Trash2 } from 'lucide-react'
 import { EmptyPayments } from '@/components/brand/Illustrations'
+import { useYukleme } from '@/lib/useYukleme'
 
 export default function HesapHareketleriPage() {
   const { okul } = useAuth()
@@ -31,7 +32,7 @@ export default function HesapHareketleriPage() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useYukleme(load)
 
 
   async function sil(id: number) {
@@ -40,8 +41,8 @@ export default function HesapHareketleriPage() {
 
   async function silGercek(id: number) {
     setConf(null)
-    await supabase.from('hesap_hareketleri').delete().eq('id', id)
-    load()
+    const { error } = await supabase.from('hesap_hareketleri').delete().eq('id', id)
+    if (!error) load()
   }
 
   const filtrelenmis = hareketler.filter(h => {

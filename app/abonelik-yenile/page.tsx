@@ -1,17 +1,9 @@
 'use client'
-import { useState, useEffect, Suspense } from 'react'
+import { useState, Suspense } from 'react'
+import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/AuthContext'
-import {
-  RefreshCw,
-  CheckCircle2,
-  ShieldAlert,
-  ArrowRight,
-  Lock,
-  LogOut,
-  Loader2,
-  Calendar,
-  AlertTriangle
-} from 'lucide-react'
+import { RefreshCw, CheckCircle2, ArrowRight, Lock, LogOut, Loader2, Calendar, AlertTriangle } from 'lucide-react'
+import { hataMesaji } from '@/lib/hata'
 
 const AYLIK = 750
 const YILLIK = 7500
@@ -29,9 +21,10 @@ function AbonelikYenileIc() {
     setLoading(true)
     setError(null)
     try {
+      const { data: { session: oturum } } = await supabase.auth.getSession()
       const res = await fetch('/api/lemonsqueezy/create-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${oturum?.access_token ?? ''}` },
         body: JSON.stringify({ 
           okulId: okul.id, 
           variantId: secDonem === 'month' ? "1588063" : "1588065",
@@ -41,8 +34,8 @@ function AbonelikYenileIc() {
       const data = await res.json()
       if (data.url) window.location.href = data.url
       else throw new Error(data.error || 'Bağlantı oluşturulamadı')
-    } catch (e: any) {
-      setError(e.message || 'Bağlantı hatası oluştu.')
+    } catch (e) {
+      setError(hataMesaji(e, 'Bağlantı hatası oluştu.'))
     } finally {
       setLoading(false)
     }

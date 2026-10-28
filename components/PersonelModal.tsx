@@ -1,11 +1,13 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { X, Save, UserPlus, UserCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { logIslem } from '@/lib/audit'
 import { Personel, Ayarlar } from '@/lib/types'
 import ConfirmModal from '@/components/ConfirmModal'
 import SayiInput from '@/components/SayiInput'
+import { useDegisince } from '@/lib/useDegisince'
+import { useYukleme } from '@/lib/useYukleme'
 
 interface Props {
   editItem: Personel | null
@@ -28,22 +30,13 @@ const EMPTY: Partial<Personel> = {
 }
 
 export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose, onSaved }: Props) {
-  const [form, setForm] = useState<Partial<Personel>>(EMPTY)
+  const [form, setForm] = useState<Partial<Personel>>(() => editItem ? { ...editItem } : EMPTY)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
   const [koordinatorler, setKoordinatorler] = useState<{ id: number; ad: string }[]>([])
   const [matrahConfirmData, setMatrahConfirmData] = useState<{ val: number, msg: string } | null>(null)
   const [lastAskedMatrah, setLastAskedMatrah] = useState<number | null>(null)
   const overlayDown = useRef(false)
-
-  useEffect(() => {
-    if (editItem) {
-      setForm({ ...editItem })
-    } else {
-      setForm(EMPTY)
-    }
-    loadKoordinatorler()
-  }, [editItem])
 
   async function loadKoordinatorler() {
     const { data } = await supabase
@@ -53,6 +46,10 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
       .eq('aktif', true)
     setKoordinatorler(data || [])
   }
+
+  useDegisince(editItem?.id ?? null, () => setForm(editItem ? { ...editItem } : EMPTY))
+  useYukleme(loadKoordinatorler, [])
+
 
   function setF(key: keyof Personel, val: unknown) {
     setForm(f => ({ ...f, [key]: val }))
@@ -273,12 +270,12 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
               </label>
               <select className="form-select" style={{ width: '100%' }} value={form.personel_turu || 'kadrolu'} onChange={e => setF('personel_turu', e.target.value)}>
                 <option value="kadrolu">Kadrolu</option>
-                <option value="sgk">SGK'lı</option>
+                <option value="sgk">SGK’lı</option>
               </select>
             </div>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                SGK'lı mı? <span style={{ color: '#dc2626' }}>*</span>
+                SGK’lı mı? <span style={{ color: '#dc2626' }}>*</span>
               </label>
               <select className="form-select" style={{ width: '100%' }} value={form.sgk_li ? 'evet' : 'hayir'} onChange={e => setF('sgk_li', e.target.value === 'evet')}>
                 <option value="hayir">Hayır</option>

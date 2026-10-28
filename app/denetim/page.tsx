@@ -2,18 +2,19 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { FileText, RefreshCw, BarChart2, Calendar, UserCheck, ClipboardList, Activity } from 'lucide-react'
+import { RefreshCw, BarChart2, Calendar, UserCheck, ClipboardList, Activity } from 'lucide-react'
 import DenetciDenetimDosyasi from '@/components/DenetciDenetimDosyasi'
 import DenetciHesapKontrol, { useHesapKontrol } from '@/components/DenetciHesapKontrol'
 import { DenetimMaddeEditor } from '@/components/DenetimEvrakYonetimi'
 import { DenetimIsKuyrugu, useDonemDurumlari, varsayilanDonem } from '@/components/DenetimPanel'
 import { DenetimUstBar, DenetimOkullar, OkulIncelemeBasligi, VeriSecici, Bolum, OkulSekme, VeriSekme } from '@/components/DenetimDuzen'
-import {
-  isGunuSayisi, gunSayisi, tahakkukDagitimHesapla,
-  tavanHesapla, gorevTavanYuzdesi, tatilMi,
-  detectActiveCategories, bordroHesapla
-} from '@/lib/hesaplama'
-import { Ayarlar } from '@/lib/types'
+import { gunSayisi, tatilMi } from '@/lib/hesaplama'
+import { DersProgrami, SinifDefteri, Sinif, Tatil } from '@/lib/types'
+import { useYukleme } from '@/lib/useYukleme'
+import { useDegisince } from '@/lib/useDegisince'
+import BilancoIcerik, { actionBtn, type BilancoVerisi } from '@/components/denetim/BilancoIcerik'
+import BordroInceleme, { type BordroSatir } from '@/components/denetim/BordroInceleme'
+import { loadingOverlay, emptyView, dpTh, dpTd } from '@/components/denetim/stiller'
 
 interface OkulSatir { 
   id: number; 
@@ -24,53 +25,7 @@ interface OkulSatir {
   son_islem?: string;
 }
 
-interface BordroSatir {
-  id: number; personel_id: number; ay: number; yil: number; saat_ucreti?: number;
-  toplam_saat: number; brut: number; gv_matrah: number; gv_oran: number
-  gv_hesaplanan: number; gv_istisna_tutari: number; gv_tutar: number
-  dv_hesaplanan: number; dv_istisna_tutari: number; damga_tutar: number
-  sgk_kisi: number; sgk_issizlik_kisi: number; sgk_isveren: number
-  toplam_kesinti: number; net: number; odendi: boolean
-  personel?: { ad: string; gorev: string; tc?: string; sgk_li: boolean }
-}
 
-interface BilancoVerisi {
-  ayarlar: Ayarlar
-  toplamGelir: number
-  ogrenciSayisi: number
-  subeSayisi: number
-  toplamDersSaati: number
-  tatiller: any[]
-  personel?: any[]
-  puantaj?: any[]
-  bordro?: any[]
-}
-
-const TAVAN_KATEGORILER = [
-  { label: 'Başkan',                      gorev: 'Başkan',               sgkLi: false },
-  { label: 'Başkan Yardımcısı',           gorev: 'Başkan Yardımcısı',    sgkLi: false },
-  { label: 'Koordinatör Öğretmen',        gorev: 'Koordinatör Öğretmen', sgkLi: false },
-  { label: 'Öğretmen',                    gorev: 'Öğretmen',             sgkLi: false },
-  { label: 'Usta Öğretici',               gorev: 'Usta Öğretici',        sgkLi: true  },
-  { label: 'Usta Öğretici (Emekli)',      gorev: 'Usta Öğretici',        sgkLi: true, isRetired: true },
-  { label: 'Muhasebe Memuru',             gorev: 'Muhasebe Personeli',   sgkLi: true  },
-  { label: 'Muhasebe Memuru (Emekli)',    gorev: 'Muhasebe Personeli',   sgkLi: true, isRetired: true },
-  { label: 'Temizlik Personeli',          gorev: 'Temizlik Personeli',   sgkLi: true  },
-  { label: 'Temizlik Personeli (Emekli)', gorev: 'Temizlik Personeli',   sgkLi: true, isRetired: true },
-  { label: 'Denetim Yetkilisi',           gorev: 'Denetim Yetkilisi',    sgkLi: false },
-]
-
-const AY_ADI = ['','Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
-
-function fmt(v: number | undefined | null) {
-  return Number(v ?? 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-function fmtTL(v: number) {
-  return v.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' TL'
-}
-function sum(rows: BordroSatir[], key: keyof BordroSatir) {
-  return rows.reduce((s, b) => s + Number(b[key] ?? 0), 0)
-}
 
 export default function DenetimPage() {
   const { profil, il, loading, signOut, refresh } = useAuth()
@@ -107,12 +62,12 @@ export default function DenetimPage() {
   // Veri State'leri
   const [satirlar, setSatirlar] = useState<BordroSatir[]>([])
   const [bilVeri, setBilVeri] = useState<BilancoVerisi | null>(null)
-  const [dersProgrami, setDersProgrami] = useState<any[]>([])
-  const [sinifDefteri, setSinifDefteri] = useState<any[]>([])
-  const [siniflar, setSiniflar] = useState<any[]>([])
-  const [tatiller, setTatiller] = useState<any[]>([])
+  const [dersProgrami, setDersProgrami] = useState<DersProgrami[]>([])
+  const [sinifDefteri, setSinifDefteri] = useState<SinifDefteri[]>([])
+  const [siniflar, setSiniflar] = useState<Sinif[]>([])
+  const [tatiller, setTatiller] = useState<Tatil[]>([])
   const [yukleniyor, setYukleniyor] = useState(false)
-  const [sonHareketler, setSonHareketler] = useState<any[]>([])
+  const [sonHareketler, setSonHareketler] = useState<{ id: number; islem: string; created_at: string; aciklama?: string; okullar?: { ad?: string } }[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
   const selectedOkul = okullar.find(o => o.id === secilenOkulId)
   const [selYil, selAy] = secilenAyKey.split('-').map(Number)
@@ -148,14 +103,14 @@ export default function DenetimPage() {
   const hesapVeri = useHesapKontrol(secilenOkulId || 0, selYil, selAy)
 
   // Profil sekmesi açılınca mevcut adı doldur
-  useEffect(() => {
+  useDegisince(`${ekran}|${ayarSekme}|${profil?.ad ?? ''}|${profil?.soyad ?? ''}`, () => {
     if (ekran === 'ayarlar' && ayarSekme === 'profil') {
       setProfilAd(profil?.ad || '')
       setProfilSoyad(profil?.soyad || '')
       setProfilMesaj(null)
       setSifreMesaj(null)
     }
-  }, [ekran, ayarSekme, profil])
+  })
 
   async function handleProfilGuncelle(e: React.FormEvent) {
     e.preventDefault()
@@ -209,8 +164,9 @@ export default function DenetimPage() {
   }
 
   // Okulları ve İl Geneli Özeti Getir
+  const benimIlId = profil?.il_id
   const okullarGetir = useCallback(async () => {
-    const myIlId = profil?.il_id
+    const myIlId = benimIlId
     if (!myIlId) return
     setOkulYukleniyor(true)
     
@@ -276,9 +232,9 @@ export default function DenetimPage() {
     } finally {
       setOkulYukleniyor(false)
     }
-  }, [profil?.il_id, filtreIlceId])
+  }, [benimIlId, filtreIlceId])
 
-  useEffect(() => { okullarGetir() }, [okullarGetir, filtreIlceId])
+  useYukleme(okullarGetir, [okullarGetir, filtreIlceId])
 
   // İlçe Listesini Getir
   useEffect(() => {
@@ -293,7 +249,7 @@ export default function DenetimPage() {
   }, [profil?.il_id])
 
   // Veri Yükleme Motoru
-  useEffect(() => {
+  useYukleme(() => {
     if (!secilenOkulId || !secilenAyKey) {
       setSatirlar([])
       setBilVeri(null)
@@ -313,7 +269,7 @@ export default function DenetimPage() {
         .maybeSingle()
 
       if (ayr) {
-        setBilVeri({ ayarlar: ayr } as any)
+        setBilVeri({ ayarlar: ayr, toplamGelir: 0, ogrenciSayisi: 0, subeSayisi: 0, toplamDersSaati: 0, tatiller: [] })
       } else {
         setBilVeri(null)
       }
@@ -403,8 +359,8 @@ export default function DenetimPage() {
           supabase.from('tatiller').select('*'),
         ])
         // okul_id null olan kayıtları siniflar ile doğrula
-        const sinifAdlari = new Set((sinRes.data || []).map((s: any) => s.ad))
-        const filtrelenmis = (sdRes.data || []).filter((p: any) =>
+        const sinifAdlari = new Set((sinRes.data || []).map((s) => s.ad))
+        const filtrelenmis = (sdRes.data || []).filter((p) =>
           p.okul_id === secilenOkulId || (p.okul_id == null && sinifAdlari.has(p.kulup_adi))
         )
         setSinifDefteri(filtrelenmis)
@@ -609,157 +565,7 @@ export default function DenetimPage() {
             )}
 
         {/* BORDRO GÖRÜNÜMÜ */}
-        {aktifVeri === 'bordro' && (
-          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
-            {/* Toplamlar */}
-            {satirlar.length > 0 && <div style={{ padding: '10px 24px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
-               {satirlar.length > 0 && (
-                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 12 }}>
-                    {[
-                      { l: 'Brüt', v: sum(satirlar, 'brut'), c: 'var(--text)' },
-                      { l: 'Kesinti', v: sum(satirlar, 'toplam_kesinti'), c: 'var(--danger)' },
-                      { l: 'Net', v: sum(satirlar, 'net'), c: 'var(--accent)' }
-                    ].map(s => (
-                      <div key={s.l} style={{ textAlign: 'right', padding: '0 16px', borderRight: s.l !== 'Net' ? '1px solid var(--border-light)' : 'none' }}>
-                        <div style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.l}</div>
-                        <div style={{ fontSize: 14, fontWeight: 800, color: s.c }}>{fmt(s.v)} ₺</div>
-                      </div>
-                    ))}
-                 </div>
-               )}
-            </div>}
-
-            <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
-              {yukleniyor ? (
-                <div style={loadingOverlay}><RefreshCw size={24} className="animate-spin" color="var(--accent)" /></div>
-              ) : satirlar.length === 0 ? (
-                <div style={emptyView}>
-                   <FileText size={48} color="var(--border)" />
-                   <p style={{ marginTop: 16, color: 'var(--text3)', fontWeight: 600 }}>Bu dönem için bordro kaydı bulunamadı.</p>
-                </div>
-              ) : (
-                <div style={{ background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflowX: 'auto', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', zoom: 0.85 }}>
-                  <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'auto' }}>
-                    <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                      <tr style={{ background: 'var(--surface2)' }}>
-                        <th colSpan={4} style={thGrup}>PERSONEL BİLGİLERİ</th>
-                        <th colSpan={3} style={thGrup}>PUANTAJ & BRÜT</th>
-                        <th colSpan={5} style={{ ...thGrup, borderBottom: '1px solid var(--border)' }}>GELİR VERGİSİ</th>
-                        <th colSpan={3} style={{ ...thGrup, borderBottom: '1px solid var(--border)' }}>DAMGA VERGİSİ</th>
-                        <th colSpan={3} style={{ ...thGrup, borderBottom: '1px solid var(--border)' }}>SGK KESİNTİLERİ</th>
-                        <th style={{ ...thGrup, borderBottom: '1px solid var(--border)' }}>TOPLAM</th>
-                        <th colSpan={5} style={{ ...thGrup, borderBottom: '1px solid var(--border)', borderRight: 'none' }}>İŞVEREN SGK DETAYLARI</th>
-                      </tr>
-                      <tr style={{ background: 'var(--surface)', borderBottom: '2px solid var(--accent)' }}>
-                        {[
-                          { l: 'S.N.', a: 'center', w: 30, sticky: 0 },
-                          { l: 'GÖREVİ', a: 'left', w: 100, sticky: 30 },
-                          { l: 'ADI SOYADI', a: 'left', w: 140, sticky: 130 },
-                          { l: 'TC KİMLİK', a: 'center', w: 95 },
-                          { l: 'Ders\nSaati', a: 'center', w: 40 },
-                          { l: 'Saat\nÜcreti', a: 'center', w: 50 },
-                          { l: 'Brüt', a: 'center', w: 50, bold: true },
-                          { l: 'GV\nMat.', a: 'center', w: 45 },
-                          { l: '%', a: 'center', w: 25 },
-                          { l: 'Hes.\nGV', a: 'center', w: 40, muted: true },
-                          { l: 'GV\nİst.', a: 'center', w: 40 },
-                          { l: 'GV\nKes.', a: 'center', w: 45, bold: true },
-                          { l: 'Hes.\nDV', a: 'center', w: 40, muted: true },
-                          { l: 'DV\nİst.', a: 'center', w: 40 },
-                          { l: 'DV\nKes.', a: 'center', w: 45, bold: true },
-                          { l: 'SGK\n%14', a: 'center', w: 40 },
-                          { l: 'İşs.\n%1', a: 'center', w: 40 },
-                          { l: 'Kes.\nTop.', a: 'center', w: 50, bold: true },
-                          { l: 'NET\nÖDENECEK', a: 'center', w: 65, bold: true, success: true },
-                          { l: 'Kısa\n.25', a: 'center', w: 35 },
-                          { l: 'Em.\n%20', a: 'center', w: 35 },
-                          { l: 'Sağ.\n.5', a: 'center', w: 35 },
-                          { l: 'İşs.\n%3', a: 'center', w: 35 },
-                          { l: 'İşv.\nTop.', a: 'center', w: 55, bold: true },
-                        ].map((h, i) => (
-                          <th key={i} style={{ 
-                            ...thSub, 
-                            textAlign: h.a as any, 
-                            minWidth: h.w, 
-                            color: h.success ? 'var(--accent)' : 'var(--text2)', 
-                            fontWeight: h.bold ? 800 : 700,
-                            position: h.sticky !== undefined ? 'sticky' : 'relative',
-                            left: h.sticky,
-                            zIndex: h.sticky !== undefined ? 20 : 1
-                          }}>{h.l}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        // Kurumsal birim saat ücretini listedeki "Öğretmen" veya "Usta Öğretici"den koklayarak bulalım
-                        // Çünkü onların brüt ücretinde ek tazminat (koordinatörlük vb.) genelde yoktur.
-                        const referansSatir = satirlar.find(s => (s.personel?.gorev === 'Öğretmen' || s.personel?.gorev === 'Usta Öğretici') && s.toplam_saat > 0)
-                        const hesaplananRefUcret = referansSatir ? (referansSatir.brut / referansSatir.toplam_saat) : 0
-                        const standartSaatUcreti = bilVeri?.ayarlar?.saat_ucreti || hesaplananRefUcret
-
-                        return satirlar.map((b, i) => (
-                          <tr key={b.id} style={{ background: i % 2 === 0 ? 'var(--surface)' : 'var(--bg)', borderBottom: '1px solid var(--border-light)' }}>
-                            <td style={{ ...td, textAlign: 'center', fontWeight: 800, color: 'var(--text)', position: 'sticky', left: 0, zIndex: 10, background: 'inherit' }}>{i + 1}</td>
-                            <td style={{ ...td, textAlign: 'left', fontWeight: 700, color: 'var(--text2)', position: 'sticky', left: 30, zIndex: 10, background: 'inherit', fontSize: 10 }}>{b.personel?.gorev ?? '—'}</td>
-                            <td style={{ ...td, textAlign: 'left', fontWeight: 900, color: 'var(--text)', position: 'sticky', left: 130, zIndex: 10, background: 'inherit', fontSize: 13 }}>{b.personel?.ad ?? `#${b.personel_id}`}</td>
-                            <td style={{ ...td, textAlign: 'center', fontWeight: 700, color: 'var(--text3)', fontFamily: 'monospace', fontSize: 10 }}>{b.personel?.tc ?? '—'}</td>
-                            <td style={{ ...td, fontWeight: 700, color: 'var(--text)' }}>{b.toplam_saat}</td>
-                            <td style={{ ...td, fontWeight: 700, color: 'var(--text)' }}>{fmt(standartSaatUcreti > 0 ? standartSaatUcreti : (b.saat_ucreti || (b.toplam_saat > 0 ? (b.brut / b.toplam_saat) : 0)))}</td>
-                            <td style={{ ...td, fontWeight: 700, color: 'var(--text)' }}>{fmt(b.brut)}</td>
-                            <td style={{ ...td, color: 'var(--text)' }}>{fmt(b.gv_matrah)}</td>
-                            <td style={{ ...td, color: 'var(--text)' }}>{fmt(b.gv_oran * 100)}%</td>
-                            <td style={{ ...td, color: 'var(--text)', opacity: 0.8 }}>{fmt(b.gv_hesaplanan)}</td>
-                            <td style={{ ...td, color: 'var(--text)' }}>{fmt(b.gv_istisna_tutari)}</td>
-                            <td style={{ ...td, fontWeight: 700, color: 'var(--text)' }}>{fmt(b.gv_tutar)}</td>
-                            <td style={{ ...td, color: 'var(--text)', opacity: 0.8 }}>{fmt(b.dv_hesaplanan)}</td>
-                            <td style={{ ...td, color: 'var(--text)' }}>{fmt(b.dv_istisna_tutari || 0)}</td>
-                            <td style={{ ...td, fontWeight: 700, color: 'var(--text)' }}>{fmt(b.damga_tutar)}</td>
-                            <td style={{ ...td, color: 'var(--text)' }}>{b.personel?.sgk_li ? fmt(b.sgk_kisi) : '—'}</td>
-                            <td style={{ ...td, color: 'var(--text)' }}>{b.personel?.sgk_li ? fmt(b.sgk_issizlik_kisi) : '—'}</td>
-                            <td style={{ ...td, fontWeight: 800, color: 'var(--text)' }}>{fmt(b.toplam_kesinti)}</td>
-                            <td style={{ ...td, fontWeight: 900, color: 'var(--text)', background: 'var(--surface2)', borderLeft: '2px solid var(--accent)' }}>{fmt(b.net)}</td>
-                            {/* İşveren SGK Detayları */}
-                            <td style={{ ...td, color: 'var(--text)', fontSize: 11 }}>{b.personel?.sgk_li ? fmt(b.brut * 0.0225) : '—'}</td>
-                            <td style={{ ...td, color: 'var(--text)', fontSize: 11 }}>{b.personel?.sgk_li ? fmt(b.brut * 0.20) : '—'}</td>
-                            <td style={{ ...td, color: 'var(--text)', fontSize: 11 }}>{b.personel?.sgk_li ? fmt(b.brut * 0.125) : '—'}</td>
-                            <td style={{ ...td, color: 'var(--text)', fontSize: 11 }}>{b.personel?.sgk_li ? fmt(b.brut * 0.03) : '—'}</td>
-                            <td style={{ ...td, fontWeight: 800, color: 'var(--text)', borderRight: 'none', fontSize: 12 }}>{b.personel?.sgk_li ? fmt(b.sgk_isveren) : '—'}</td>
-                          </tr>
-                        ))
-                      })()}
-                      {/* GENEL TOPLAM SATIRI */}
-                      <tr style={{ background: 'var(--accent-lighter)', borderTop: '3px solid var(--accent)', borderBottom: '2px solid var(--border)', position: 'sticky', bottom: 0, zIndex: 30, boxShadow: '0 -4px 10px rgba(0,0,0,0.05)' }}>
-                        <td colSpan={4} style={{ ...td, textAlign: 'right', fontWeight: 800, color: 'var(--accent)', background: 'inherit', fontSize: 10, position: 'sticky', left: 0, zIndex: 30 }}>GENEL TOPLAM</td>
-                        <td style={{ ...td, fontWeight: 800, color: 'var(--text)', background: 'inherit', fontSize: 12 }}>{sum(satirlar, 'toplam_saat')}</td>
-                        <td style={{ ...td, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 12 }}>—</td>
-                        <td style={{ ...td, fontWeight: 800, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 12 }}>{fmt(sum(satirlar, 'brut'))}</td>
-                        <td style={{ ...td, fontWeight: 900, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 12 }}>{fmt(sum(satirlar, 'gv_matrah'))}</td>
-                        <td style={{ ...td, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 12 }}>—</td>
-                        <td style={{ ...td, fontWeight: 800, color: 'var(--text)', opacity: 0.8, background: 'var(--accent-lighter)', fontSize: 11 }}>{fmt(sum(satirlar, 'gv_hesaplanan'))}</td>
-                        <td style={{ ...td, fontWeight: 800, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 12 }}>{fmt(sum(satirlar, 'gv_istisna_tutari'))}</td>
-                        <td style={{ ...td, fontWeight: 800, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 12 }}>{fmt(sum(satirlar, 'gv_tutar'))}</td>
-                        <td style={{ ...td, fontWeight: 900, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 12 }}>{fmt(sum(satirlar, 'dv_hesaplanan'))}</td>
-                        <td style={{ ...td, fontWeight: 800, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 12 }}>{fmt(sum(satirlar, 'dv_istisna_tutari'))}</td>
-                        <td style={{ ...td, fontWeight: 800, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 12 }}>{fmt(sum(satirlar, 'damga_tutar'))}</td>
-                        <td style={{ ...td, fontWeight: 800, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 12 }}>{fmt(sum(satirlar, 'sgk_kisi'))}</td>
-                        <td style={{ ...td, fontWeight: 800, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 12 }}>{fmt(sum(satirlar, 'sgk_issizlik_kisi'))}</td>
-                        <td style={{ ...td, fontWeight: 800, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 12 }}>{fmt(sum(satirlar, 'toplam_kesinti'))}</td>
-                        <td style={{ ...td, fontWeight: 900, color: 'var(--accent)', background: 'var(--accent-lighter)', fontSize: 16 }}>{fmt(sum(satirlar, 'net'))}</td>
-                        {/* İşveren Toplamları */}
-                        <td style={{ ...td, fontWeight: 800, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 13 }}>{fmt(satirlar.reduce((s, b) => s + (b.personel?.sgk_li ? b.brut * 0.0225 : 0), 0))}</td>
-                        <td style={{ ...td, fontWeight: 800, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 13 }}>{fmt(satirlar.reduce((s, b) => s + (b.personel?.sgk_li ? b.brut * 0.20 : 0), 0))}</td>
-                        <td style={{ ...td, fontWeight: 800, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 13 }}>{fmt(satirlar.reduce((s, b) => s + (b.personel?.sgk_li ? b.brut * 0.125 : 0), 0))}</td>
-                        <td style={{ ...td, fontWeight: 800, color: 'var(--text)', background: 'var(--accent-lighter)', fontSize: 13 }}>{fmt(satirlar.reduce((s, b) => s + (b.personel?.sgk_li ? b.brut * 0.03 : 0), 0))}</td>
-                        <td style={{ ...td, fontWeight: 900, color: 'var(--text)', borderRight: 'none', background: 'var(--accent-lighter)', fontSize: 14 }}>{fmt(sum(satirlar, 'sgk_isveren'))}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        {aktifVeri === 'bordro' && <BordroInceleme satirlar={satirlar} yukleniyor={yukleniyor} bilVeri={bilVeri} />}
 
         {/* BİLANÇO GÖRÜNÜMÜ */}
         {aktifVeri === 'bilanco' && (
@@ -1078,254 +884,3 @@ export default function DenetimPage() {
 }
 
 // --- YARDIMCI BİLEŞENLER VE STİLLER ---
-
-
-const loadingOverlay: React.CSSProperties = { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(245,242,236,0.5)', backdropFilter: 'blur(2px)' }
-const emptyView: React.CSSProperties = { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }
-
-const thSub: React.CSSProperties = {
-  padding: '10px 1px', fontSize: 9, letterSpacing: 0, textTransform: 'uppercase',
-  whiteSpace: 'pre-line', lineHeight: 1.2, borderRight: '1px solid var(--border-light)',
-  background: 'var(--surface2)', color: 'var(--text2)', fontWeight: 700
-}
-
-// ── Bilanço İçerik Bileşeni ───────────────────────────────────
-function BilancoIcerik({ veri, ay, yil, okulAd }: { veri: BilancoVerisi; ay: number; yil: number; okulAd: string }) {
-  const { ayarlar, toplamGelir, ogrenciSayisi, subeSayisi, toplamDersSaati, tatiller } = veri
-
-  const isGunu    = isGunuSayisi(yil, ay, tatiller)
-  const sonGun    = gunSayisi(yil, ay)
-  const bKatsayi  = ayarlar.katsayi || 0
-  const bGosterge = ayarlar.gosterge || 140
-  const bGunlukSt = ayarlar.gunluk_saat || 6
-  const bToplamSt = toplamDersSaati > 0 ? toplamDersSaati : (isGunu * bGunlukSt)
-
-  const bEnAz          = Math.round(((bKatsayi * bGosterge) / 6) * 100) / 100
-  const bEnCok         = Math.round(((bKatsayi * bGosterge) / 3) * 100) / 100
-  const bEnYuksekMemur = Math.round((9500 * bKatsayi) * 100) / 100
-
-  const effectiveAyarlar: Ayarlar = {
-    ...ayarlar,
-    tavan_katsayi:       ayarlar.tavan_katsayi       || bEnYuksekMemur,
-    dagitim_temel_gider: ayarlar.dagitim_temel_gider ?? 26,
-    dagitim_ogretmen:    ayarlar.dagitim_ogretmen    ?? 55,
-    dagitim_baskan:      ayarlar.dagitim_baskan      ?? 7,
-    dagitim_baskan_yrd:  ayarlar.dagitim_baskan_yrd  ?? 5,
-    dagitim_muhasebe:    ayarlar.dagitim_muhasebe    ?? 2,
-    dagitim_temizlik:    ayarlar.dagitim_temizlik    ?? 4,
-    dagitim_denetim:     ayarlar.dagitim_denetim     ?? 1,
-  }
-  const activeCategories = detectActiveCategories(veri.personel || [], veri.puantaj || [], veri.bordro || [])
-  const dagitim      = toplamGelir > 0 ? tahakkukDagitimHesapla(toplamGelir, effectiveAyarlar, activeCategories) : null
-  const tavanKatsayi = effectiveAyarlar.tavan_katsayi!
-
-  const tahakkukSatirlari = [
-    { label: 'Temel Giderler (Materyal, Beslenme, SGK Primi, Diğer Giderler)', yuzde: dagitim?.pct_temel_gider ?? effectiveAyarlar.dagitim_temel_gider!, tutar: dagitim?.temel_gider || 0 },
-    { label: 'Kulüp Yönetim Kurulu Başkanı (Müdür)',                           yuzde: dagitim?.pct_baskan ?? effectiveAyarlar.dagitim_baskan!,      tutar: dagitim?.baskan || 0 },
-    { label: 'Kulüp Yönetim Kurulu Üyesi (Müdür Yardımcısı)',                 yuzde: dagitim?.pct_baskan_yrd ?? effectiveAyarlar.dagitim_baskan_yrd!,  tutar: dagitim?.baskan_yrd || 0 },
-    { label: 'Koordinatör Öğretmen, Öğretmen, Usta Öğretici',                  yuzde: dagitim?.pct_ogretmen ?? effectiveAyarlar.dagitim_ogretmen!,    tutar: dagitim?.ogretmen_havuzu || 0 },
-    { label: 'Yazışma-Muhasebe İşlerini Yürüten Personel',                     yuzde: dagitim?.pct_muhasebe ?? effectiveAyarlar.dagitim_muhasebe!,    tutar: dagitim?.muhasebe || 0 },
-    { label: 'Temizlik Bakım ve Beslenme İşlerini Yürüten Personel',           yuzde: dagitim?.pct_temizlik ?? effectiveAyarlar.dagitim_temizlik!,    tutar: dagitim?.temizlik || 0 },
-    { label: 'Denetim Yetkilisi',                                               yuzde: dagitim?.pct_denetim ?? effectiveAyarlar.dagitim_denetim!,     tutar: dagitim?.denetim || 0 },
-  ]
-
-  const tavanHesaplari = TAVAN_KATEGORILER.map(kat => {
-    const brut = tavanHesapla(kat.gorev, tavanKatsayi, kat.sgkLi)
-    const yuzde = gorevTavanYuzdesi(kat.gorev, kat.sgkLi)
-    
-    let net = brut
-    if (kat.gorev.toLowerCase().includes('denetim')) {
-      net = brut
-    } else {
-      const sonuc = bordroHesapla(
-        effectiveAyarlar,
-        0, // hours
-        0, // cumulative matrah
-        !!kat.sgkLi,
-        !!(kat as any).isRetired,
-        kat.gorev,
-        brut,
-        true // vergiIstisnasi
-      )
-      net = sonuc.net
-    }
-    
-    return { ...kat, yuzde, brut, net }
-  })
-
-  const thS: React.CSSProperties = { fontSize: 10, padding: '12px 16px', background: 'var(--surface2)', border: '1px solid var(--border)', fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase' }
-  const tdS: React.CSSProperties = { fontSize: 13, padding: '12px 16px', border: '1px solid var(--border)', color: 'var(--text)', background: 'var(--surface)' }
-  const tdR: React.CSSProperties = { ...tdS, textAlign: 'right' }
-  const tdC: React.CSSProperties = { ...tdS, textAlign: 'center' }
-
-  return (
-    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-      {/* Başlık */}
-      <div style={{ textAlign: 'center', marginBottom: 40 }}>
-        <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', letterSpacing: -0.5, fontFamily: 'var(--font-display)' }}>
-          {ayarlar.kurum_adi || okulAd}
-        </div>
-        <div style={{ fontSize: 15, color: 'var(--text3)', marginTop: 8, fontWeight: 500 }}>
-          01 {AY_ADI[ay]} {yil} – {sonGun} {AY_ADI[ay]} {yil} Tarihleri Arası Çocuk Kulübü Bilançosu
-        </div>
-      </div>
-
-      {/* Parametreler tablosu */}
-      <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)', boxShadow: '0 5px 15px rgba(0,0,0,0.05)', background: 'var(--surface)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
-          <tbody>
-            <tr>
-              <th style={{...thS, fontSize: 9}}>AYLIKLAR İÇİN BELİRLENEN KATSAYI</th>
-              <th style={{...thS, fontSize: 9}}>GÜNDÜZ ÖĞRETİMİ GÖSTERGESİ</th>
-              <th style={{...thS, fontSize: 9}}>EN AZ SAAT ÜCRETİ</th>
-              <th style={{...thS, fontSize: 9}}>EN ÇOK SAAT ÜCRETİ</th>
-              <th style={{...thS, fontSize: 9}}>SAAT ÜCRETİ</th>
-              <th style={{...thS, fontSize: 9}}>EN YÜKSEK MEMUR BRÜTÜ</th>
-            </tr>
-            <tr>
-              <td style={tdC}>{bKatsayi.toFixed(6)}</td>
-              <td style={tdC}>{bGosterge}</td>
-              <td style={tdC}>{fmt(bEnAz)}</td>
-              <td style={tdC}>{fmt(bEnCok)}</td>
-              <td style={tdC}>{fmt(ayarlar.saat_ucreti)}</td>
-              <td style={{ ...tdC, color: 'var(--accent)', fontWeight: 800 }}>{fmtTL(bEnYuksekMemur)}</td>
-            </tr>
-            <tr>
-              <th style={{...thS, fontSize: 9}}>ÖĞRENCİ SAYISI</th>
-              <th style={{...thS, fontSize: 9}}>ŞUBE SAYISI</th>
-              <th style={{...thS, fontSize: 9}}>İŞ GÜNÜ SAYISI</th>
-              <th style={{...thS, fontSize: 9}}>GÜNLÜK DERS SAATİ</th>
-              <th style={{...thS, fontSize: 9}}>TOPLAM DERS SAATİ</th>
-              <th style={{...thS, fontSize: 9}}>TOPLAM TAHAKKUK</th>
-            </tr>
-            <tr>
-              <td style={tdC}>{ogrenciSayisi}</td>
-              <td style={tdC}>{subeSayisi}</td>
-              <td style={tdC}>{isGunu}</td>
-              <td style={tdC}>{bGunlukSt}</td>
-              <td style={tdC}>{bToplamSt}</td>
-              <td style={{ ...tdC, color: 'var(--accent2)', fontWeight: 800 }}>{fmtTL(toplamGelir)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Tahakkuk dağılım tablosu */}
-      <div style={{ marginBottom: 40, borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-        <div style={{ fontSize: 13, fontWeight: 700, background: 'var(--th-bg)', color: 'var(--th-fg)', padding: '14px 20px', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          Aylık Tahakkuk Dağılımı
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ ...thS, textAlign: 'left', background: 'var(--surface2)' }}>KATEGORİ</th>
-              <th style={{ ...thS, textAlign: 'center', width: 100, background: 'var(--surface2)' }}>ORAN</th>
-              <th style={{ ...thS, textAlign: 'right', width: 200, background: 'var(--surface2)' }}>TUTAR (TL)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tahakkukSatirlari.map((row, i) => (
-              <tr key={i} style={{ background: i % 2 === 0 ? 'var(--surface)' : 'var(--bg)' }}>
-                <td style={{ ...tdS, textAlign: 'left' }}>{row.label}</td>
-                <td style={{ ...tdC, color: 'var(--accent)', fontWeight: 700 }}>%{row.yuzde}</td>
-                <td style={{ ...tdR, fontWeight: 700, color: 'var(--text)' }}>{fmtTL(row.tutar)}</td>
-              </tr>
-            ))}
-            <tr style={{ background: 'var(--surface2)', borderTop: '2px solid var(--accent)' }}>
-              <td style={{ ...tdS, fontWeight: 800, color: 'var(--text)' }}>TOPLAM TAHAKKUK</td>
-              <td style={tdC}></td>
-              <td style={{ ...tdR, fontWeight: 800, fontSize: 16, color: 'var(--accent2)' }}>{fmtTL(toplamGelir)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Tavan tabloları */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginBottom: 48 }}>
-        <div style={{ borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-          <div style={{ fontSize: 11, fontWeight: 800, background: 'var(--surface2)', color: 'var(--text3)', padding: '12px 16px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)' }}>Harcama Tavanı (Net)</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr><th style={{...thS, padding: '10px 16px'}}>GÖREV</th><th style={{...thS, padding: '10px 16px'}}>ORAN</th><th style={{...thS, textAlign:'right', padding: '10px 16px'}}>NET (TL)</th></tr>
-            </thead>
-            <tbody>
-              {tavanHesaplari.map((kat, i) => (
-                <tr key={i} style={{ background: i % 2 === 0 ? 'var(--surface)' : 'var(--bg)' }}>
-                  <td style={{ ...tdS, fontSize: 12, padding: '10px 16px' }}>{kat.label}</td>
-                  <td style={{ ...tdC, color: 'var(--accent)', fontSize: 12, padding: '10px 16px' }}>%{kat.yuzde}</td>
-                  <td style={{ ...tdR, fontWeight: 700, fontSize: 12, padding: '10px 16px' }}>{fmtTL(kat.net)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div style={{ borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-          <div style={{ fontSize: 11, fontWeight: 800, background: 'var(--surface2)', color: 'var(--text3)', padding: '12px 16px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)' }}>Harcama Tavanı (Brüt)</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr><th style={{...thS, padding: '10px 16px', background: 'var(--surface2)'}}>GÖREV</th><th style={{...thS, padding: '10px 16px', background: 'var(--surface2)'}}>ORAN</th><th style={{...thS, textAlign:'right', padding: '10px 16px', background: 'var(--surface2)'}}>BRÜT (TL)</th></tr>
-            </thead>
-            <tbody>
-              {tavanHesaplari.map((kat, i) => (
-                <tr key={i} style={{ background: i % 2 === 0 ? 'var(--surface)' : 'var(--bg)' }}>
-                  <td style={{ ...tdS, fontSize: 12, padding: '10px 16px' }}>{kat.label}</td>
-                  <td style={{ ...tdC, color: 'var(--accent2)', fontSize: 12, padding: '10px 16px' }}>%{kat.yuzde}</td>
-                  <td style={{ ...tdR, fontWeight: 700, fontSize: 12, color: 'var(--accent2)', padding: '10px 16px' }}>{fmtTL(kat.brut)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* İmza Bloğu */}
-      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '48px 0', borderTop: '2px solid var(--border-light)' }}>
-        {[
-          { b: 'ÜYE (DÜZENLEYEN)', a: ayarlar.duzenleyen_adi || '—', u: ayarlar.duzenleyen_unvani || 'Müdür Yardımcısı' },
-          { b: 'BAŞKAN (ONAYLAYAN)',  a: ayarlar.mudur_adi || '—',      u: ayarlar.mudur_unvani || 'Okul Müdürü' },
-        ].map(i => (
-          <div key={i.b} style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text3)', marginBottom: 16, letterSpacing: 1 }}>{i.b}</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>{i.a}</div>
-            <div style={{ fontSize: 13, color: 'var(--text3)', marginTop: 4, fontWeight: 500 }}>{i.u}</div>
-            <div style={{ marginTop: 40, width: 200, borderBottom: '1.5px solid var(--border)', margin: '0 auto' }}></div>
-            <div style={{ fontSize: 11, marginTop: 8, color: 'var(--text3)', fontWeight: 600 }}>İmza / Mühür</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ── Sınıf & Stil Sabitleri ────────────────────────────────────
-const actionBtn: React.CSSProperties = {
-  background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
-  padding: '7px 8px', cursor: 'pointer', color: 'var(--text2)',
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  flexShrink: 0, transition: 'all 0.15s',
-  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-}
-const thGrup: React.CSSProperties = {
-  padding: '12px 2px', textAlign: 'center', fontSize: 9,
-  fontWeight: 800, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0,
-  borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border-light)',
-  background: 'var(--surface2)', lineHeight: 1.4,
-}
-const td: React.CSSProperties = {
-  padding: '12px 4px', textAlign: 'right', fontSize: 12,
-  color: 'var(--text2)', borderRight: '1px solid var(--border-light)',
-  whiteSpace: 'nowrap', lineHeight: 1.4
-}
-
-function dpTh(w: number): React.CSSProperties {
-  return {
-    padding: '6px 2px', color: 'var(--th-fg)', fontWeight: 700, fontSize: 9,
-    border: '1px solid var(--th-border)', textAlign: 'center',
-    width: w, minWidth: w, boxSizing: 'border-box', verticalAlign: 'middle', lineHeight: 1.2,
-  }
-}
-const dpTd: React.CSSProperties = {
-  padding: '4px 2px', border: '1px solid var(--border-light)',
-  fontSize: 9, verticalAlign: 'middle', minWidth: 52, height: 40,
-}
-

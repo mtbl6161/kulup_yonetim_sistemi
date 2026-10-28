@@ -3,38 +3,16 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
-import { fmtTL, ayLabel, isGunuSayisi, tarihFmt, tatilMi, RESMI_TATILLER } from '@/lib/hesaplama'
-import { Ogrenci, Tahsilat, HesapHareketi, Ayarlar, Personel, kulupOgrencisi } from '@/lib/types'
+import { ayLabel, isGunuSayisi, tatilMi, RESMI_TATILLER } from '@/lib/hesaplama'
+import { Ogrenci, Tahsilat, HesapHareketi, Ayarlar, Personel, kulupOgrencisi, Sinif, Bordro, Puantaj, Tatil } from '@/lib/types'
 import Link from 'next/link'
 
 import { useAuth } from '@/lib/AuthContext'
+import { uyari } from '@/lib/diyalog'
 import {
-  Users,
-  Wallet,
-  TrendingUp,
-  CheckCircle2,
-  AlertCircle,
-  PlusCircle,
-  ArrowRightCircle,
-  Settings,
-  FileText,
-  Clock,
-  PieChart,
-  UserCheck,
-  AlertTriangle,
-  User,
-  XCircle,
-  Megaphone,
-  Bell,
-  Calendar,
-  GraduationCap,
-  ArrowUpRight,
-  Activity,
-  Target,
-  ShieldCheck,
-  Search,
-  Info
+  TrendingUp, CheckCircle2, PlusCircle, Settings, FileText, Clock, UserCheck, AlertTriangle, Megaphone, GraduationCap, ShieldCheck, Search, Info,
 } from 'lucide-react'
+import { useYukleme } from '@/lib/useYukleme'
 
 // Saat kendi bileşeninde güncellenir: tüm panel her saniye yeniden çizilmesin
 function Saat() {
@@ -46,6 +24,18 @@ function Saat() {
   return <>{t.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</>
 }
 
+function Banner({ color, bg, border, icon, title, children, action }: { color: string; bg: string; border: string; icon: React.ReactNode; title: string; children?: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px', borderRadius: 8, background: bg, border: `1px solid ${border}`, flexWrap: 'wrap' }}>
+      <span style={{ color, display: 'flex', flexShrink: 0 }}>{icon}</span>
+      <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: 'var(--text2)', lineHeight: 1.45 }}>
+        <strong style={{ color: 'var(--text)', fontWeight: 600 }}>{title}</strong>{children ? <> {children}</> : null}
+      </div>
+      {action}
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const { ay, yil } = useAy()
   const { okul, profil, session } = useAuth()
@@ -54,13 +44,13 @@ export default function DashboardPage() {
   const [prevTahsilatlar, setPrevTahsilatlar] = useState<Tahsilat[]>([])
   const [hareketler, setHareketler] = useState<HesapHareketi[]>([])
   const [ayarlar, setAyarlar] = useState<Ayarlar | null>(null)
-  const [duyuru, setDuyuru] = useState<any>(null)
+  const [duyuru, setDuyuru] = useState<{ baslik: string; icerik: string; tur: 'info' | 'warning' | 'danger' | string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [personel, setPersonel] = useState<Personel[]>([])
-  const [siniflar, setSiniflar] = useState<any[]>([])
-  const [bordrolar, setBordrolar] = useState<any[]>([])
-  const [puantajlar, setPuantajlar] = useState<any[]>([])
-  const [tatiller, setTatiller] = useState<any[]>([])
+  const [siniflar, setSiniflar] = useState<Pick<Sinif, 'kapasite'>[]>([])
+  const [bordrolar, setBordrolar] = useState<Pick<Bordro, 'personel_id' | 'odendi'>[]>([])
+  const [puantajlar, setPuantajlar] = useState<Pick<Puantaj, 'personel_id' | 'tarih' | 'saat'>[]>([])
+  const [tatiller, setTatiller] = useState<Tatil[]>([])
   const [searchQuery, setSearchQuery] = useState('')
 
   // Denetçi Durumu State
@@ -109,7 +99,7 @@ export default function DashboardPage() {
       supabase.from('bordro').select('personel_id,odendi').eq('ay', ay).eq('yil', yil).eq('okul_id', okul?.id)
     ])
 
-    let pua: any[] = []
+    let pua: Pick<Puantaj, 'personel_id' | 'tarih' | 'saat'>[] = []
     if (per && per.length > 0) {
       const { data } = await supabase.from('puantaj')
         .select('personel_id,tarih,saat')
@@ -194,7 +184,7 @@ export default function DashboardPage() {
   async function handleTalepGonder(e: React.FormEvent) {
     e.preventDefault()
     if (!talepForm.il_id) {
-      alert('Lütfen ilinizi seçin.')
+      uyari('Lütfen ilinizi seçin.')
       return
     }
     setTalepGonderiliyor(true)
@@ -212,21 +202,21 @@ export default function DashboardPage() {
         setShowDenetciModal(false)
         setDenetciDurumu('beklemede')
       } else {
-        alert(body.error || 'Talep gönderilirken bir hata oluştu.')
+        uyari(body.error || 'Talep gönderilirken bir hata oluştu.')
       }
     } catch {
-      alert('Talep gönderilirken bir hata oluştu.')
+      uyari('Talep gönderilirken bir hata oluştu.')
     } finally {
       setTalepGonderiliyor(false)
     }
   }
 
-  useEffect(() => {
+  useYukleme(() => {
     loadData()
     loadDuyuru()
   }, [loadData, loadDuyuru])
 
-  useEffect(() => {
+  useYukleme(() => {
     if (session?.access_token) checkDenetciDurumu(session.access_token)
   }, [session?.access_token, checkDenetciDurumu])
 
@@ -369,16 +359,6 @@ export default function DashboardPage() {
   const tone = (t: string) => t === 'danger' || t === 'alert' ? 'var(--danger)' : t === 'warning' || t === 'warn' ? 'var(--warn)' : 'var(--accent)'
 
   // Üst şerit bildirimleri: tek satır, sakin
-  const Banner = ({ color, bg, border, icon, title, children, action }: { color: string; bg: string; border: string; icon: React.ReactNode; title: string; children?: React.ReactNode; action?: React.ReactNode }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px', borderRadius: 8, background: bg, border: `1px solid ${border}`, flexWrap: 'wrap' }}>
-      <span style={{ color, display: 'flex', flexShrink: 0 }}>{icon}</span>
-      <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: 'var(--text2)', lineHeight: 1.45 }}>
-        <strong style={{ color: 'var(--text)', fontWeight: 600 }}>{title}</strong>{children ? <> {children}</> : null}
-      </div>
-      {action}
-    </div>
-  )
-
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', padding: '24px 32px 40px' }}>
       <div style={{ maxWidth: 1440, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>

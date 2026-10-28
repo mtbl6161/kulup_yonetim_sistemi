@@ -1,8 +1,9 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { DenetimMadde, MaddeTip, OtomatikKod, OTOMATIK_KODLAR } from '@/lib/denetimDosyasi'
 import { Plus, Save } from 'lucide-react'
+import { useYukleme } from '@/lib/useYukleme'
 
 const kutu: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }
 const th: React.CSSProperties = { padding: '10px 12px', fontSize: 11, fontWeight: 800, color: 'var(--text3)', textAlign: 'left', textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }
@@ -28,7 +29,7 @@ export function DenetimMaddeEditor({ ilId }: { ilId: number }) {
     setSatirlar((data || []) as Taslak[])
   }, [ilId])
 
-  useEffect(() => { load() }, [load])
+  useYukleme(load)
 
   function degistir(i: number, alan: keyof Taslak, deger: unknown) {
     setSatirlar(s => s.map((r, j) => {

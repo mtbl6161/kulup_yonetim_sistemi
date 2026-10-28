@@ -2,124 +2,25 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
-import { pdfHazirla, pdfBaslik, pdfTablo, pdfAc, PDF_RENK, PDF_KENAR } from '@/lib/pdf'
+import { pdfHazirla, pdfBaslik, pdfTablo, pdfAc, PDF_RENK } from '@/lib/pdf'
+import type { CellHookData } from '@/lib/pdf'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { ayLabel, fmtTL, AYLAR } from '@/lib/hesaplama'
-import { TahsilatKategori, TahsilatKategoriTip, TahsilatVeriKaynagi, TahsilatKapsam, TahsilatKaydi, TahsilatTaksitPlani, Ogrenci, Ayarlar, kulupOgrencisi, Birim, birimKurumAdi } from '@/lib/types'
+import { ayLabel, fmtTL } from '@/lib/hesaplama'
+import { TahsilatKategori, TahsilatVeriKaynagi, TahsilatKaydi, TahsilatTaksitPlani, Ogrenci, Ayarlar, kulupOgrencisi, Birim, birimKurumAdi } from '@/lib/types'
 import ConfirmModal from '@/components/ConfirmModal'
 import { sayiCoz } from '@/components/SayiInput'
 import { taksitAcilabilir, taksitKey, anaDonem, esitBol, aylikVadeler, fmtVade, MAX_TAKSIT } from '@/lib/taksit'
-import { ClipboardList, Plus, Pencil, Trash2, Users, CalendarRange, CalendarDays, Ticket, RefreshCw, Search, X, Grid3x3, FolderCog, Check, FileWarning, Download, Layers, AlertTriangle } from 'lucide-react'
+import { ClipboardList, Plus, Pencil, Trash2, Users, RefreshCw, X, Grid3x3, FolderCog, Check, FileWarning, Download, Layers, AlertTriangle } from 'lucide-react'
+import { hataMesaji } from '@/lib/hata'
+import { useYukleme } from '@/lib/useYukleme'
+import { useDegisince } from '@/lib/useDegisince'
+import { TIP_LABELS, TIP_ICON, FormState, BOS_FORM, PlanForm, TurFiltre, ucretBul, kapsamOgrencileri, planDurumu, turUygun, aramaUygun, AramaKutusu, Donem, donemGeldi, bugunISO, sayiYaz, hesaplaDonemler, badge, popKonum, overlay, modalCard, emptyBox, thStyle, tdStyle, statBox, statLabel, statVal, statAlt, TurRozet } from './yardimcilar'
+import KategoriModal from '@/app/tahsilat-takip/KategoriModal'
 
-const TIP_LABELS: Record<TahsilatKategoriTip, string> = {
-  aylik: 'Aylık', donemlik: 'Dönemlik', tek_seferlik: 'Tek Seferlik',
-}
-const TIP_ICON: Record<TahsilatKategoriTip, React.ReactNode> = {
-  aylik: <CalendarDays size={13} />, donemlik: <CalendarRange size={13} />, tek_seferlik: <Ticket size={13} />,
-}
-
-interface FormState {
-  ad: string
-  tip: TahsilatKategoriTip
-  veri_kaynagi: TahsilatVeriKaynagi
-  kapsam: TahsilatKapsam
-  varsayilan_tutar: string       // kulüp öğrencisi ücreti
-  varsayilan_tutar_okul: string  // okul öğrencisi ücreti
-}
-const BOS_FORM: FormState = { ad: '', tip: 'aylik', veri_kaynagi: 'manuel', kapsam: 'tumu', varsayilan_tutar: '', varsayilan_tutar_okul: '' }
-
-/** Taksit planı formu (öğrenci × dönem) */
-interface PlanForm {
-  o: Ogrenci
-  d: Donem
-  planId: number | null
-  odenenNo: number[]     // ödenmiş taksit numaraları (düzenlemede korunur)
-  toplam: string
-  adet: number
-  ilkVade: string
-  vadeler: string[]
-  tutarlar: string[]
-  aciklama: string
-}
-
-type TurFiltre = 'hepsi' | 'kulup' | 'okul'
-
-/** Öğrencinin türüne göre kategorinin varsayılan ücreti (okul ücreti boşsa kulüp ücreti kullanılır) */
-function ucretBul(k: TahsilatKategori, o: Ogrenci): number | null {
-  const v = kulupOgrencisi(o) ? k.varsayilan_tutar : (k.varsayilan_tutar_okul ?? k.varsayilan_tutar)
-  return v != null ? Number(v) : null
-}
-
-/** Kategoriye dahil öğrenciler — otomatik (kulüp aidatı) kategorisi yalnız kulüp öğrencilerini kapsar */
-function kapsamOgrencileri(k: TahsilatKategori, ogrenciler: Ogrenci[], uyelikler: { kategori_id: number; ogrenci_id: number }[]): Ogrenci[] {
-  if (k.veri_kaynagi === 'otomatik_kulup') return ogrenciler.filter(kulupOgrencisi)
-  if (k.kapsam === 'tumu') return ogrenciler
-  const set = new Set(uyelikler.filter(u => u.kategori_id === k.id).map(u => u.ogrenci_id))
-  return ogrenciler.filter(o => set.has(o.id))
-}
-
-/** Taksit planının durumu — bul: dönem anahtarına ('-/T2') göre öğrencinin kaydını döndürür */
-function planDurumu(p: TahsilatTaksitPlani, bul: (donemKey: string) => TahsilatKaydi | undefined, bugun: string) {
-  const taksitler = p.vadeler.map((vade, i) => {
-    const kayit = bul(taksitKey(p.donem, i + 1))
-    return { no: i + 1, vade, tutar: Number(p.tutarlar[i]) || 0, kayit, gecikti: !kayit && vade < bugun }
-  })
-  const odenen = taksitler.filter(t => t.kayit)
-  return {
-    taksitler,
-    adet: taksitler.length,
-    odenenAdet: odenen.length,
-    odenenTutar: odenen.reduce((s, t) => s + (t.kayit!.tutar != null ? Number(t.kayit!.tutar) : t.tutar), 0),
-    toplam: taksitler.reduce((s, t) => s + t.tutar, 0),
-    geciken: taksitler.filter(t => t.gecikti).length,
-    sonrakiVade: taksitler.find(t => !t.kayit)?.vade || null,
-  }
-}
-
-function turUygun(o: Ogrenci, f: TurFiltre) {
-  return f === 'hepsi' || (f === 'kulup') === kulupOgrencisi(o)
-}
-
-/** Ad, soyad (her iki sırada), sınıf veya kimlik no içinde arar — Türkçe büyük/küçük harf duyarsız */
-function aramaUygun(o: Ogrenci, arama: string) {
-  const q = arama.toLocaleLowerCase('tr').trim()
-  if (!q) return true
-  return [`${o.ad} ${o.soyad}`, `${o.soyad} ${o.ad}`, o.sinif || '', o.tc || '']
-    .some(s => s.toLocaleLowerCase('tr').includes(q))
-}
-
-/** Arama kutusu — harf girildikçe liste süzülür */
-function AramaKutusu({ value, onChange, sonuc }: { value: string; onChange: (v: string) => void; sonuc?: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
-        <Search size={15} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />
-        <input className="form-input" value={value} onChange={e => onChange(e.target.value)} placeholder="Öğrenci ara (ad, soyad, sınıf, kimlik no)..." style={{ paddingLeft: 34, paddingRight: value ? 32 : undefined, width: '100%' }} />
-        {value && (
-          <button type="button" onClick={() => onChange('')} title="Aramayı temizle" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', display: 'flex', padding: 4 }}>
-            <X size={14} />
-          </button>
-        )}
-      </div>
-      {value && sonuc && <span style={{ fontSize: 12, color: 'var(--text3)' }}>{sonuc}</span>}
-    </div>
-  )
-}
-
-interface Donem { key: string; label: string; kisa: string }
-
-/** Dönem bugüne kadar başladı mı? Aylık: o ayın 1'i · 1. dönem: 1 Eylül · 2. dönem: 1 Şubat · tek seferlik: her zaman */
-function donemGeldi(key: string, bugun: string): boolean {
-  if (key === '-') return true
-  const [y, p] = key.split('-')
-  const baslangic = p === 'D1' ? `${y}-09-01` : p === 'D2' ? `${Number(y) + 1}-02-01` : `${y}-${p}-01`
-  return baslangic <= bugun
-}
-
-const bugunISO = () => new Date().toISOString().split('T')[0]
-/** Sayıyı kutuya Türkçe yazımla koyar (1500.5 → "1500,5") — sayiCoz ile geri okunur */
-const sayiYaz = (n: number | string | null | undefined) => n == null || n === '' ? '' : String(n).replace('.', ',')
+// İyimser güncellemelerde sunucu kimliği gelene kadar kullanılan geçici negatif kimlik
+let geciciSayac = 0
+const geciciId = () => --geciciSayac
 
 export default function TahsilatTakip({ birim }: { birim: Birim }) {
   const { ay, yil } = useAy()
@@ -163,7 +64,19 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
   const [planMsg, setPlanMsg] = useState('')
   const [taksitPop, setTaksitPop] = useState<{ o: Ogrenci; d: Donem; rect: DOMRect } | null>(null)
   const [planSilOnay, setPlanSilOnay] = useState<TahsilatTaksitPlani | null>(null)
-  const bugun = bugunISO()
+  const [bugun] = useState(bugunISO) // sayfa açıkken sabit; her çizimde yeniden hesaplanmaz
+
+  // Ödeme durumu raporu (state burada; hesaplar raporun bölümünde)
+  const [rKategoriId, setRKategoriId] = useState<number | null>(null)
+  const [rDonem, setRDonem] = useState<string>('')
+  const [rSinif, setRSinif] = useState<string>('')
+  const [rDurum, setRDurum] = useState<'hepsi' | 'odeyen' | 'odemeyen' | 'geciken'>('hepsi')
+  const [rArama, setRArama] = useState('')
+  // Seçili kategori+dönemin kayıtları (peşin + taksit) ve taksit planları
+  const [rKayitlar, setRKayitlar] = useState<TahsilatKaydi[]>([])
+  const [rPlanlar, setRPlanlar] = useState<TahsilatTaksitPlani[]>([])
+  const [rLoading, setRLoading] = useState(false)
+  const [pdfMsg, setPdfMsg] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -183,7 +96,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
     setLoading(false)
   }, [birim])
 
-  useEffect(() => { load() }, [load])
+  useYukleme(load)
 
   const seciliKategori = useMemo(() => kategoriler.find(k => k.id === seciliKategoriId) || null, [kategoriler, seciliKategoriId])
 
@@ -219,11 +132,10 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
     setKayitLoading(false)
   }, [])
 
-  useEffect(() => {
+  useYukleme(() => {
     if (!seciliKategori) { setKayitlar([]); return }
     if (seciliKategori.veri_kaynagi === 'otomatik_kulup') loadKulupTahsilat(seciliKategori.id, egitimYili)
     else loadKayitlar(seciliKategori.id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seciliKategoriId, seciliKategori?.veri_kaynagi, egitimYili])
 
   function bilgi(text: string, sure = 3000) { setMsg(text); if (sure) setTimeout(() => setMsg(''), sure) }
@@ -319,7 +231,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
     if (!okulId) return
     const donem = taksitKey(p.donem, no)
     const tutar = Number(p.tutarlar[no - 1]) || null
-    const optimistik: TahsilatKaydi = { id: -Date.now(), kategori_id: p.kategori_id, ogrenci_id: p.ogrenci_id, donem, tutar, tarih: bugun }
+    const optimistik: TahsilatKaydi = { id: geciciId(), kategori_id: p.kategori_id, ogrenci_id: p.ogrenci_id, donem, tutar, tarih: bugun }
     setKayitlar(prev => [...prev, optimistik])
     const { data, error } = await supabase.from('tahsilat_kayitlari')
       .insert({ kategori_id: p.kategori_id, ogrenci_id: p.ogrenci_id, donem, tutar, tarih: bugun, okul_id: okulId })
@@ -344,7 +256,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
     const ogrenciId = o.id
     const donem = d.key
     const tutar = ucretBul(seciliKategori, o)
-    const optimistik: TahsilatKaydi = { id: -Date.now(), kategori_id: seciliKategori.id, ogrenci_id: ogrenciId, donem, tutar, tarih: bugunISO() }
+    const optimistik: TahsilatKaydi = { id: geciciId(), kategori_id: seciliKategori.id, ogrenci_id: ogrenciId, donem, tutar, tarih: bugunISO() }
     setKayitlar(prev => [...prev, optimistik])
     const { data, error } = await supabase.from('tahsilat_kayitlari')
       .insert({ kategori_id: seciliKategori.id, ogrenci_id: ogrenciId, donem, tutar, tarih: bugunISO(), okul_id: okulId })
@@ -441,8 +353,8 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
       bilgi(editId ? '✅ Kategori güncellendi.' : '✅ Kategori eklendi.')
       if (!editId && katId) setSeciliKategoriId(katId)
       load()
-    } catch (err: any) {
-      bilgi('❌ Kayıt hatası: ' + (err.message || 'Bilinmiyor'), 5000)
+    } catch (err) {
+      bilgi('❌ Kayıt hatası: ' + (hataMesaji(err, 'Bilinmiyor')), 5000)
     } finally { setSaving(false) }
   }
 
@@ -511,17 +423,6 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
     return { kulupTutar, okulTutar, toplamTutar, kulupSayi, okulSayi: uyeOgrenciler.length - kulupSayi, beklenen, kalan, ucretTanimli, geciken, gecikenOgrenci: gecikenOgrenci.size, planli }
   }, [kayitlar, donemler, uyeOgrenciler, seciliKategori, saltOkunur, kayitMap, planMap, bugun])
 
-  // ───────── ÖDEME DURUMU RAPORU ─────────
-  const [rKategoriId, setRKategoriId] = useState<number | null>(null)
-  const [rDonem, setRDonem] = useState<string>('')
-  const [rSinif, setRSinif] = useState<string>('')
-  const [rDurum, setRDurum] = useState<'hepsi' | 'odeyen' | 'odemeyen' | 'geciken'>('hepsi')
-  const [rArama, setRArama] = useState('')
-  // Seçili kategori+dönemin kayıtları (peşin + taksit) ve taksit planları
-  const [rKayitlar, setRKayitlar] = useState<TahsilatKaydi[]>([])
-  const [rPlanlar, setRPlanlar] = useState<TahsilatTaksitPlani[]>([])
-  const [rLoading, setRLoading] = useState(false)
-  const [pdfMsg, setPdfMsg] = useState('')
 
   const rKategori = useMemo(() => kategoriler.find(k => k.id === rKategoriId) || null, [kategoriler, rKategoriId])
   const rDonemler = useMemo(() => hesaplaDonemler(rKategori, egitimYili), [rKategori, egitimYili])
@@ -529,17 +430,16 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
   const siniflar = useMemo(() => Array.from(new Set(ogrenciler.map(o => o.sinif).filter(Boolean))).sort() as string[], [ogrenciler])
 
   // Rapor kategorisi seçilince ilk kategori + geçerli dönem ata
-  useEffect(() => {
-    if (view !== 'rapor') return
-    if (rKategoriId == null && kategoriler.length) setRKategoriId(kategoriler[0].id)
-  }, [view, kategoriler, rKategoriId])
-  useEffect(() => {
+  useDegisince([view, kategoriler, rKategoriId], () => {
+    if (view === 'rapor' && rKategoriId == null && kategoriler.length) setRKategoriId(kategoriler[0].id)
+  })
+  useDegisince([rDonemler, rDonem], () => {
     if (rDonemler.length && !rDonemler.some(d => d.key === rDonem)) setRDonem(rDonemler[0].key)
-  }, [rDonemler, rDonem])
+  })
 
   // Seçili kategori+dönem için ödeyenleri çek
   useEffect(() => {
-    if (view !== 'rapor' || !rKategori || !rDonem) { setRKayitlar([]); setRPlanlar([]); return }
+    if (view !== 'rapor' || !rKategori || !rDonem) { queueMicrotask(() => { setRKayitlar([]); setRPlanlar([]) }); return }
     let iptal = false
     ;(async () => {
       setRLoading(true)
@@ -648,7 +548,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
         columnStyles: rPlanVar
           ? { 0: { cellWidth: 9 }, 1: { cellWidth: 22 }, 2: { halign: 'left' }, 3: { cellWidth: 12 }, 5: { cellWidth: 12 }, 6: { cellWidth: 17 }, 7: { cellWidth: 18, halign: 'right' }, 8: { cellWidth: 18, halign: 'right' }, 9: { cellWidth: 20, fontStyle: 'bold' } }
           : { 0: { cellWidth: 12 }, 1: { cellWidth: 28 }, 2: { halign: 'left' }, 3: { cellWidth: 16 }, 5: { cellWidth: 16 }, 6: { cellWidth: 22, fontStyle: 'bold' } },
-        didParseCell: (d: any) => {
+        didParseCell: (d: CellHookData) => {
           if (d.section === 'body' && d.column.index === durumKol) {
             const raw = String(d.cell.raw)
             d.cell.styles.textColor = raw.startsWith('ÖDEDİ') ? [11, 107, 66] : raw.startsWith('KISMİ') ? [138, 82, 0] : PDF_RENK.hata
@@ -657,8 +557,8 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
       }))
       pdfAc(pdf, `${rKategori.ad} tahsilat listesi`)
       setPdfMsg('✅ PDF hazırlandı.')
-    } catch (err: any) {
-      setPdfMsg('❌ PDF hatası: ' + (err.message || 'Bilinmiyor'))
+    } catch (err) {
+      setPdfMsg('❌ PDF hatası: ' + (hataMesaji(err, 'Bilinmiyor')))
     } finally { setTimeout(() => setPdfMsg(''), 4000) }
   }
 
@@ -1165,98 +1065,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
       )}
 
       {/* Kategori form modal */}
-      {modalAcik && (
-        <div style={overlay} onClick={() => !saving && setModalAcik(false)}>
-          <div className="card" style={modalCard} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-              <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 700 }}>{editId ? 'Kategoriyi Düzenle' : 'Yeni Kategori'}</h2>
-              <button onClick={() => setModalAcik(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)' }}><X size={20} /></button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <label className="form-label">Kategori Adı</label>
-                <input className="form-input" autoFocus value={form.ad} onChange={e => setForm(f => ({ ...f, ad: e.target.value }))} placeholder="Örn. Kırtasiye, Bahar Şenliği, Okul Aidatı" />
-              </div>
-              <div>
-                <label className="form-label">Veri Kaynağı</label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="button" onClick={() => kaynakDegistir('manuel')} style={secBtn(form.veri_kaynagi === 'manuel')}><Users size={14} /> Manuel işaretleme</button>
-                  {birim === 'okul' && <button type="button" onClick={() => kaynakDegistir('otomatik_kulup')} style={secBtn(form.veri_kaynagi === 'otomatik_kulup')}><RefreshCw size={14} /> Otomatik (Kulüp)</button>}
-                </div>
-                <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
-                  {otomatikKilit ? 'Kulüp aidatı mevcut Ödeme Takibi verisinden salt-okunur gelir. Aylık ve tüm öğrenciler olarak sabitlenir.' : 'Memur her öğrenciyi ödedi / ödenmedi olarak elle işaretler.'}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 12, opacity: otomatikKilit ? 0.5 : 1, pointerEvents: otomatikKilit ? 'none' : 'auto' }}>
-                <div style={{ flex: 1 }}>
-                  <label className="form-label">Dönem Tipi</label>
-                  <select className="form-select" value={form.tip} onChange={e => setForm(f => ({ ...f, tip: e.target.value as TahsilatKategoriTip }))}>
-                    <option value="aylik">Aylık (12 ay)</option>
-                    <option value="donemlik">Dönemlik (1. / 2. Dönem)</option>
-                    <option value="tek_seferlik">Tek Seferlik</option>
-                  </select>
-                </div>
-              </div>
-              {!otomatikKilit && (
-                <div>
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <div style={{ flex: 1 }}>
-                      <label className="form-label">Kulüp Öğrencisi Ücreti (₺)</label>
-                      <input className="form-input" type="text" inputMode="decimal" value={form.varsayilan_tutar} onChange={e => setForm(f => ({ ...f, varsayilan_tutar: e.target.value }))} placeholder="Opsiyonel" />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label className="form-label">Okul Öğrencisi Ücreti (₺)</label>
-                      <input className="form-input" type="text" inputMode="decimal" value={form.varsayilan_tutar_okul} onChange={e => setForm(f => ({ ...f, varsayilan_tutar_okul: e.target.value }))} placeholder={form.varsayilan_tutar ? `Boşsa ${form.varsayilan_tutar}` : 'Opsiyonel'} />
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
-                    &quot;Ödedi&quot; işaretlenince öğrencinin türüne göre bu ücret yazılır. Ücret farkı yoksa ikisine aynı tutarı girin (okul ücreti boş bırakılırsa kulüp ücreti kullanılır).
-                    {form.tip !== 'aylik' && ' Taksit isteyen öğrenciye, takip ekranında hücredeki taksit düğmesiyle bu ücret üzerinden plan açılır.'}
-                  </div>
-                </div>
-              )}
-              {!otomatikKilit && (
-                <div>
-                  <label className="form-label">Kapsam</label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button type="button" onClick={() => setForm(f => ({ ...f, kapsam: 'tumu' }))} style={secBtn(form.kapsam === 'tumu')}>Tüm öğrenciler</button>
-                    <button type="button" onClick={() => setForm(f => ({ ...f, kapsam: 'secili' }))} style={secBtn(form.kapsam === 'secili')}>Seçili öğrenciler</button>
-                  </div>
-                </div>
-              )}
-              {!otomatikKilit && form.kapsam === 'secili' && (
-                <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
-                    <Search size={14} style={{ color: 'var(--text3)' }} />
-                    <input value={ogrenciArama} onChange={e => setOgrenciArama(e.target.value)} placeholder="Öğrenci / sınıf ara..." style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13 }} />
-                    <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700 }}>{seciliOgrenci.size} seçili</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, padding: '6px 10px', borderBottom: '1px solid var(--border)' }}>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSeciliOgrenci(new Set(filtreliOgrenciler.map(o => o.id)))} style={{ fontSize: 11 }}>Görünenleri Seç</button>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSeciliOgrenci(new Set())} style={{ fontSize: 11 }}>Temizle</button>
-                  </div>
-                  <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-                    {filtreliOgrenciler.length === 0 ? (
-                      <div style={{ padding: 16, textAlign: 'center', fontSize: 12, color: 'var(--text3)' }}>Öğrenci bulunamadı.</div>
-                    ) : filtreliOgrenciler.map(o => (
-                      <label key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border-light)' }}>
-                        <input type="checkbox" checked={seciliOgrenci.has(o.id)} onChange={() => toggleOgrenci(o.id)} />
-                        <TurRozet okul={!kulupOgrencisi(o)} />
-                        <span style={{ fontSize: 13 }}>{o.ad} {o.soyad}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 'auto' }}>{o.sinif || '-'}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
-              <button className="btn btn-secondary" onClick={() => setModalAcik(false)} disabled={saving}>İptal</button>
-              <button className="btn btn-primary" onClick={kaydet} disabled={saving}>{saving ? 'Kaydediliyor...' : (editId ? 'Güncelle' : 'Kaydet')}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {modalAcik && <KategoriModal birim={birim} editId={editId} form={form} setForm={setForm} otomatikKilit={otomatikKilit} kaynakDegistir={kaynakDegistir} ogrenciArama={ogrenciArama} setOgrenciArama={setOgrenciArama} filtreliOgrenciler={filtreliOgrenciler} seciliOgrenci={seciliOgrenci} setSeciliOgrenci={setSeciliOgrenci} toggleOgrenci={toggleOgrenci} saving={saving} setModalAcik={setModalAcik} kaydet={kaydet} />}
 
       {conf && (
         <ConfirmModal baslik="Kategoriyi Sil" mesaj={`"${conf.ad}" kategorisi ve bu kategoriye ait tüm tahsilat işaretleri kalıcı olarak silinecek. Emin misiniz?`} onayMetni="Evet, Sil" tehlikeli onOnayla={silOnayla} onIptal={() => setConf(null)} />
@@ -1310,66 +1119,4 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
       `}</style>
     </div>
   )
-}
-
-function hesaplaDonemler(kat: TahsilatKategori | null, ey: number): Donem[] {
-  if (!kat) return []
-  if (kat.tip === 'tek_seferlik') return [{ key: '-', label: 'Tahsilat', kisa: 'Tahsilat' }]
-  if (kat.tip === 'donemlik') return [
-    { key: `${ey}-D1`, label: '1. Dönem', kisa: '1. Dönem' },
-    { key: `${ey}-D2`, label: '2. Dönem', kisa: '2. Dönem' },
-  ]
-  const order = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8]
-  return order.map(m => {
-    const y = m >= 9 ? ey : ey + 1
-    return { key: `${y}-${String(m).padStart(2, '0')}`, label: `${AYLAR[m]} ${y}`, kisa: AYLAR[m].substring(0, 3) }
-  })
-}
-
-const badge: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)', letterSpacing: 0.2 }
-// Hücreye bağlı popover konumu: altta yer yoksa hücrenin üstünde açılır, ekrana sığmazsa kaydırılır
-function popKonum(rect: DOMRect, genislik: number, tahminiYukseklik: number): React.CSSProperties {
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 800
-  const vw = typeof window !== 'undefined' ? window.innerWidth : 1000
-  const left = Math.max(8, Math.min(rect.left, vw - genislik - 12))
-  const altBosluk = vh - rect.bottom - 14
-  const ustBosluk = rect.top - 14
-  if (altBosluk >= tahminiYukseklik || altBosluk >= ustBosluk) {
-    return { position: 'absolute', top: rect.bottom + 6, left, maxHeight: altBosluk, overflowY: 'auto' }
-  }
-  return { position: 'absolute', bottom: vh - rect.top + 6, left, maxHeight: ustBosluk, overflowY: 'auto' }
-}
-
-const overlay: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(26,26,20,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }
-const modalCard: React.CSSProperties = { width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', padding: '24px 26px', marginBottom: 0, boxShadow: '0 24px 60px rgba(0,0,0,0.28)' }
-const emptyBox: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 24px', textAlign: 'center', background: 'var(--surface)', borderRadius: 14, border: '1.5px dashed var(--border)', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }
-const thStyle: React.CSSProperties = { background: 'var(--th-bg)', color: 'var(--th-fg)', border: '1px solid var(--th-border)', fontSize: 10.5, fontWeight: 600, padding: '11px 6px', textAlign: 'center', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: 0.4 }
-const tdStyle: React.CSSProperties = { padding: '6px', textAlign: 'center', borderRight: '1px solid var(--border-light)' }
-const statBox: React.CSSProperties = { padding: '16px 18px', position: 'relative', overflow: 'hidden' }
-const statLabel: React.CSSProperties = { fontSize: 10.5, color: 'var(--text3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 6 }
-const statVal: React.CSSProperties = { fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }
-
-const statAlt: React.CSSProperties = { marginTop: 8, fontSize: 12, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }
-
-/** Öğrenci türü rozeti: K = kulüp, O = okul */
-function TurRozet({ okul, uzun }: { okul: boolean; uzun?: boolean }) {
-  return (
-    <span
-      title={okul ? 'Okul öğrencisi' : 'Kulüp öğrencisi'}
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        minWidth: 18, height: 18, padding: uzun ? '0 8px' : '0 4px', borderRadius: 5,
-        fontSize: 10, fontWeight: 700, letterSpacing: 0.3, verticalAlign: 1,
-        background: okul ? 'var(--info-light)' : 'var(--accent-lighter)',
-        color: okul ? '#1a5b8a' : 'var(--accent)',
-        border: `1px solid ${okul ? 'var(--info-border)' : 'var(--accent-light)'}`,
-      }}
-    >
-      {uzun ? (okul ? 'Okul' : 'Kulüp') : (okul ? 'O' : 'K')}
-    </span>
-  )
-}
-
-function secBtn(active: boolean): React.CSSProperties {
-  return { flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 10px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border)'}`, background: active ? 'var(--accent)' : 'var(--surface)', color: active ? '#fff' : 'var(--text2)', boxShadow: active ? '0 2px 8px rgba(35,71,217,0.25)' : 'none', transition: 'all 0.15s' }
 }

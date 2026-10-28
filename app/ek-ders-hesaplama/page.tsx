@@ -75,10 +75,10 @@ export default function Page() {
             <div className="pub-prose">
               <h2>Saat ücreti nasıl hesaplanır?</h2>
               <p>
-                MEB Çocuk Kulüpleri Yönergesi'ne göre saat ücreti, <strong>140 gösterge rakamının
+                MEB Çocuk Kulüpleri Yönergesi’ne göre saat ücreti, <strong>140 gösterge rakamının
                 memur aylık maaş katsayısı ile çarpılıp bir bölene ayrılmasıyla</strong> bulunur.
                 Azami ücrette bölen <strong>4</strong>, asgari ücrette <strong>6</strong>, yemek ikramı
-                verilen kulüplerde <strong>3</strong>'tür. Katsayı her bütçe döneminde güncellendiği için
+                verilen kulüplerde <strong>3</strong>’tür. Katsayı her bütçe döneminde güncellendiği için
                 saat ücreti de dönemsel olarak değişir.
               </p>
               <h2>Diğer hesaplama araçları</h2>

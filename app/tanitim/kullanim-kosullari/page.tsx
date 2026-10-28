@@ -23,8 +23,8 @@ export default function KullanimKosullariPage() {
           <div className="pub-prose">
             <h2>1. Taraflar ve Konu</h2>
             <p>
-              İşbu Kullanım Koşulları, Klüp360 platformunu (Bundan böyle "Platform" olarak anılacaktır) kullanan
-              tüm kurumlar, yöneticiler, eğitmenler ve veliler (Bundan böyle "Kullanıcı" olarak anılacaktır) için
+              İşbu Kullanım Koşulları, Klüp360 platformunu (Bundan böyle “Platform” olarak anılacaktır) kullanan
+              tüm kurumlar, yöneticiler, eğitmenler ve veliler (Bundan böyle “Kullanıcı” olarak anılacaktır) için
               geçerlidir. Platformu kullanmaya başlamanız, bu koşulları kabul ettiğiniz anlamına gelir.
             </p>
 

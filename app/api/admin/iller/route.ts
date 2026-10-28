@@ -1,24 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
+import { adminClient, getCallerIfSuperAdmin } from '@/lib/apiAuth'
 import { NextResponse, type NextRequest } from 'next/server'
 import { serverError } from '@/lib/api-error'
-
-function adminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
-
-async function getCallerIfSuperAdmin(request: NextRequest) {
-  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
-  if (!token) return null
-  const { data: { user } } = await adminClient().auth.getUser(token)
-  if (!user) return null
-  const { data: profil } = await adminClient()
-    .from('profiller').select('rol').eq('id', user.id).single()
-  if (profil?.rol !== 'super_admin') return null
-  return user
-}
 
 // İl listesi + her ilin okulları
 export async function GET(request: NextRequest) {
