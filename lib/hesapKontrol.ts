@@ -34,6 +34,8 @@ export interface KontrolBordro {
   gv_tutar: number
   dv_hesaplanan?: number | null
   dv_istisna_tutari?: number | null
+  /** Bordro kaydedilirken personel kartındaki istisna ayarı (migration_bordro_istisna_karti.sql); eski kayıtlarda yok */
+  istisna_karti?: IstisnaKarti | null
   damga_tutar: number
   sgk_kisi: number
   sgk_issizlik_kisi?: number | null
@@ -43,6 +45,23 @@ export interface KontrolBordro {
   net: number
   odendi: boolean
   personel?: Personel | null
+}
+
+/** Asgari ücret istisnası ayarı: bordro anındaki kayıt ya da (eski bordrolarda) personel kartı */
+export interface IstisnaKarti {
+  vergi_istisnasi: boolean | null
+  tip: 'tam' | 'tutar'
+  gv: number
+  dv: number
+}
+
+export function istisnaKartiOlustur(p?: Personel | null): IstisnaKarti {
+  return {
+    vergi_istisnasi: p?.vergi_istisnasi ?? null,
+    tip: p?.vergi_istisna_tipi === 'tutar' ? 'tutar' : 'tam',
+    gv: Number(p?.istisna_gv_tutari || 0),
+    dv: Number(p?.istisna_dv_tutari || 0),
+  }
 }
 
 export type Kategori = 'ogretmen' | 'baskan' | 'baskan_yrd' | 'muhasebe' | 'temizlik' | 'denetim' | 'diger'
@@ -343,6 +362,11 @@ export function hesapKontrolEt(girdi: {
   const kisiler: KisiKontrol[] = satirKat.map(({ b, kat }) => {
     const p = b.personel
     const gorev = p?.gorev || ''
+    // İstisna ayarı bordro kaydedilirken saklanır; personel kartı sonradan (ör. sonraki ay için) değişmiş olabilir.
+    // Eski bordrolarda bu kayıt yoksa bugünkü kart kullanılır ve uyumsuzluk "hata" yerine "uyarı" sayılır.
+    const kartKayitli = !!b.istisna_karti
+    const kart = b.istisna_karti ?? istisnaKartiOlustur(p)
+    const kartNotu = kartKayitli ? '' : ' Bu bordro, personelin istisna ayarı kaydedilmeden önce hesaplanmış; kontrol personel kartının bugünkü hâline göre yapıldı. Kart bordrodan sonra değiştirildiyse (ör. sonraki ay için) bu uyarı geçersizdir. Bu nedenle geçmiş ayın bordrosunu yeniden hesaplamayın; yeni ayarla hesaplanır.'
     const bulgular: KontrolBulgu[] = []
     const brut = Number(b.brut || 0)
     const tavan = tavanHesapla(gorev, tavanKatsayi, p ? !!p.sgk_li : undefined)
@@ -501,10 +525,10 @@ export function hesapKontrolEt(girdi: {
       }
 
       // İstisna üst sınırları
-      const tutarTipi = p?.vergi_istisna_tipi === 'tutar'
-      const istisnaKapali = p?.vergi_istisnasi === false
-      gvSinir = istisnaKapali ? 0 : tutarTipi ? Number(p?.istisna_gv_tutari || 0) : gvSinirGenel
-      dvSinir = istisnaKapali ? 0 : tutarTipi ? Number(p?.istisna_dv_tutari || 0) : dvSinirGenel
+      const tutarTipi = kart.tip === 'tutar'
+      const istisnaKapali = kart.vergi_istisnasi === false
+      gvSinir = istisnaKapali ? 0 : tutarTipi ? kart.gv : gvSinirGenel
+      dvSinir = istisnaKapali ? 0 : tutarTipi ? kart.dv : dvSinirGenel
       const gvIzin = r2(Math.min(gvSinir, gvHes))
       const dvIzin = r2(Math.min(dvSinir, dvHes))
       const gvKural = `Asgari ücretin gelir vergisi istisnası ${AYLAR[ay]} ayı için en fazla ${tl(gvSinirGenel)}'dir (asgari ücretin vergi matrahına kümülatif dilimle isabet eden vergi). İstisna, hesaplanan vergiyi aşamaz.`
@@ -514,13 +538,13 @@ export function hesapKontrolEt(girdi: {
       const dvEksik = r2(Math.max(0, (dvHes - dvIzin) - Number(b.damga_tutar || 0)))
       if (gvIst > gvIzin + ARITMETIK_TOL) {
         bulgular.push({
-          baslik: 'Gelir vergisi istisnası fazla uygulanmış', durum: 'hata', beklenen: gvIzin, bulunan: gvIst,
+          baslik: 'Gelir vergisi istisnası fazla uygulanmış', durum: kartKayitli ? 'hata' : 'uyari', beklenen: gvIzin, bulunan: gvIst,
           aciklama: (istisnaKapali
             ? `Personel kartında asgari ücret istisnası kapalı olduğu halde ${tl(gvIst)} GV istisnası uygulanmış.`
             : `${tl(gvIst)} GV istisnası uygulanmış; uygulanabilecek en fazla ${tl(gvIzin)} (${tutarTipi ? `personele özel tanımlı ${tl(gvSinir)}` : `ayın istisna sınırı ${tl(gvSinir)}`} ile hesaplanan GV ${tl(gvHes)} tutarından küçük olanı).`)
             + (gvEksik > ARITMETIK_TOL
               ? ` Bu nedenle ${tl(gvEksik)} gelir vergisi eksik kesilmiş (kesilmesi gereken ${tl(r2(gvHes - gvIzin))}, kesilen ${tl(Number(b.gv_tutar || 0))}).`
-              : ' Kesilen vergi tutarı etkilenmemiş, ancak bordroda ve muhtasar beyannamede istisna olduğundan fazla görünür.'),
+              : ' Kesilen vergi tutarı etkilenmemiş, ancak bordroda ve muhtasar beyannamede istisna olduğundan fazla görünür.') + kartNotu,
           kural: gvKural,
           oneri: gvEksik > ARITMETIK_TOL
             ? 'Eksik kesilen vergi muhtasar beyannamede düzeltilmeli; personel istisnayı başka işverende kullanıyorsa kartında istisna kapatılmalı.'
@@ -529,13 +553,13 @@ export function hesapKontrolEt(girdi: {
       }
       if (dvIst > dvIzin + ARITMETIK_TOL) {
         bulgular.push({
-          baslik: 'Damga vergisi istisnası fazla uygulanmış', durum: 'hata', beklenen: dvIzin, bulunan: dvIst,
+          baslik: 'Damga vergisi istisnası fazla uygulanmış', durum: kartKayitli ? 'hata' : 'uyari', beklenen: dvIzin, bulunan: dvIst,
           aciklama: (istisnaKapali
             ? `Personel kartında asgari ücret istisnası kapalı olduğu halde ${tl(dvIst)} DV istisnası uygulanmış.`
             : `${tl(dvIst)} DV istisnası uygulanmış; uygulanabilecek en fazla ${tl(dvIzin)} (${tutarTipi ? `personele özel tanımlı ${tl(dvSinir)}` : `istisna sınırı ${tl(dvSinir)}`} ile hesaplanan DV ${tl(dvHes)} tutarından küçük olanı).`)
             + (dvEksik > ARITMETIK_TOL
               ? ` Bu nedenle ${tl(dvEksik)} damga vergisi eksik kesilmiş.`
-              : ' Kesilen damga vergisi etkilenmemiş, ancak istisna olduğundan fazla görünür.'),
+              : ' Kesilen damga vergisi etkilenmemiş, ancak istisna olduğundan fazla görünür.') + kartNotu,
           kural: dvKural,
           oneri: dvEksik > ARITMETIK_TOL
             ? 'Eksik kesilen damga vergisi muhtasar beyannamede düzeltilmeli.'
@@ -598,15 +622,16 @@ export function hesapKontrolEt(girdi: {
       })
     }
     if (kat !== 'denetim' && p?.sgk_li) {
-      const istisnaYok = p.vergi_istisnasi === false
-      const istisnaEksik = p.vergi_istisna_tipi === 'tutar' && Number(p.istisna_gv_tutari || 0) < gvSinirGenel - ARITMETIK_TOL
+      // "Hiç uygulanmamış" yalnızca bordroda gerçekten istisna yoksa söylenir
+      const istisnaYok = kart.vergi_istisnasi === false && Number(b.gv_istisna_tutari || 0) <= ARITMETIK_TOL
+      const istisnaEksik = kart.tip === 'tutar' && kart.gv < gvSinirGenel - ARITMETIK_TOL
       if (istisnaYok || istisnaEksik) {
         baskaKurum.push('Asgari ücret istisnası kısıtlı')
         bulgular.push({
           baslik: 'İstisna başka işverende kullanılıyor olabilir', durum: 'bilgi',
           aciklama: istisnaYok
             ? 'SGK\'lı personelde asgari ücret istisnası hiç uygulanmamış. Bu genellikle istisnanın başka bir işverende kullanıldığını gösterir.'
-            : `SGK'lı personelde aylık ${tl(Number(p.istisna_gv_tutari || 0))} GV istisnası tanımlı; tam tutar ${tl(gvSinirGenel)}. Kalan ${tl(gvSinirGenel - Number(p.istisna_gv_tutari || 0))} başka işverende kullanılıyor olabilir.`,
+            : `SGK'lı personelde aylık ${tl(kart.gv)} GV istisnası tanımlı; tam tutar ${tl(gvSinirGenel)}. Kalan ${tl(gvSinirGenel - kart.gv)} başka işverende kullanılıyor olabilir.`,
           kural: 'Asgari ücret istisnası aynı ay içinde yalnızca bir kez (bir işverende) uygulanabilir.',
           oneri: 'KBS / diğer işverenin bordrosu ile teyit edin; başka işveren yoksa istisna eksik uygulanmış demektir ve personel aleyhine fazla vergi kesilmiştir.',
         })

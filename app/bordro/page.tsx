@@ -20,6 +20,7 @@ import { hataMesaji } from '@/lib/hata'
 import { useYukleme } from '@/lib/useYukleme'
 import { bordroOzetPdf, bordroSirala, bordroToplamlari } from '@/lib/bordroOzet'
 import { bordroSatirlariHesapla } from '@/lib/bordroHesap'
+import { istisnaKartiOlustur } from '@/lib/hesapKontrol'
 
 export default function BordroPage() {
   const { ay, yil } = useAy()
@@ -455,6 +456,8 @@ export default function BordroPage() {
         toplam_kesinti: s.sonuc.toplam_kesinti,
         net: s.sonuc.net,
         odendi: odendiMap.get(s.personel.id) ?? false,
+        // Hesaplamada kullanılan istisna ayarı: kart sonradan değişse de hesap kontrolü bu ayı doğru değerlendirir
+        istisna_karti: istisnaKartiOlustur(s.personel),
       }))
 
       // Önce bu ay/yıl/okul için mevcut kayıtları sil
@@ -467,7 +470,11 @@ export default function BordroPage() {
       if (delErr) throw new Error('Bordro silinemedi: ' + delErr.message)
 
       // Sonra yeni hesaplanan değerleri ekle
-      const { error: saveErr } = await supabase.from('bordro').insert(kayitlar)
+      let { error: saveErr } = await supabase.from('bordro').insert(kayitlar)
+      // Veritabanı güncellemesi (migration_bordro_istisna_karti.sql) yapılmadıysa istisna kaydı olmadan kaydet
+      if (saveErr && /istisna_karti/.test(saveErr.message)) {
+        ;({ error: saveErr } = await supabase.from('bordro').insert(kayitlar.map(k => ({ ...k, istisna_karti: undefined }))))
+      }
       if (saveErr) throw new Error('Bordro kaydedilemedi: ' + saveErr.message + ' | Kod: ' + saveErr.code)
 
       logIslem({ 
