@@ -19,6 +19,10 @@ export function makamSatirlari(ilAd?: string | null, ilceAd?: string | null): st
   return []
 }
 
+// Kayıtta küçük harfle girilmiş okul adında her kelimenin baş harfi büyütülür; kelimenin geri kalanına
+// dokunulmaz ki "TOKİ" gibi kısaltmalar bozulmasın.
+const basHarfleriBuyuk = (s: string) => s.replace(/(^|\s)(\S)/g, (_, bosluk: string, harf: string) => bosluk + harf.toLocaleUpperCase('tr-TR'))
+
 export interface KapakVerisi {
   makam: string[]
   okulAdi: string
@@ -39,7 +43,7 @@ export function defterKapagi(pdf: Pdf, autoTable: AutoTable, k: KapakVerisi) {
   pdf.setTextColor(...PDF_RENK.metin)
   pdf.setFont('NotoSans', 'bold'); pdf.setFontSize(13)
   let y = 32
-  for (const satir of ['T.C.', ...k.makam, k.okulAdi].filter(Boolean)) {
+  for (const satir of ['T.C.', ...k.makam, basHarfleriBuyuk(k.okulAdi)].filter(Boolean)) {
     pdf.text(satir, W / 2, y, { align: 'center', maxWidth: genislik })
     y += 6.5
   }

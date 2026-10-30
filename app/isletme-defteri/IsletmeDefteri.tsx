@@ -198,7 +198,8 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
     ])
     return {
       makam: makamSatirlari(il?.data?.ad, ilce?.data?.ad),
-      okulAdi: okul?.ad || ayarlar?.kurum_adi || '',
+      // Ayarlar'daki Kurum Adı esastır (diğer resmî çıktılardaki gibi); boşsa kayıttaki okul adı kullanılır
+      okulAdi: ayarlar?.kurum_adi?.trim() || okul?.ad || '',
       hesapAdi: BIRIM_HESAP_ADI[birim],
       yil, devreden, aylar: aylikOzet,
     }
