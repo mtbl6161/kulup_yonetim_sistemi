@@ -1,86 +1,52 @@
 'use client'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import {
-  Users,
-  Calendar,
-  BookOpen,
-  Clock,
-  Wallet,
-  BarChart3,
-  Landmark,
-  TrendingUp,
-  FileText,
-  Settings,
-  GraduationCap,
-  School,
-  CheckCircle,
-  Shield,
-  ArrowRight,
-  ArrowUpRight,
-  Building2,
-  Eye,
-  MapPin,
-  Activity,
-  BarChart2,
-  UserCheck,
-  Bell
+  Users, Calendar, Clock, BarChart3, Landmark, TrendingUp, FileText, School, CheckCircle, Shield, ArrowRight, ArrowUpRight,
+  Building2, Eye, MapPin, Activity, BarChart2, UserCheck, Bell, PlayCircle, HeartHandshake, Receipt, CalendarRange, GraduationCap, Menu, X,
 } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
+import { Film, MiniFilm, Sinema, FILM_CSS, KULUP_SETI, kaydiriciBul, type FilmSeti } from './Film'
+import { BOLUMLER } from './sahneler'
+import { DENETCI_SETI, DENETCI_CSS } from './denetciSahneleri'
 
 /* ----------------------------------------------------------------- data */
 
-const features = [
-  { icon: Users, title: 'Öğrenci Yönetimi', desc: 'Kayıt, devam takibi, sınıf atama ve veli bilgileri tek ekranda.' },
-  { icon: GraduationCap, title: 'Personel Yönetimi', desc: 'Öğretmen ve personel bilgileri, görev atamaları, iletişim kayıtları.' },
-  { icon: Calendar, title: 'Ders Programı', desc: 'Haftalık ders planlaması, sınıf ve öğretmen bazlı program takibi.' },
-  { icon: BookOpen, title: 'Sınıf Defteri', desc: 'Günlük devam kaydı, yoklama ve gözlem notları dijital ortamda.' },
-  { icon: Clock, title: 'Puantaj', desc: 'Personel çalışma saatlerini otomatik hesapla, aylık puantaj oluştur.' },
-  { icon: FileText, title: 'Bordro', desc: 'MEB katsayılarına göre tam otomatik maaş hesaplama ve e-posta gönderimi.' },
-  { icon: Wallet, title: 'Ödeme Takibi', desc: 'Öğrenci aidat ve kurs ücretlerini tahsil et, gecikmeleri izle.' },
-  { icon: BarChart3, title: 'Gelir / Gider', desc: 'Tüm finansal hareketler, kategori bazlı raporlar ve grafikler.' },
-  { icon: Landmark, title: 'Bilanço', desc: 'Yıllık mali durum, aktif/pasif dengesi, kurumsal finansal rapor.' },
-  { icon: TrendingUp, title: 'Hesap Hareketleri', desc: 'Kasa ve banka hareketleri, dönem bazlı akış analizi.' },
-  { icon: School, title: 'Sınıf Tanımları', desc: 'Sınıf oluştur, öğretmen ata, kapasite ve program ayarla.' },
-  { icon: Settings, title: 'Kurumsal Ayarlar', desc: 'SGK, vergi, katsayı ve tüm bordro parametrelerini tek yerden yönet.' },
-]
-
-const stats = [
-  { value: '12+', label: 'Entegre Modül' },
-  { value: '%100', label: 'MEB Uyumlu' },
-  { value: '0,3 sn', label: 'Bordro Hesabı' },
-  { value: '256-bit', label: 'Şifreli Altyapı' },
-]
-
-const contrast = [
-  { bad: 'Karışık Excel tabloları', good: 'Tek merkezi sistem', goodDesc: 'Her modülün birbirine bağlı olduğu bütünleşik mimari.' },
-  { bad: 'Manuel maaş hesapları', good: 'Saniyeler içinde bordro', goodDesc: 'Güncel MEB katsayılarıyla sıfır hata payı.' },
-  { bad: 'Geciken aidat tespiti', good: 'Zamanında tahsilat', goodDesc: 'Vadesi geçen ödemeler için otomatik uyarılar.' },
+// Filmde gösterilmeyen ama sistemde bulunan modüller
+const dahasi = [
+  { icon: Calendar, title: 'Ders programı', desc: 'Sınıf ve öğretmen bazlı haftalık program; sınıf defterine tek tıkla aktarılır.' },
+  { icon: GraduationCap, title: 'Personel', desc: 'Görev, SGK durumu, IBAN ve iletişim bilgileri tek kartta.' },
+  { icon: School, title: 'Sınıflar ve kontenjan', desc: 'Sınıf, yaş grubu ve kapasite tanımları; doluluk oranı panelde izlenir.' },
+  { icon: Receipt, title: 'Tahsilat takip', desc: 'Kırtasiye, gezi, etkinlik gibi aidat dışı ödemeler ve taksit planları.' },
+  { icon: BarChart3, title: 'Gelir / gider ve bilanço', desc: 'Aylık kâr-zarar, ücret dağıtım bilançosu ve hesap hareketleri.' },
+  { icon: Landmark, title: 'Muhtasar ve SGK', desc: 'Muhtasar beyanname dosyası ve eksik gün nedenleriyle SGK bildirimi.' },
+  { icon: HeartHandshake, title: 'Okul Aile Birliği', desc: 'Birliğin bağış, aidat tahsilatı ve kendi işletme defteri.' },
+  { icon: CalendarRange, title: 'Akıllı takip', desc: 'Geciken ödeme, eksik puantaj, yaklaşan beyanname son günü uyarıları.' },
 ]
 
 const steps = [
   { num: '01', title: 'Kurumunuzu kaydedin', desc: 'Birkaç dakikada okul bilgilerinizi ve SGK / vergi parametrelerinizi tanımlayın.' },
   { num: '02', title: 'Personel ve öğrencileri girin', desc: 'Mevcut verilerinizi içe aktarın ya da sıfırdan kayıt oluşturun.' },
-  { num: '03', title: 'Yönetimi otomatikleştirin', desc: 'Bordro, tahsilat, devam ve raporlar artık tek tıkla hazır.' },
+  { num: '03', title: 'Ayı tek akışta yönetin', desc: 'Yoklama, tahsilat, bordro, işletme defteri ve denetim dosyası aynı sistemde birbirine bağlı.' },
 ]
 
 const audit = [
-  { icon: MapPin, title: 'İl / İlçe geneli özet', desc: 'Bölgedeki toplam öğrenci, personel ve operasyon verilerini kuşbakışı tek ekranda görün.' },
+  { icon: MapPin, title: 'İl geneli özet', desc: 'İldeki kulüplerin öğrenci, personel ve dosya durumlarını tek ekranda görün; ilçeye göre süzün.' },
   { icon: Building2, title: 'Okul bazlı izleme', desc: 'Bağlı her kulübün dosyasına inin; mevcut öğrenci ve kapasite kontrolleri anlık hesaplanır.' },
-  { icon: FileText, title: 'Resmi bordro görüntüleme', desc: 'Beyan edilen aylık bordroları ve MEB katsayı doğrulamalarını salt-okunur inceleyin.' },
-  { icon: BarChart2, title: 'Finansal şeffaflık', desc: 'Gelir-gider tabloları ve aidat tahsilat oranları yasal denetim formatında hazırdır.' },
+  { icon: FileText, title: 'Aylık denetim dosyası', desc: 'Kulüplerin gönderdiği evrakı madde madde inceleyin, onaylayın ya da notla iade edin.' },
+  { icon: BarChart2, title: 'Bordro kontrolü', desc: 'Beyan edilen bordroları inceleyin; hesap hataları ve eksikler madde madde listelenir.' },
   { icon: Calendar, title: 'Sınıf defteri ve yoklama', desc: 'Hangi öğretmenin hangi sınıfta derste olduğunu fiili devam defterinden inceleyin.' },
-  { icon: UserCheck, title: 'Mutlak salt-okunur erişim', desc: 'Denetim yetkilisi veriyi değiştiremez veya silemez. Veri %100 şeffaflıkla yansır.' },
+  { icon: UserCheck, title: 'Salt okunur erişim', desc: 'Denetim yetkilisi veriyi değiştiremez veya silemez; kayıtlar olduğu gibi yansır.' },
 ]
 
 const trust = [
-  { icon: Shield, title: 'Şifreli altyapı', desc: 'Tüm verileriniz 256-bit şifrelenmiş olarak bulutta saklanır; izniniz olmadan kimse erişemez.' },
-  { icon: CheckCircle, title: 'MEB ve SGK uyumu', desc: 'Bordro algoritmaları MEB katsayıları ve SGK güncellemelerine endekslidir. Yasal risk sıfır.' },
-  { icon: Building2, title: 'Çoklu kurum mimarisi', desc: 'Birden fazla işletmenizi tek hesapta birleştirin; her kurumun verisi mutlak izoledir.' },
-  { icon: Activity, title: 'Gerçek zamanlı senkron', desc: 'Bir kayıt girdiğinizde ekiptekilerin ekranına anında düşer. Aynı anda beraber çalışın.' },
-  { icon: Bell, title: 'Proaktif bildirimler', desc: 'Geciken ödemeler, kritik eksiklikler ve yaklaşan tahsilatlar size sistemden bildirilir.' },
-  { icon: TrendingUp, title: 'Otomatik raporlama', desc: 'Aylık, dönemlik veya anlık mali bilançolarınızı saniyeler içinde çekin.' },
+  { icon: Shield, title: 'Şifreli altyapı', desc: 'Tüm verileriniz şifrelenmiş olarak bulutta saklanır; izniniz olmadan kimse erişemez.' },
+  { icon: CheckCircle, title: 'MEB ve SGK uyumu', desc: 'Bordro hesabı MEB katsayıları ve güncel SGK / vergi parametreleriyle yapılır.' },
+  { icon: Building2, title: 'Kurumlar birbirinden ayrı', desc: 'Her kurumun verisi ayrı tutulur; bir okul başka bir okulun kaydını göremez.' },
+  { icon: Activity, title: 'Kurulum gerektirmez', desc: 'Tarayıcıdan çalışır; program yüklemeden bilgisayardan da telefondan da açılır.' },
+  { icon: Bell, title: 'Proaktif uyarılar', desc: 'Geciken ödemeler, eksik belgeler ve yaklaşan son günler panelde sizi bekler.' },
+  { icon: TrendingUp, title: 'Hazır raporlar', desc: 'Aylık özet, işletme defteri ve bilançoyu PDF olarak saniyeler içinde alın.' },
 ]
 
 /* ----------------------------------------------------------------- page */
@@ -89,9 +55,7 @@ export default function TanitimPage() {
   const { user, profil } = useAuth()
   const rootRef = useRef<HTMLDivElement>(null)
 
-  // Robust scroll-reveal. This app scrolls inside a nested overflow:auto
-  // container (globals set html/body overflow:hidden), so the observer must be
-  // rooted to that container — not the viewport — to fire reliably.
+  // Uygulama iç içe bir overflow:auto kabında kaydığı için (html/body overflow:hidden) gözlemci o kaba bağlanır
   useEffect(() => {
     const root = rootRef.current
     if (!root) return
@@ -101,7 +65,6 @@ export default function TanitimPage() {
 
     if (!('IntersectionObserver' in window)) { revealAll(); return }
 
-    // Find the scrollable ancestor (falls back to viewport root = null).
     let scroller: HTMLElement | null = root.parentElement
     while (scroller) {
       const oy = getComputedStyle(scroller).overflowY
@@ -119,16 +82,30 @@ export default function TanitimPage() {
     }, { root: scroller, threshold: 0.1, rootMargin: '0px 0px -8% 0px' })
 
     els.forEach(el => io.observe(el))
-    // Failsafe: never leave content hidden if the observer misbehaves.
     const failsafe = window.setTimeout(revealAll, 2500)
     return () => { io.disconnect(); window.clearTimeout(failsafe) }
   }, [])
 
   const panelUrl = profil?.rol === 'super_admin' ? '/yonetim' : (profil?.rol === 'denetim_yetkilisi' ? '/denetim' : '/')
+  // Filmler sayfadan ayrılmadan tam ekran izleme katmanında açılır
+  const [sinema, setSinema] = useState<{ set: FilmSeti; bolum: number; donus?: HTMLElement | null } | null>(null)
+  const sinemayiKapat = useCallback(() => setSinema(null), [])
+  const [menuAcik, setMenuAcik] = useState(false)
+
+  // Sayfa içi bağlantılar: iç kaydırma kabını yumuşakça kaydır, sabit üst menünün altında kalmasın
+  const bolumeGit = (e: MouseEvent, id: string) => {
+    const el = document.getElementById(id), s = kaydiriciBul(el)
+    if (!el || !s) return
+    e.preventDefault()
+    setMenuAcik(false)
+    const hareketAz = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    s.scrollTo({ top: el.getBoundingClientRect().top - s.getBoundingClientRect().top + s.scrollTop - 68, behavior: hareketAz ? 'auto' : 'smooth' })
+    history.replaceState(null, '', `#${id}`)
+  }
 
   return (
     <div ref={rootRef} className="tz">
-      <style>{CSS}</style>
+      <style>{CSS + FILM_CSS + DENETCI_CSS}</style>
 
       {/* ---------------------------------------------------------- NAV */}
       <nav className="tz-nav">
@@ -139,9 +116,9 @@ export default function TanitimPage() {
           </Link>
 
           <div className="tz-nav-links">
+            <a href="#film" onClick={e => bolumeGit(e, 'film')}>Nasıl çalışır</a>
             <Link href="/rehber" className="tz-nav-tool">Rehber ve Araçlar</Link>
             <Link href="/fiyatlandirma">Fiyatlandırma</Link>
-            <Link href="/tanitim/kullanim-kosullari">Koşullar</Link>
             <Link href="/tanitim/iletisim">İletişim</Link>
           </div>
 
@@ -157,210 +134,113 @@ export default function TanitimPage() {
                 <Link href="/signup" className="tz-btn tz-btn-primary">Ücretsiz Başla <ArrowRight size={16} /></Link>
               </>
             )}
+            <button type="button" className="tz-menu-btn" onClick={() => setMenuAcik(v => !v)} aria-expanded={menuAcik} aria-controls="tz-mobil-menu" aria-label={menuAcik ? 'Menüyü kapat' : 'Menüyü aç'}>
+              {menuAcik ? <X size={20} /> : <Menu size={20} />}
+            </button>
           </div>
         </div>
+        {menuAcik && (
+          <div id="tz-mobil-menu" className="tz-mobil-menu" onKeyDown={e => { if (e.key === 'Escape') setMenuAcik(false) }}>
+            <a href="#film" onClick={e => bolumeGit(e, 'film')}>Nasıl çalışır</a>
+            <Link href="/rehber" onClick={() => setMenuAcik(false)}>Rehber ve Araçlar</Link>
+            <Link href="/fiyatlandirma" onClick={() => setMenuAcik(false)}>Fiyatlandırma</Link>
+            <Link href="/tanitim/iletisim" onClick={() => setMenuAcik(false)}>İletişim</Link>
+            {!user && <Link href="/login" onClick={() => setMenuAcik(false)} className="tz-mobil-giris">Giriş Yap</Link>}
+          </div>
+        )}
       </nav>
 
-      {/* ---------------------------------------------------------- HERO */}
-      <header className="tz-hero">
+      {/* ---------------------------------------------------------- HERO + FİLM */}
+      <header className="tz-hero" id="film">
         <div className="tz-hero-glow" aria-hidden />
         <div className="tz-container tz-hero-inner">
           <span className="tz-badge">
             <span className="tz-badge-dot" />
-            MEB Çocuk Kulüpleri Yönergesi’ne %100 uyumlu
+            MEB Çocuk Kulüpleri Yönergesi’ne uygun
           </span>
 
           <h1 className="tz-h1">
-            Çocuk kulübünüzün tüm yönetimi,<br />
-            <span className="tz-grad">tek akıllı platformda.</span>
+            Bir çocuk kulübünün ayı, <span className="tz-grad">bir dakikada.</span>
           </h1>
 
           <p className="tz-hero-lead">
-            Excel dosyalarına ve kağıt yığınlarına veda edin. Bordro, tahsilat, ders programı
-            ve yoklama süreçlerinizi <strong>saniyeler içinde</strong> ve hatasız yönetin.
+            Kayıttan denetim dosyasına kadar bir ayın tamamını Klüp360’ta nasıl yönettiğinizi izleyin.
+            Ekranlar sistemin birebir canlandırması, veriler örnektir.
           </p>
+
+          <div className="tz-film">
+            <Film onBuyut={b => setSinema({ set: KULUP_SETI, bolum: b })} />
+          </div>
 
           <div className="tz-hero-actions">
             <Link href="/signup" className="tz-btn tz-btn-primary tz-btn-lg">
               Ücretsiz Başlayın <ArrowRight size={18} />
             </Link>
-            <Link href="/fiyatlandirma" className="tz-btn tz-btn-ghost tz-btn-lg">
-              Fiyatları İnceleyin
-            </Link>
+            <a href="#ay" onClick={e => bolumeGit(e, 'ay')} className="tz-btn tz-btn-ghost tz-btn-lg">
+              Adım adım inceleyin
+            </a>
           </div>
-
           <div className="tz-hero-note">
             <CheckCircle size={15} /> Kredi kartı gerekmez · Kurulum dakikalar sürer
-          </div>
-
-          {/* Product preview */}
-          <div className="tz-preview">
-            <div className="tz-chip tz-chip-a">
-              <span className="tz-chip-ic tz-chip-ic-green"><CheckCircle size={18} /></span>
-              <div>
-                <div className="tz-chip-t">Bordro hesaplandı</div>
-                <div className="tz-chip-s">Tüm personel eksiksiz</div>
-              </div>
-            </div>
-            <div className="tz-chip tz-chip-b">
-              <span className="tz-chip-ic tz-chip-ic-gold"><TrendingUp size={18} /></span>
-              <div>
-                <div className="tz-chip-t">+₺45.250</div>
-                <div className="tz-chip-s">Bu haftaki tahsilat</div>
-              </div>
-            </div>
-
-            <div className="tz-window">
-              <div className="tz-window-bar">
-                <span className="tz-dot" style={{ background: '#ff5f56' }} />
-                <span className="tz-dot" style={{ background: '#ffbd2e' }} />
-                <span className="tz-dot" style={{ background: '#27c93f' }} />
-                <div className="tz-window-url">app.klup360.com / kontrol-paneli</div>
-              </div>
-              <div className="tz-mock">
-                <aside className="tz-mock-side">
-                  <div className="tz-mock-brand">
-                    <Image src="/logo.png" alt="" width={64} height={64} />
-                    <span>Klüp360</span>
-                  </div>
-                  {['Kontrol Paneli', 'Öğrenciler', 'Bordro', 'Tahsilat', 'Ders Programı', 'Raporlar'].map((m, i) => (
-                    <div key={m} className={`tz-mock-nav ${i === 0 ? 'is-active' : ''}`}>
-                      <span className="tz-mock-nav-ic" />
-                      <span className="tz-mock-nav-tx">{m}</span>
-                    </div>
-                  ))}
-                </aside>
-                <div className="tz-mock-main">
-                  <div className="tz-mock-head">
-                    <div>
-                      <div className="tz-mock-title">Kontrol Paneli</div>
-                      <div className="tz-mock-sub">Ağustos 2026 dönemi</div>
-                    </div>
-                    <div className="tz-mock-btn">+ Yeni Kayıt</div>
-                  </div>
-                  <div className="tz-mock-stats">
-                    {[
-                      { l: 'Aktif Öğrenci', v: '248', c: 'green' },
-                      { l: 'Aylık Tahsilat', v: '₺186K', c: 'gold' },
-                      { l: 'Personel', v: '19', c: 'blue' },
-                    ].map(s => (
-                      <div key={s.l} className="tz-mock-stat">
-                        <span className={`tz-mock-stat-ic ${s.c}`} />
-                        <div className="tz-mock-stat-l">{s.l}</div>
-                        <div className="tz-mock-stat-v">{s.v}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="tz-mock-panel">
-                    <div className="tz-mock-panel-head">
-                      <span className="tz-mock-panel-title">Aylık Tahsilat Akışı</span>
-                      <span className="tz-mock-legend"><i /> 2026</span>
-                    </div>
-                    <div className="tz-mock-chart">
-                      {[48, 62, 40, 74, 58, 88, 70, 95, 66, 82].map((h, i) => (
-                        <span key={i} className="tz-bar" style={{ height: `${h}%` }} />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="tz-preview-fade" aria-hidden />
           </div>
         </div>
       </header>
 
-      {/* ---------------------------------------------------------- STATS */}
-      <section className="tz-statsband">
-        <div className="tz-container tz-stats">
-          {stats.map(s => (
-            <div key={s.label} className="tz-stat">
-              <div className="tz-stat-v">{s.value}</div>
-              <div className="tz-stat-l">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------- CONTRAST */}
-      <section className="tz-section">
-        <div className="tz-container tz-split">
-          <div className="tz-reveal">
-            <span className="tz-eyebrow">Neden Klüp360</span>
-            <h2 className="tz-h2">Eski yöntemleri geride bırakın</h2>
-            <p className="tz-lead">
-              Excel dosyaları, kayıp kağıtlar ve manuel bordro hesaplama yüküyle kurumunuzu yormayın.
-              Modern dijital yönetimle hatasız ve hızlı bir düzene geçin.
+      {/* ---------------------------------------------------------- BİR AY, ADIM ADIM */}
+      <section className="tz-section" id="ay">
+        <div className="tz-container">
+          <div className="tz-head tz-reveal">
+            <span className="tz-eyebrow"><PlayCircle size={15} /> Bir ay, adım adım</span>
+            <h2 className="tz-h2">Bir kez girilen bilgi, sonraki işe aktarılır</h2>
+            <p className="tz-lead tz-lead-center">
+              Öğrencinin aidatı kayıtla birlikte hesaplanır; sınıf defterindeki dersler puantaja, puantaj
+              bordroya geçer. Tahsilatlar işletme defterine, bordro ve puantaj denetim dosyasına kendiliğinden yansır.
             </p>
-            <ul className="tz-contrast">
-              {contrast.map(c => (
-                <li key={c.good} className="tz-contrast-row">
-                  <span className="tz-contrast-bad">{c.bad}</span>
-                  <ArrowRight size={16} className="tz-contrast-arrow" />
-                  <div className="tz-contrast-good">
-                    <div className="tz-contrast-good-t"><CheckCircle size={16} /> {c.good}</div>
-                    <div className="tz-contrast-good-d">{c.goodDesc}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
           </div>
 
-          <div className="tz-reveal tz-contrast-visual">
-            <div className="tz-xls">
-              <div className="tz-xls-bar">Bordro_Hesaplari_Son.xlsx</div>
-              <div className="tz-xls-grid">
-                {['Ahmet Yılmaz', 'Zeynep A.', 'Ayşe K.', 'Murat T.', 'Elif S.'].map((n, i) => (
-                  <div key={n} className="tz-xls-row">
-                    <span className="tz-xls-c muted">{i + 1}</span>
-                    <span className="tz-xls-c">{n}</span>
-                    <span className={`tz-xls-c ${i === 0 ? 'err' : ''}`}>{i === 0 ? 'EKSİK' : 'Tamam'}</span>
-                    <span className={`tz-xls-c ${i === 2 ? 'err' : ''}`}>{i === 2 ? '#DEĞER!' : '₺24.500'}</span>
+          <ol className="tz-akis">
+            {BOLUMLER.map((b, i) => (
+              <li key={b.id} className={`tz-adim ${i % 2 ? 'ters' : ''}`}>
+                <div className="tz-adim-metin tz-reveal">
+                  <div className="tz-adim-ust">
+                    <span className="tz-adim-no">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="tz-adim-gun">{b.gun}</span>
                   </div>
-                ))}
-              </div>
-              <span className="tz-xls-flag">✕ Formül hatası</span>
-            </div>
-
-            <div className="tz-clean">
-              <div className="tz-clean-head">
-                <span className="tz-clean-ic"><CheckCircle size={20} /></span>
-                <div>
-                  <div className="tz-clean-t">Maaş Bordrosu</div>
-                  <div className="tz-clean-s">Tüm kayıtlar doğrulandı</div>
+                  <h3>{b.baslik}</h3>
+                  <p>{b.anlatim}</p>
+                  <ul className="tz-adim-maddeler">
+                    {b.maddeler.map(m => <li key={m}><CheckCircle size={15} />{m}</li>)}
+                  </ul>
+                  <button type="button" className="tz-adim-izle" onClick={e => setSinema({ set: KULUP_SETI, bolum: i, donus: e.currentTarget })}>
+                    <PlayCircle size={16} /> Anlatımlı izle
+                  </button>
                 </div>
-                <span className="tz-clean-badge">HATASIZ</span>
-              </div>
-              <div className="tz-clean-row">
-                <span>Toplam ödenecek</span>
-                <strong>₺145.500,00</strong>
-              </div>
-              <div className="tz-clean-track"><span /></div>
-              <div className="tz-clean-speed"><Clock size={16} /> 0,3 sn hesaplama süresi</div>
-            </div>
-          </div>
+                <div className="tz-adim-film tz-reveal">
+                  <MiniFilm bolum={i} />
+                </div>
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
 
-      {/* ---------------------------------------------------------- FEATURES */}
+      {/* ---------------------------------------------------------- DAHASI */}
       <section className="tz-section tz-section-alt">
         <div className="tz-container">
           <div className="tz-head tz-reveal">
-            <span className="tz-eyebrow">Hepsi bir arada</span>
-            <h2 className="tz-h2">İhtiyacınız olan her şey</h2>
+            <span className="tz-eyebrow"><Users size={15} /> Ve dahası</span>
+            <h2 className="tz-h2">Kulübün diğer işleri de burada</h2>
             <p className="tz-lead tz-lead-center">
-              12 modül, tek platform. Başka hiçbir yazılıma ya da Excel dosyasına ihtiyaç
-              duymadan kulübünüzü yönetmek için gereken tüm akıllı araçlar burada.
+              Ders programından Okul Aile Birliği’ne kadar, kulübünüzün geri kalan işleri de
+              aynı sistemde ve aynı verilerle yürür.
             </p>
           </div>
-
-          <div className="tz-features">
-            {features.map((f, i) => (
-              <div key={f.title} className="tz-fcard tz-reveal" style={{ transitionDelay: `${(i % 4) * 60}ms` }}>
-                <span className="tz-ficon"><f.icon size={20} /></span>
-                <h3>{f.title}</h3>
-                <p>{f.desc}</p>
-                <f.icon className="tz-fcard-ghost" size={104} aria-hidden />
+          <div className="tz-dahasi">
+            {dahasi.map((d, i) => (
+              <div key={d.title} className="tz-dcard tz-reveal" style={{ transitionDelay: `${(i % 4) * 60}ms` }}>
+                <span className="tz-ficon"><d.icon size={19} /></span>
+                <h3>{d.title}</h3>
+                <p>{d.desc}</p>
               </div>
             ))}
           </div>
@@ -372,15 +252,16 @@ export default function TanitimPage() {
         <div className="tz-audit-glow" aria-hidden />
         <div className="tz-container tz-audit-inner">
           <div className="tz-head tz-reveal">
-            <span className="tz-eyebrow tz-eyebrow-light"><Eye size={15} /> Resmi kurumlar / MEB için</span>
-            <h2 className="tz-h2 tz-h2-light">Şeffaf ve anlık denetim paneli</h2>
+            <span className="tz-eyebrow tz-eyebrow-light"><Eye size={15} /> İl millî eğitim denetçileri için</span>
+            <h2 className="tz-h2 tz-h2-light">Denetçinin gördüğü ekran</h2>
             <p className="tz-lead tz-lead-center tz-lead-light">
-              İl ve İlçe Milli Eğitim Müdürlüklerine özel tahsis edilen salt-okunur panel ile
-              bölgenizdeki tüm bağlı kurumları saniyeler içinde denetleyin.
+              İlinizdeki kulüplerin aylık dosyaları tek bir kuyrukta toplanır. Belgeleri açar, bordroyu sistemin
+              yeniden hesaplamasıyla kontrol eder, onaylar ya da notla iade edersiniz. Aşağıda bir dosyanın yolculuğunu izleyin.
             </p>
-            <Link href="/login?type=denetim" className="tz-btn tz-btn-white tz-btn-lg">
-              Denetçi Girişi Yapın <ArrowRight size={18} />
-            </Link>
+          </div>
+
+          <div className="tz-film tz-film-denetci tz-reveal">
+            <Film set={DENETCI_SETI} onBuyut={b => setSinema({ set: DENETCI_SETI, bolum: b })} />
           </div>
 
           <div className="tz-audit-grid">
@@ -392,6 +273,12 @@ export default function TanitimPage() {
               </div>
             ))}
           </div>
+
+          <div className="tz-audit-cta tz-reveal">
+            <Link href="/login?type=denetim" className="tz-btn tz-btn-white tz-btn-lg">
+              Denetçi Girişi Yapın <ArrowRight size={18} />
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -402,7 +289,7 @@ export default function TanitimPage() {
             <span className="tz-eyebrow"><Clock size={15} /> Dakikalar içinde kurulum</span>
             <h2 className="tz-h2">3 adımda sisteme geçin</h2>
             <p className="tz-lead tz-lead-center">
-              Karmaşık entegrasyonlar yok. Öğle aranızda bile sistemi kurup canlıya alabilirsiniz.
+              Karmaşık entegrasyonlar yok. Öğle aranızda bile sistemi kurup kullanmaya başlayabilirsiniz.
             </p>
           </div>
 
@@ -425,7 +312,7 @@ export default function TanitimPage() {
             <span className="tz-eyebrow"><Shield size={15} /> Kurumsal güven</span>
             <h2 className="tz-h2">Güvenli ve uyumlu</h2>
             <p className="tz-lead tz-lead-center">
-              Verileriniz endüstri standartlarında şifrelenir, altyapımız MEB mevzuatına tam uyumlu çalışır.
+              Verileriniz şifrelenerek saklanır, hesaplamalar MEB mevzuatına göre yapılır.
             </p>
           </div>
 
@@ -449,10 +336,10 @@ export default function TanitimPage() {
           <div className="tz-cta tz-reveal">
             <div className="tz-cta-glow" aria-hidden />
             <div className="tz-cta-inner">
-              <h2>Kulübünüzü dijitale taşıyın</h2>
+              <h2>Gelecek ayı Klüp360’ta yönetin</h2>
               <p>
-                Kağıt, Excel ve manuel hesaplama dönemine kalıcı son verin. Klüp360 ile
-                dakikalar içinde yeni nesil yönetime geçin.
+                İzlediğiniz akışı kendi kulübünüzün verileriyle deneyin. Kurulum dakikalar sürer,
+                kredi kartı gerekmez.
               </p>
               <div className="tz-hero-actions tz-cta-actions">
                 <Link href="/signup" className="tz-btn tz-btn-white tz-btn-lg">
@@ -492,6 +379,8 @@ export default function TanitimPage() {
           © {new Date().getFullYear()} Klüp360 — Tüm hakları saklıdır.
         </div>
       </footer>
+
+      {sinema && <Sinema set={sinema.set} bolum={sinema.bolum} donus={sinema.donus} onKapat={sinemayiKapat} />}
     </div>
   )
 }
@@ -537,7 +426,7 @@ const CSS = `
 .tz-btn-outline-light:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.5); transform: translateY(-2px); }
 
 /* nav */
-.tz-nav { position: sticky; top: 0; z-index: 100; background: rgba(245,242,236,.82);
+.tz-nav { position: sticky; top: 0; z-index: 100; background: rgba(245,246,248,.84);
   backdrop-filter: saturate(160%) blur(14px); border-bottom: 1px solid var(--line); }
 .tz-nav-inner { max-width: 1180px; margin: 0 auto; height: 68px; padding: 0 clamp(20px,5vw,48px);
   display: flex; align-items: center; justify-content: space-between; gap: 20px; }
@@ -563,7 +452,7 @@ const CSS = `
 
 /* hero */
 .tz-hero { position: relative; overflow: hidden; padding: clamp(64px,9vw,120px) 0 0;
-  background: radial-gradient(120% 70% at 50% -10%, #ecf7f0 0%, var(--bg) 60%); text-align: center; }
+  background: radial-gradient(120% 70% at 50% -10%, #EEF2FE 0%, var(--bg) 60%); text-align: center; }
 .tz-hero-glow { position: absolute; top: -140px; left: 50%; transform: translateX(-50%);
   width: min(760px,90vw); height: 460px; background: radial-gradient(closest-side, rgba(35,71,217,.16), transparent);
   filter: blur(30px); pointer-events: none; }
@@ -572,7 +461,7 @@ const CSS = `
   border: 1px solid var(--line-2); border-radius: 999px; padding: 8px 18px; font-size: 13px; font-weight: 600;
   color: var(--g-d); box-shadow: 0 4px 16px rgba(35,71,217,.06); }
 .tz-badge-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold);
-  box-shadow: 0 0 0 4px rgba(200,131,42,.18); }
+  box-shadow: 0 0 0 4px rgba(142,163,238,.25); }
 .tz-h1 { font-family: var(--font-display); font-weight: 800; letter-spacing: -.02em;
   font-size: clamp(36px, 6.2vw, 74px); line-height: 1.08; margin: 28px auto 22px; max-width: 15ch; }
 .tz-grad { background: linear-gradient(100deg, var(--g) 0%, var(--gold) 100%);
@@ -581,72 +470,6 @@ const CSS = `
 .tz-hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
 .tz-hero-note { display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; font-size: 13.5px; color: var(--tx3); font-weight: 500; }
 .tz-hero-note svg { color: var(--g); }
-
-/* product preview */
-.tz-preview { position: relative; max-width: 1000px; margin: clamp(56px,8vw,88px) auto 0; }
-.tz-window { position: relative; z-index: 3; border-radius: 18px 18px 0 0; overflow: hidden;
-  border: 1px solid var(--line-2); border-bottom: none; background: var(--surf);
-  box-shadow: 0 40px 80px -30px rgba(30,66,41,.35), 0 0 0 8px rgba(255,255,255,.5); }
-.tz-window-bar { height: 46px; display: flex; align-items: center; gap: 8px; padding: 0 18px;
-  background: #fbf9f3; border-bottom: 1px solid var(--line); }
-.tz-dot { width: 11px; height: 11px; border-radius: 50%; }
-.tz-window-url { flex: 1; margin: 0 12px; max-width: 320px; height: 26px; border-radius: 8px;
-  background: var(--bg); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center;
-  font-size: 11.5px; color: var(--tx3); }
-.tz-mock { display: flex; min-height: 440px; text-align: left; }
-.tz-mock-side { width: 210px; flex-shrink: 0; background: linear-gradient(180deg,var(--g-d),var(--g-dd)); padding: 18px 14px; }
-.tz-mock-brand { display: flex; align-items: center; gap: 9px; padding: 4px 6px 20px; }
-.tz-mock-brand img { width: 26px; height: 26px; }
-.tz-mock-brand span { color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 16px; }
-.tz-mock-nav { display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 9px; margin-bottom: 3px; }
-.tz-mock-nav.is-active { background: rgba(255,255,255,.14); }
-.tz-mock-nav-ic { width: 16px; height: 16px; border-radius: 5px; background: rgba(255,255,255,.35); flex-shrink: 0; }
-.tz-mock-nav.is-active .tz-mock-nav-ic { background: var(--gold); }
-.tz-mock-nav-tx { font-size: 12.5px; color: rgba(255,255,255,.62); font-weight: 500; }
-.tz-mock-nav.is-active .tz-mock-nav-tx { color: #fff; font-weight: 600; }
-.tz-mock-main { flex: 1; min-width: 0; padding: 24px; background: var(--bg); }
-.tz-mock-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.tz-mock-title { font-family: var(--font-display); font-size: 19px; font-weight: 700; }
-.tz-mock-sub { font-size: 12px; color: var(--tx3); margin-top: 2px; }
-.tz-mock-btn { background: var(--g); color: #fff; font-size: 12px; font-weight: 600; padding: 8px 14px; border-radius: 9px; }
-.tz-mock-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 18px; }
-.tz-mock-stat { background: var(--surf); border: 1px solid var(--line); border-radius: 14px; padding: 15px; }
-.tz-mock-stat-ic { display: block; width: 30px; height: 30px; border-radius: 9px; margin-bottom: 12px; }
-.tz-mock-stat-ic.green { background: #EEF2FE; border: 1px solid #cdeed9; }
-.tz-mock-stat-ic.gold { background: #fdf3e2; border: 1px solid #f2ddb8; }
-.tz-mock-stat-ic.blue { background: #e8f2fb; border: 1px solid #cadff2; }
-.tz-mock-stat-l { font-size: 11px; color: var(--tx3); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.tz-mock-stat-v { font-family: var(--font-display); font-size: 22px; font-weight: 700; margin-top: 3px; }
-.tz-mock-panel { background: var(--surf); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
-.tz-mock-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.tz-mock-panel-title { font-size: 13px; font-weight: 600; }
-.tz-mock-legend { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--tx3); }
-.tz-mock-legend i { width: 9px; height: 9px; border-radius: 3px; background: var(--g); }
-.tz-mock-chart { display: flex; align-items: flex-end; gap: 8px; height: 110px; }
-.tz-bar { flex: 1; border-radius: 5px 5px 2px 2px; background: linear-gradient(180deg,var(--gold) 0%,var(--g) 100%); opacity: .9; }
-.tz-preview-fade { position: absolute; left: -20px; right: -20px; bottom: -1px; height: 150px;
-  background: linear-gradient(180deg, transparent, var(--bg) 92%); z-index: 4; pointer-events: none; }
-
-/* accent chips — statically anchored to the window frame corners */
-.tz-chip { position: absolute; z-index: 5; display: flex; align-items: center; gap: 12px;
-  background: #ffffff; border: 1px solid var(--line);
-  border-radius: 16px; padding: 12px 16px; box-shadow: 0 24px 48px -20px rgba(30,66,41,.4);
-  transition: transform .35s cubic-bezier(.16,1,.3,1), box-shadow .35s; }
-.tz-chip:hover { transform: translateY(-3px); box-shadow: 0 30px 56px -20px rgba(30,66,41,.5); }
-.tz-chip-a { top: -26px; left: -26px; }
-.tz-chip-b { bottom: 132px; right: -30px; }
-.tz-chip-ic { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.tz-chip-ic-green { background: #EEF2FE; color: var(--g); }
-.tz-chip-ic-gold { background: #fdf3e2; color: var(--gold); }
-.tz-chip-t { font-size: 15px; font-weight: 800; color: var(--tx); line-height: 1.1; }
-.tz-chip-s { font-size: 12px; color: var(--tx2); margin-top: 2px; }
-
-/* stats band */
-.tz-statsband { background: linear-gradient(135deg,var(--g),var(--g-d)); }
-.tz-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 24px; padding-top: 44px; padding-bottom: 44px; }
-.tz-stat { text-align: center; }
-.tz-stat-v { font-family: var(--font-display); font-size: clamp(28px,4vw,40px); font-weight: 800; color: #fff; line-height: 1; }
-.tz-stat-l { font-size: 13px; color: rgba(255,255,255,.72); margin-top: 8px; }
 
 /* generic section */
 .tz-section { padding: clamp(72px,10vw,120px) 0; }
@@ -664,80 +487,20 @@ const CSS = `
 .tz-lead-center { margin-left: auto; margin-right: auto; }
 .tz-lead-light { color: rgba(255,255,255,.72); }
 
-/* contrast split */
-.tz-split { display: grid; grid-template-columns: 1.05fr .95fr; gap: clamp(40px,6vw,80px); align-items: center; }
-.tz-split .tz-eyebrow { margin-top: 0; }
-.tz-split .tz-h2, .tz-split .tz-lead { text-align: left; }
-.tz-split .tz-lead { margin-bottom: 32px; }
-.tz-contrast { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
-.tz-contrast-row { display: grid; grid-template-columns: minmax(120px,1fr) auto 1.5fr; align-items: center; gap: 14px; }
-.tz-contrast-bad { font-size: 14px; font-weight: 600; color: var(--tx3); text-decoration: line-through; text-decoration-color: var(--line-2); }
-.tz-contrast-arrow { color: var(--line-2); flex-shrink: 0; }
-.tz-contrast-good { position: relative; background: var(--surf); border: 1px solid var(--line);
-  border-left: 3px solid var(--g); border-radius: 12px; padding: 12px 16px; }
-.tz-contrast-good-t { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; }
-.tz-contrast-good-t svg { color: var(--g); flex-shrink: 0; }
-.tz-contrast-good-d { font-size: 13px; color: var(--tx2); margin-top: 3px; padding-left: 24px; }
-
-/* contrast visual */
-.tz-contrast-visual { position: relative; min-height: 400px; }
-.tz-xls { position: absolute; top: 0; right: 0; width: min(320px,80%); background: #fff; border: 1px solid #d9d9d9;
-  border-radius: 12px; overflow: hidden; box-shadow: 0 16px 40px -18px rgba(0,0,0,.25);
-  transform: rotate(4deg); filter: grayscale(.25); }
-.tz-xls-bar { background: #217346; color: #fff; font-size: 11px; font-weight: 600; padding: 8px 12px; }
-.tz-xls-grid { padding: 4px 0; }
-.tz-xls-row { display: grid; grid-template-columns: 28px 1.4fr 1fr 1fr; border-bottom: 1px solid #f0f0f0; }
-.tz-xls-c { font-size: 11px; color: #444; padding: 7px 8px; border-right: 1px solid #f0f0f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tz-xls-c.muted { background: #f3f2f1; color: #999; text-align: center; }
-.tz-xls-c.err { color: #c0392b; font-weight: 700; background: #fdecea; }
-.tz-xls-flag { position: absolute; bottom: 24px; right: -8px; background: #c0392b; color: #fff;
-  font-size: 11.5px; font-weight: 700; padding: 7px 13px; border-radius: 8px; box-shadow: 0 10px 24px -8px rgba(192,57,43,.6); }
-.tz-clean { position: relative; z-index: 2; width: min(330px,88%); margin-top: 130px;
-  background: var(--g-dd); border-radius: 20px; padding: 22px;
-  box-shadow: 0 40px 70px -28px rgba(22,54,32,.7), 0 0 0 8px rgba(255,255,255,.4); }
-.tz-clean-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
-.tz-clean-ic { width: 42px; height: 42px; border-radius: 12px; background: rgba(255,255,255,.1); color: #58c98a;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.tz-clean-t { color: #fff; font-size: 15px; font-weight: 700; }
-.tz-clean-s { color: rgba(255,255,255,.6); font-size: 12px; margin-top: 1px; }
-.tz-clean-badge { margin-left: auto; align-self: flex-start; background: rgba(88,201,138,.16); color: #58c98a;
-  border: 1px solid rgba(88,201,138,.4); font-size: 10.5px; font-weight: 800; letter-spacing: .05em; padding: 4px 9px; border-radius: 7px; }
-.tz-clean-row { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 0 12px; }
-.tz-clean-row span { color: rgba(255,255,255,.7); font-size: 13px; }
-.tz-clean-row strong { color: #fff; font-size: 18px; font-weight: 800; }
-.tz-clean-track { height: 8px; border-radius: 5px; background: rgba(255,255,255,.12); overflow: hidden; }
-.tz-clean-track span { display: block; width: 100%; height: 100%; background: linear-gradient(90deg,var(--g),var(--gold)); }
-.tz-clean-speed { display: flex; align-items: center; gap: 7px; margin-top: 14px; color: rgba(255,255,255,.82); font-size: 12.5px; font-weight: 600; }
-.tz-clean-speed svg { color: var(--gold); }
-
-/* features */
-.tz-features { display: grid; grid-template-columns: repeat(4,1fr); gap: 18px; }
-.tz-fcard { position: relative; overflow: hidden; background: var(--surf); border: 1px solid var(--line);
-  border-radius: 18px; padding: 26px 24px; transition: transform .3s cubic-bezier(.16,1,.3,1), box-shadow .3s, border-color .3s; }
-.tz-fcard:hover { transform: translateY(-5px); border-color: #cdeed9; box-shadow: 0 22px 40px -22px rgba(35,71,217,.4); }
-.tz-ficon { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 13px;
-  background: linear-gradient(135deg,#EEF2FE,#d6f0e0); color: var(--g); margin-bottom: 18px;
-  box-shadow: 0 4px 12px rgba(35,71,217,.1); transition: transform .3s; }
-.tz-fcard:hover .tz-ficon { transform: scale(1.06) rotate(-4deg); }
-.tz-fcard h3 { font-size: 16px; font-weight: 700; margin: 0 0 8px; }
-.tz-fcard p { font-size: 13.5px; color: var(--tx2); line-height: 1.6; margin: 0; }
-.tz-fcard-ghost { position: absolute; right: -22px; bottom: -22px; color: var(--g); opacity: .04; transition: transform .4s, opacity .4s; }
-.tz-fcard:hover .tz-fcard-ghost { transform: scale(1.15) rotate(-8deg); opacity: .07; }
-
 /* audit (dark) */
 .tz-audit { position: relative; overflow: hidden; padding: clamp(72px,10vw,120px) 0;
-  background: linear-gradient(160deg,var(--g-dd) 0%,#1a3c26 100%); }
+  background: linear-gradient(160deg,var(--g-dd) 0%,#16245E 100%); }
 .tz-audit-glow { position: absolute; bottom: -20%; right: -5%; width: 620px; height: 620px; border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(200,131,42,.16), transparent); filter: blur(20px); pointer-events: none; }
+  background: radial-gradient(closest-side, rgba(142,163,238,.18), transparent); filter: blur(20px); pointer-events: none; }
 .tz-audit-inner { position: relative; z-index: 2; }
 .tz-audit .tz-head .tz-btn { margin-top: 30px; }
 .tz-audit-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
 .tz-acard { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); border-radius: 18px;
   padding: 28px; transition: transform .3s, background .3s, border-color .3s; }
-.tz-acard:hover { transform: translateY(-4px); background: rgba(255,255,255,.07); border-color: rgba(200,131,42,.5); }
+.tz-acard:hover { transform: translateY(-4px); background: rgba(255,255,255,.07); border-color: rgba(142,163,238,.55); }
 .tz-acard-ic { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 14px;
   background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.14); color: #fff; margin-bottom: 18px; }
-.tz-acard:hover .tz-acard-ic { color: var(--gold); border-color: rgba(200,131,42,.45); }
+.tz-acard:hover .tz-acard-ic { color: var(--gold); border-color: rgba(142,163,238,.5); }
 .tz-acard h3 { font-size: 16px; font-weight: 700; color: #fff; margin: 0 0 10px; }
 .tz-acard p { font-size: 14px; color: rgba(255,255,255,.62); line-height: 1.6; margin: 0; }
 
@@ -747,7 +510,7 @@ const CSS = `
   background: linear-gradient(90deg, transparent, var(--line-2) 15%, var(--line-2) 85%, transparent); }
 .tz-step { position: relative; text-align: center; background: var(--surf); border: 1px solid var(--line);
   border-radius: 20px; padding: 40px 28px 32px; transition: transform .3s cubic-bezier(.16,1,.3,1), box-shadow .3s, border-color .3s; }
-.tz-step:hover { transform: translateY(-6px); border-color: #cdeed9; box-shadow: 0 24px 44px -24px rgba(35,71,217,.4); }
+.tz-step:hover { transform: translateY(-6px); border-color: #C9D4FA; box-shadow: 0 24px 44px -24px rgba(35,71,217,.4); }
 .tz-step-num { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%;
   background: var(--surf); border: 1px solid var(--line-2); box-shadow: 0 6px 18px rgba(35,71,217,.1);
   font-family: var(--font-display); font-size: 24px; font-weight: 800; color: var(--g);
@@ -759,7 +522,7 @@ const CSS = `
 .tz-trust { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
 .tz-tcard { display: flex; gap: 16px; background: var(--surf); border: 1px solid var(--line); border-radius: 18px;
   padding: 26px 24px; transition: transform .3s, box-shadow .3s, border-color .3s; }
-.tz-tcard:hover { transform: translateY(-4px); border-color: #cdeed9; box-shadow: 0 20px 38px -22px rgba(35,71,217,.35); }
+.tz-tcard:hover { transform: translateY(-4px); border-color: #C9D4FA; box-shadow: 0 20px 38px -22px rgba(35,71,217,.35); }
 .tz-tcard-ic { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 13px; flex-shrink: 0;
   background: linear-gradient(135deg,var(--bg),var(--surf)); border: 1px solid var(--line-2); color: var(--g); }
 .tz-tcard h3 { font-size: 15.5px; font-weight: 700; margin: 2px 0 7px; }
@@ -770,7 +533,7 @@ const CSS = `
 .tz-cta { position: relative; overflow: hidden; border-radius: clamp(24px,4vw,36px);
   background: linear-gradient(135deg,var(--g-d) 0%,var(--g-dd) 100%); padding: clamp(48px,7vw,84px) clamp(24px,5vw,48px); text-align: center; }
 .tz-cta-glow { position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(60% 120% at 85% -10%, rgba(200,131,42,.28), transparent 60%),
+  background: radial-gradient(60% 120% at 85% -10%, rgba(142,163,238,.3), transparent 60%),
               radial-gradient(50% 120% at 10% 120%, rgba(35,71,217,.5), transparent 60%); }
 .tz-cta-inner { position: relative; z-index: 2; }
 .tz-cta h2 { font-family: var(--font-display); font-weight: 800; letter-spacing: -.015em;
@@ -789,33 +552,73 @@ const CSS = `
 .tz-footer-links { display: flex; gap: 22px; flex-wrap: wrap; }
 .tz-footer-links a { font-size: 13.5px; color: rgba(255,255,255,.65); transition: color .15s; }
 .tz-footer-links a:hover { color: #fff; }
-.tz-footer-copy { font-size: 12.5px; color: rgba(255,255,255,.42); padding-top: 22px; }
+.tz-footer-copy { font-size: 12.5px; color: rgba(255,255,255,.62); padding-top: 22px; }
+
+/* film */
+.tz-hero { padding-top: clamp(40px,6vw,80px); }
+.tz-hero .tz-h1 { max-width: 19ch; font-size: clamp(34px,5.4vw,64px); margin: 22px auto 18px; }
+.tz-hero .tz-hero-lead { margin-bottom: 0; }
+.tz-film.tz-film-denetci { margin-top: 0; margin-bottom: clamp(44px,6vw,64px); }
+.tz-audit-cta { text-align: center; margin-top: clamp(36px,5vw,52px); }
+.tz-film { max-width: 1040px; margin: clamp(36px,5vw,56px) auto clamp(36px,5vw,48px); }
+
+/* bir ay, adım adım */
+.tz-akis { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: clamp(56px,8vw,104px); position: relative; }
+.tz-adim { display: grid; grid-template-columns: .85fr 1.15fr; gap: clamp(32px,5vw,64px); align-items: center; }
+.tz-adim.ters .tz-adim-metin { order: 2; }
+.tz-adim-ust { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.tz-adim-no { font-family: var(--font-display); font-size: 15px; font-weight: 800; color: #fff; background: var(--g);
+  width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; }
+.tz-adim-gun { font-size: 12.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--g-d);
+  background: #E8EDFD; padding: 5px 11px; border-radius: 999px; }
+.tz-adim h3 { font-family: var(--font-display); font-size: clamp(22px,2.6vw,30px); font-weight: 800; letter-spacing: -.015em; line-height: 1.2; margin: 0 0 14px; }
+.tz-adim p { font-size: 15.5px; color: var(--tx2); line-height: 1.7; margin: 0 0 18px; }
+.tz-adim-maddeler { list-style: none; margin: 0 0 22px; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 9px 16px; }
+.tz-adim-maddeler li { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; font-weight: 600; color: var(--tx); }
+.tz-adim-maddeler svg { color: var(--g); flex-shrink: 0; margin-top: 2px; }
+.tz-adim-izle { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; font-family: inherit; font-size: 14px; font-weight: 700; color: var(--g);
+  background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 0 16px; cursor: pointer; transition: border-color .15s, background .15s; }
+.tz-adim-izle:hover { border-color: var(--g); background: #F3F5FE; }
+
+/* telefon / tablet menüsü */
+.tz-menu-btn { display: none; width: 44px; height: 44px; border-radius: 11px; border: 1px solid var(--line); background: var(--surf); color: var(--tx); align-items: center; justify-content: center; cursor: pointer; }
+.tz-mobil-menu { display: none; }
+
+/* dahası */
+.tz-dahasi { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+.tz-dcard { background: var(--surf); border: 1px solid var(--line); border-radius: 16px; padding: 22px 20px; transition: transform .3s cubic-bezier(.16,1,.3,1), box-shadow .3s, border-color .3s; }
+.tz-dcard:hover { transform: translateY(-4px); border-color: #C9D4FA; box-shadow: 0 22px 40px -22px rgba(35,71,217,.4); }
+.tz-ficon { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 12px;
+  background: linear-gradient(135deg,#EEF2FE,#DCE3FB); color: var(--g); margin-bottom: 16px; }
+.tz-dcard h3 { font-size: 15.5px; font-weight: 700; margin: 0 0 7px; }
+.tz-dcard p { font-size: 13.5px; color: var(--tx2); line-height: 1.6; margin: 0; }
 
 /* ---------------- responsive ---------------- */
 @media (max-width: 980px) {
-  .tz-split { grid-template-columns: 1fr; }
-  .tz-contrast-visual { min-height: 380px; max-width: 420px; margin: 0 auto; }
-  .tz-features { grid-template-columns: repeat(2,1fr); }
+  .tz-adim, .tz-adim.ters { grid-template-columns: 1fr; }
+  .tz-adim.ters .tz-adim-metin { order: 0; }
+  .tz-dahasi { grid-template-columns: repeat(2,1fr); }
   .tz-audit-grid, .tz-trust { grid-template-columns: repeat(2,1fr); }
 }
 @media (max-width: 860px) {
   .tz-nav-links { display: none; }
+  .tz-menu-btn { display: inline-flex; }
+  .tz-mobil-menu { display: flex; flex-direction: column; padding: 8px clamp(20px,5vw,48px) 16px; border-top: 1px solid var(--line); background: var(--surf); }
+  .tz-mobil-menu a { display: flex; align-items: center; min-height: 48px; font-size: 15.5px; font-weight: 600; color: var(--tx); border-bottom: 1px solid var(--line); }
+  .tz-mobil-menu a:last-child { border-bottom: none; }
+  .tz-mobil-menu .tz-mobil-giris { color: var(--g); }
   .tz-steps { grid-template-columns: 1fr; gap: 44px; }
   .tz-steps::before { display: none; }
   .tz-step-num { margin-top: 0; }
-  .tz-chip { display: none; }
-  .tz-mock-side { display: none; }
 }
 @media (max-width: 620px) {
-  .tz-stats { grid-template-columns: repeat(2,1fr); gap: 28px; }
-  .tz-features, .tz-audit-grid, .tz-trust { grid-template-columns: 1fr; }
+  /* Telefonda küçük filmler okunmayacak kadar küçülüyor ve sayfayı uzatıyor; "Anlatımlı izle" tam ekranda açar */
+  .tz-adim-film { display: none; }
+  .tz-akis { gap: 40px; }
+  .tz-nav-cta .tz-btn-primary { padding: 10px 14px; }
+  .tz-dahasi, .tz-audit-grid, .tz-trust { grid-template-columns: 1fr; }
+  .tz-adim-maddeler { grid-template-columns: 1fr; }
   .tz-nav-login { display: none; }
-  .tz-contrast-row { grid-template-columns: 1fr; gap: 6px; }
-  .tz-contrast-arrow { display: none; }
-  .tz-contrast-bad { padding-bottom: 2px; }
-  .tz-window-url { display: none; }
-  .tz-mock-main { padding: 18px; }
-  .tz-mock-stats { gap: 10px; }
   .tz-tcard { padding: 20px; }
 }
 `
