@@ -258,8 +258,8 @@ export const actionBtn: React.CSSProperties = {
   boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
 }
 export const thGrup: React.CSSProperties = {
-  padding: '12px 2px', textAlign: 'center', fontSize: 9,
-  fontWeight: 800, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0,
+  padding: '10px 4px', textAlign: 'center', fontSize: 10.5, height: 37, boxSizing: 'border-box',
+  fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 0,
   borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border-light)',
   background: 'var(--surface2)', lineHeight: 1.4,
 }

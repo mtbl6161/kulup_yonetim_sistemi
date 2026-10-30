@@ -10,10 +10,10 @@ import { AlertTriangle, CheckCircle2, XCircle, Info, RefreshCw, ChevronDown, Che
 import { useYukleme } from '@/lib/useYukleme'
 
 const RENK: Record<KontrolDurum, { bg: string; fg: string; border: string; ad: string }> = {
-  ok: { bg: 'var(--success-light)', fg: '#1a6b34', border: 'var(--success-border)', ad: 'Uygun' },
-  uyari: { bg: 'var(--warn-light)', fg: '#8a5a00', border: 'var(--warn-border)', ad: 'Uyarı' },
+  ok: { bg: 'var(--success-light)', fg: 'var(--success)', border: 'var(--success-border)', ad: 'Uygun' },
+  uyari: { bg: 'var(--warn-light)', fg: '#8a5200', border: 'var(--warn-border)', ad: 'Uyarı' },
   hata: { bg: 'var(--danger-light)', fg: 'var(--danger)', border: 'var(--danger-border)', ad: 'Hata' },
-  bilgi: { bg: 'var(--info-light)', fg: '#1a5b8a', border: 'var(--info-border)', ad: 'Bilgi' },
+  bilgi: { bg: 'var(--info-light)', fg: 'var(--info)', border: 'var(--info-border)', ad: 'Bilgi' },
 }
 const IKON: Record<KontrolDurum, typeof Info> = { ok: CheckCircle2, uyari: AlertTriangle, hata: XCircle, bilgi: Info }
 
@@ -21,7 +21,7 @@ function Rozet({ d }: { d: KontrolDurum }) {
   const r = RENK[d]
   const I = IKON[d]
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: r.bg, color: r.fg, whiteSpace: 'nowrap' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 5, fontSize: 11.5, fontWeight: 600, background: r.bg, color: r.fg, whiteSpace: 'nowrap' }}>
       <I size={12} aria-hidden="true" /> {r.ad}
     </span>
   )
@@ -60,7 +60,7 @@ const altSatir: React.CSSProperties = { fontSize: 11.5, fontWeight: 500, color: 
 function hucre(k: KisiKontrol, basliklar: string[]): React.CSSProperties {
   const b = k.bulgular.filter(x => basliklar.includes(x.baslik))
   if (b.some(x => x.durum === 'hata')) return { ...td, background: 'var(--danger-light)', color: 'var(--danger)', fontWeight: 700 }
-  if (b.some(x => x.durum === 'uyari')) return { ...td, background: 'var(--warn-light)', color: '#8a5a00', fontWeight: 700 }
+  if (b.some(x => x.durum === 'uyari')) return { ...td, background: 'var(--warn-light)', color: '#8a5200', fontWeight: 700 }
   return td
 }
 
@@ -183,7 +183,7 @@ export default function DenetciHesapKontrol({ veri }: { veri: HesapKontrolVeri }
   const acikMi = (k: KisiKontrol) => (k.durum === 'hata' || k.durum === 'uyari') !== degisen.has(k.satir.id)
 
   return (
-    <div style={{ flex: 1, overflow: 'auto', padding: '18px 24px', display: 'flex', flexDirection: 'column', gap: 16, background: 'var(--bg)' }}>
+    <div className="dn-sayfa" style={{ gap: 16 }}>
       {/* Özet başlıkta; burada yalnızca kapsam ve yenileme */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <span style={{ fontSize: 13, color: 'var(--text2)' }}>
@@ -276,7 +276,7 @@ export default function DenetciHesapKontrol({ veri }: { veri: HesapKontrolVeri }
                           <div style={{ fontWeight: 700 }}>
                             {k.ad}
                             {k.baskaKurum.length > 0 && (
-                              <span title={k.baskaKurum.join(' · ')} style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, padding: '1px 6px', borderRadius: 20, background: 'var(--info-light)', color: '#1a5b8a', whiteSpace: 'nowrap' }}>
+                              <span title={k.baskaKurum.join(' · ')} style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, padding: '1px 6px', borderRadius: 20, background: 'var(--info-light)', color: 'var(--info)', whiteSpace: 'nowrap' }}>
                                 Başka kurum?
                               </span>
                             )}

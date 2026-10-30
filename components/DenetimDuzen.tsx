@@ -1,24 +1,23 @@
 'use client'
-// Denetim paneli düzeni: üst bar, Okullar sayfası ve okul inceleme başlığı (karar + özet + sekmeler).
-// Okul açıkken ekranda tek sütun vardır; dosya kararı her sekmede başlıkta durur.
+// Denetim paneli düzeni: kabuk (yan menü + üst başlık), Okullar sayfası ve okul inceleme başlığı (karar + özet + sekmeler).
+// Okul açıkken ekranda tek sütun vardır; dosya kararı her sekmede başlıkta durur, tablolar başlığın hemen altından başlar.
 import { useMemo, useState } from 'react'
+import { BrandMark } from '@/components/brand/Logo'
+import { KABUK_STIL } from '@/components/yonetim/kabukStil'
+import { Filtre } from '@/components/yonetim/ortak'
+import { useDegisince } from '@/lib/useDegisince'
 import { supabase } from '@/lib/supabase'
-import { AYLAR } from '@/lib/hesaplama'
 import { DenetimTeslim } from '@/lib/denetimDosyasi'
 import { HesapKontrolSonuc } from '@/lib/hesapKontrol'
 import { HesapKontrolVeri } from '@/components/DenetciHesapKontrol'
-import { DurumRozeti, OkulDonemDurumu, donemSecenekleri } from '@/components/DenetimPanel'
+import { DurumRozeti, EvrakIlerleme, OkulDonemDurumu, donemSecenekleri } from '@/components/DenetimPanel'
 import {
   Inbox, Building2, ScrollText, Settings, LogOut, Search, RefreshCw, ArrowLeft, ChevronLeft, ChevronRight,
-  CheckCircle2, Undo2, FolderOpen, ShieldCheck, Database, ArrowRight, Clock,
+  CheckCircle2, Undo2, FolderOpen, ShieldCheck, Database, ArrowRight, Clock, Menu, X,
 } from 'lucide-react'
 
 export type Bolum = 'kuyruk' | 'okullar' | 'kayitlar' | 'ayarlar'
 export type OkulSekme = 'evrak' | 'hesap' | 'veri'
-
-const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
-const btnOnay: React.CSSProperties = { ...btn, background: '#2d6a3e', color: '#ffffff', border: 'none' }
-const btnIade: React.CSSProperties = { ...btn, color: '#9a3412', borderColor: '#e8b48f' }
 
 function gunFarki(iso?: string | null): number {
   if (!iso) return 0
@@ -33,77 +32,184 @@ function goreceTarih(iso?: string | null) {
 }
 
 // ============================================================
-// Üst bar
+// Kabuk: yönetim konsoluyla aynı koyu yan menü, üst başlık (dönem seçimi) ve dar ekran çekmecesi
 // ============================================================
-export function DenetimUstBar({ bolum, onBolum, donem, onDonem, bekleyen, ilAd, kullaniciAd, onCikis }: {
+const MENU: { id: Bolum; ad: string; icon: typeof Inbox }[] = [
+  { id: 'kuyruk', ad: 'İş kuyruğu', icon: Inbox },
+  { id: 'okullar', ad: 'Okullar', icon: Building2 },
+  { id: 'kayitlar', ad: 'Kayıtlar', icon: ScrollText },
+  { id: 'ayarlar', ad: 'Ayarlar', icon: Settings },
+]
+
+export function DenetimKabuk({ bolum, onBolum, donem, onDonem, bekleyen, ilAd, kullaniciAd, onCikis, baslik, alt, children }: {
   bolum: Bolum; onBolum: (b: Bolum) => void
   donem: string; onDonem: (k: string) => void
   bekleyen: number; ilAd?: string; kullaniciAd?: string; onCikis: () => void
+  baslik: string; alt?: string
+  children: React.ReactNode
 }) {
-  const ogeler: { id: Bolum; ad: string; icon: typeof Inbox }[] = [
-    { id: 'kuyruk', ad: 'İş Kuyruğu', icon: Inbox },
-    { id: 'okullar', ad: 'Okullar', icon: Building2 },
-    { id: 'kayitlar', ad: 'Kayıtlar', icon: ScrollText },
-    { id: 'ayarlar', ad: 'Ayarlar', icon: Settings },
-  ]
+  const [acik, setAcik] = useState(false)
+  useDegisince(bolum, () => setAcik(false))
+  const ad = kullaniciAd || 'Denetim yetkilisi'
+  const basHarf = ad.split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join('').toLocaleUpperCase('tr-TR')
+
   return (
-    <header style={{ flexShrink: 0, background: '#1f3a2a', color: '#e8efe9', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px 18px', padding: '10px 20px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div aria-hidden="true" style={{ width: 30, height: 30, borderRadius: 8, background: '#e9b44c', color: '#1f3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>K</div>
-        <div style={{ lineHeight: 1.15 }}>
-          <div style={{ fontWeight: 800, fontSize: 14 }}>Kulüp360</div>
-          <div style={{ fontSize: 10, color: '#b7cbbd', letterSpacing: 1.1, fontWeight: 700 }}>DENETİM</div>
+    <div className="yk yk-sabit">
+      <style>{KABUK_STIL + DENETIM_STIL}</style>
+      <aside className={`yk-menu${acik ? ' acik' : ''}`} aria-label="Denetim menüsü">
+        <div className="yk-marka">
+          <BrandMark size={30} />
+          <div><strong>Klüp360</strong><span>Denetim paneli</span></div>
+          <button type="button" className="yk-kapat" onClick={() => setAcik(false)} aria-label="Menüyü kapat"><X size={18} /></button>
         </div>
-      </div>
-
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#b7cbbd', fontWeight: 700 }}>
-        <span style={{ letterSpacing: 0.5 }}>DÖNEM</span>
-        <select value={donem} onChange={e => onDonem(e.target.value)}
-          style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #3d6650', background: '#2a4a37', color: '#ffffff', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>
-          {donemSecenekleri().map(d => <option key={d.key} value={d.key}>{d.ad}</option>)}
-        </select>
-      </label>
-
-      <nav aria-label="Denetim menüsü" style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        {ogeler.map(o => {
-          const aktif = bolum === o.id
-          return (
-            <button key={o.id} type="button" onClick={() => onBolum(o.id)} aria-current={aktif ? 'page' : undefined}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 12px', borderRadius: 9, border: 'none', cursor: 'pointer',
-                background: aktif ? '#2f5440' : 'transparent', color: aktif ? '#ffffff' : '#d4e2d8', fontWeight: aktif ? 700 : 500, fontSize: 13.5, fontFamily: 'inherit' }}>
-              <o.icon size={15} aria-hidden="true" />
-              {o.ad}
-              {o.id === 'kuyruk' && bekleyen > 0 && (
-                <span style={{ background: '#e9b44c', color: '#1f3a2a', borderRadius: 20, padding: '0 7px', fontSize: 11.5, fontWeight: 800 }}>{bekleyen}</span>
-              )}
+        <nav>
+          <div className="yk-grup">{ilAd ? `${ilAd} İl MEM` : 'Denetim'}</div>
+          {MENU.map(o => (
+            <button key={o.id} type="button" className={`yk-oge${bolum === o.id ? ' on' : ''}`} aria-current={bolum === o.id ? 'page' : undefined} onClick={() => onBolum(o.id)}>
+              <o.icon size={16} aria-hidden="true" />
+              <span>{o.ad}</span>
+              {o.id === 'kuyruk' && bekleyen > 0 && <em className="vurgu">{bekleyen}</em>}
             </button>
-          )
-        })}
-      </nav>
-
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ textAlign: 'right', lineHeight: 1.2, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>{kullaniciAd || 'Denetim yetkilisi'}</div>
-          {ilAd && <div style={{ fontSize: 11, color: '#b7cbbd' }}>{ilAd} İl MEM</div>}
+          ))}
+        </nav>
+        <div className="yk-kisi">
+          <div className="yk-avatar" aria-hidden="true">{basHarf || 'DY'}</div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <strong title={ad}>{ad}</strong>
+            <span>{ilAd ? `${ilAd} İl MEM denetçisi` : 'Denetim yetkilisi'}</span>
+          </div>
+          <button type="button" onClick={onCikis} aria-label="Çıkış yap" title="Çıkış yap"><LogOut size={16} /></button>
         </div>
-        <button type="button" onClick={onCikis} aria-label="Çıkış yap" title="Çıkış"
-          style={{ width: 34, height: 34, borderRadius: 9, border: '1px solid #3d6650', background: 'transparent', color: '#f3c9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-          <LogOut size={15} />
-        </button>
-      </div>
-    </header>
+      </aside>
+      {acik && <div className="yk-perde" onClick={() => setAcik(false)} aria-hidden="true" />}
+
+      <main className="yk-ana">
+        <header className="yk-ust">
+          <button type="button" className="yk-menu-ac" onClick={() => setAcik(true)} aria-label="Menüyü aç"><Menu size={20} /></button>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h1>{baslik}</h1>
+            {alt && <p>{alt}</p>}
+          </div>
+          <div className="yk-ust-eylem">
+            <label className="dn-donem">
+              <span>Dönem</span>
+              <select className="form-select" value={donem} onChange={e => onDonem(e.target.value)}>
+                {donemSecenekleri().map(d => <option key={d.key} value={d.key}>{d.ad}</option>)}
+              </select>
+            </label>
+          </div>
+        </header>
+        <div className="dn-govde">{children}</div>
+      </main>
+    </div>
   )
 }
+
+// Denetim ekranları kendi içinde kayar (tablolar, belge önizlemesi); kabuk ekran yüksekliğinde sabit kalır.
+const DENETIM_STIL = `
+.yk-sabit { height: 100vh; height: 100dvh; overflow: hidden; }
+.yk-sabit .yk-menu { height: 100vh; height: 100dvh; }
+.yk-sabit .yk-ana { height: 100%; overflow: hidden; }
+/* Açık yan menü: uygulamanın ana menüsüyle aynı (beyaz zemin, seçili öğede açık mavi zemin + sol şerit) */
+.yk-sabit .yk-menu { background: var(--surface); color: var(--text2); border-right: 1px solid var(--border); }
+.yk-sabit .yk-marka strong { color: var(--text); }
+.yk-sabit .yk-marka span, .yk-sabit .yk-grup { color: var(--text3); }
+.yk-sabit .yk-kapat { color: var(--text2); }
+.yk-sabit .yk-oge { color: var(--text2); position: relative; }
+.yk-sabit .yk-oge svg { color: var(--text3); }
+.yk-sabit .yk-oge:hover { background: #f1f3f6; color: var(--text); }
+.yk-sabit .yk-oge.on { background: #f0f3fe; color: var(--accent-dark); box-shadow: inset 3px 0 0 var(--accent); }
+.yk-sabit .yk-oge.on svg { color: var(--accent); }
+.yk-sabit .yk-oge:focus-visible, .yk-sabit .yk-kisi button:focus-visible { outline-color: var(--accent); }
+.yk-sabit .yk-oge em.vurgu { background: var(--warn-light); color: #8a5200; border: 1px solid var(--warn-border); }
+.yk-sabit .yk-kisi { border-top-color: var(--border); }
+.yk-sabit .yk-kisi strong { color: var(--text); }
+.yk-sabit .yk-kisi span { color: var(--text3); }
+.yk-sabit .yk-kisi button { color: var(--danger); border: 1px solid var(--danger-border); }
+.yk-sabit .yk-kisi button:hover { color: var(--danger); background: var(--danger-light); }
+.yk-sabit .yk-avatar { background: var(--text); }
+.yk-sabit .yk-ust { position: static; flex-shrink: 0; }
+.dn-govde { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.dn-kaydir { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 28px 40px; }
+.dn-sayfa { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 28px 40px; display: flex; flex-direction: column; gap: 18px; }
+.dn-donem { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text3); }
+.dn-donem .form-select { width: auto; min-width: 150px; font-size: 13px; font-weight: 600; }
+.dn-secim { width: auto; min-width: 150px; font-size: 13px; }
+.yk-kpi > button { text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 15px 17px; cursor: pointer; font: inherit; color: inherit; }
+.yk-kpi > button:hover { border-color: var(--border-strong); }
+.yk-kpi > button.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.dn-ilerleme { display: flex; align-items: center; gap: 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.dn-ilerleme > span:first-child { width: 80px; height: 6px; border-radius: 6px; background: var(--surface2); overflow: hidden; flex-shrink: 0; }
+.dn-ilerleme > span:first-child > span { display: block; height: 100%; border-radius: 6px; }
+.dn-baslik { flex-shrink: 0; background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px 0; display: flex; flex-direction: column; gap: 12px; }
+.dn-sekmeler { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.dn-sekmeler button { display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; font: inherit; font-size: 13.5px; font-weight: 500; color: var(--text2); cursor: pointer; white-space: nowrap; }
+.dn-sekmeler button.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.dn-sekmeler em { font-style: normal; background: var(--danger); color: #fff; border-radius: 10px; padding: 0 7px; font-size: 11px; font-weight: 700; }
+.dn-iade { color: #8a5200; border-color: var(--warn-border); }
+.dn-iade:hover { background: var(--warn-light); border-color: #e0bf7a; }
+.dn-alt-arac { flex-shrink: 0; padding: 12px 28px; border-bottom: 1px solid var(--border-light); background: var(--surface); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.dn-sekme-satir { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; }
+.dn-sekme-satir .dn-sekmeler { flex: 1 0 auto; }
+.dn-sekme-satir > .dn-sekme-sag { flex-shrink: 0; padding-bottom: 6px; }
+.dn-sekmeler em.ok { background: var(--success-light); color: var(--success); }
+.dn-sekmeler em.uyari { background: var(--warn-light); color: #8a5200; }
+.dn-sekmeler em.notr { background: var(--surface2); color: var(--text2); }
+
+/* Aylık ızgara (ders programı / sınıf defteri): ekranın kalan yüksekliğine sığar, kendi içinde kayar */
+.dn-izgara { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 14px 28px 18px; }
+.dn-izgara-arac { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; }
+.dn-izgara-ozet { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--text2); }
+.dn-lejant { display: inline-flex; align-items: center; gap: 6px; }
+.dn-lejant i { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--border-strong); }
+.dn-lejant i.geldi { background: var(--success-light); border-color: var(--success-border); }
+.dn-lejant i.gelmedi { background: var(--danger-light); border-color: var(--danger-border); }
+.dn-lejant i.plan { background: var(--accent-lighter); border-color: var(--accent-light); }
+.dn-lejant i.kapali { background: var(--th-off-bg); }
+.dn-sayac-hata { font-style: normal; background: var(--danger); color: #fff; border-radius: 10px; padding: 0 6px; font-size: 11px; font-weight: 700; }
+.dn-izgara-bos { padding: 40px 20px; text-align: center; color: var(--text2); background: var(--surface); border: 1px dashed var(--border-strong); border-radius: 12px; }
+.dn-izgara-kutu { flex: 0 1 auto; min-height: 0; overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.dn-izgara-tablo { border-collapse: separate; border-spacing: 0; font-size: 11px; width: 100%; }
+.dn-izgara-tablo th, .dn-izgara-tablo td { border-right: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light); }
+.dn-izgara-tablo thead th { position: sticky; top: 0; z-index: 2; background: var(--th-bg); color: var(--th-fg); border-bottom-color: var(--th-border); font-size: 10.5px; font-weight: 600; line-height: 1.2; padding: 6px 2px; text-align: center; min-width: 54px; }
+.dn-izgara-tablo thead th b { display: block; font-size: 13px; font-weight: 700; }
+.dn-izgara-tablo thead th.kapali { background: var(--th-off-bg); color: var(--th-off-fg); min-width: 24px; width: 24px; font-weight: 500; }
+.dn-izgara-tablo .sol { position: sticky; left: 0; z-index: 1; background: var(--surface); color: var(--text); text-align: left; padding: 0 12px; min-width: 76px; font-weight: 600; white-space: nowrap; box-shadow: inset -1px 0 0 var(--border); }
+.dn-izgara-tablo .sol.koord { color: var(--info); }
+.dn-izgara-tablo thead th.sol { z-index: 3; background: var(--th-bg); color: var(--th-fg); }
+.dn-izgara-tablo td { height: 32px; padding: 2px 3px; text-align: center; white-space: nowrap; color: var(--text); font-weight: 500; }
+.dn-izgara-tablo td.kapali { background: var(--th-off-bg); }
+.dn-izgara-tablo td.geldi { background: var(--success-light); }
+.dn-izgara-tablo td.gelmedi { background: var(--danger-light); color: var(--danger); font-weight: 700; }
+.dn-izgara-tablo td.plan { background: var(--accent-lighter); color: var(--accent); font-weight: 600; }
+.dn-izgara-tablo tbody tr:hover td:not(.kapali) { box-shadow: inset 0 0 0 999px rgba(14,17,22,.035); }
+.dn-izgara-tablo tr.grup th { background: var(--surface2); color: var(--text2); text-align: left; padding: 5px 0; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.dn-izgara-tablo tr.grup.koord th { background: var(--info-light); color: var(--info); }
+.dn-izgara-tablo tr.grup th span { position: sticky; left: 12px; }
+@media (max-width: 900px) {
+  .dn-izgara { padding: 12px 16px 14px; }
+  .dn-sekme-satir { flex-wrap: wrap; }
+  .dn-sekme-satir > .dn-sekme-sag { width: 100%; overflow-x: auto; }
+  .dn-sekme-sag .yk-segment, .dn-izgara-arac .yk-segment { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+  .dn-sekme-sag .yk-segment button, .dn-izgara-arac .yk-segment button { flex-shrink: 0; }
+  .dn-sayfa, .dn-kaydir { padding: 16px 16px 32px; }
+  .dn-baslik { padding: 12px 16px 0; }
+  .dn-alt-arac { padding: 10px 16px; }
+  .dn-donem > span { display: none; }
+  .yk-sabit .yk-ust h1 { font-size: 18px; }
+  .yk-sabit .yk-ust h1, .yk-sabit .yk-ust p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+`
 
 // ============================================================
 // Okullar sayfası (ildeki tüm okullar)
 // ============================================================
 type OkulFiltre = 'tum' | 'gonderildi' | 'iade' | 'yok' | 'onaylandi'
 
-export function DenetimOkullar({ okullar, durumlar, toplamMadde, yukleniyor, yil, ay, ilceler, filtreIlceId, onIlce, onIncele, onYenile }: {
+export function DenetimOkullar({ okullar, durumlar, toplamMadde, yukleniyor, ilceler, filtreIlceId, onIlce, onIncele, onYenile }: {
   okullar: { id: number; ad: string; ogrenci_sayisi?: number; personel_sayisi?: number; son_islem?: string }[]
   durumlar: Map<number, OkulDonemDurumu>; toplamMadde: number; yukleniyor: boolean
-  yil: number; ay: number
   ilceler: { id: number; ad: string }[]; filtreIlceId: number | null; onIlce: (id: number | null) => void
   onIncele: (okulId: number, liste: number[]) => void; onYenile: () => void
 }) {
@@ -125,83 +231,69 @@ export function DenetimOkullar({ okullar, durumlar, toplamMadde, yukleniyor, yil
   const idler = liste.map(s => s.id)
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 12 }}>
-        <div style={{ flex: 1, minWidth: 220 }}>
-          <div style={{ fontSize: 13, color: 'var(--text2)' }}>{AYLAR[ay]} {yil}</div>
-          <h1 style={{ margin: '2px 0 0', fontSize: 24, fontWeight: 800 }}>Okullar</h1>
-        </div>
-        <div style={{ position: 'relative' }}>
-          <Search size={14} aria-hidden="true" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
-          <input type="search" aria-label="Okul ara" value={ara} onChange={e => setAra(e.target.value)} placeholder="Okul ara"
-            style={{ width: 220, padding: '9px 12px 9px 30px', borderRadius: 10, border: '1px solid var(--border)', fontSize: 14, fontFamily: 'inherit', background: 'var(--surface)', color: 'var(--text)' }} />
-        </div>
-        <select aria-label="İlçe" value={filtreIlceId || ''} onChange={e => onIlce(e.target.value ? Number(e.target.value) : null)}
-          style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 14, fontFamily: 'inherit', color: 'var(--text)' }}>
+    <div className="dn-sayfa">
+      <div className="yk-arac">
+        <label className="yk-ara">
+          <Search size={14} aria-hidden="true" style={{ color: 'var(--text3)', flexShrink: 0 }} />
+          <input type="search" aria-label="Okul ara" value={ara} onChange={e => setAra(e.target.value)} placeholder="Okul ara" />
+        </label>
+        <select aria-label="İlçe" className="form-select dn-secim" value={filtreIlceId || ''} onChange={e => onIlce(e.target.value ? Number(e.target.value) : null)}>
           <option value="">Tüm ilçeler</option>
           {ilceler.map(i => <option key={i.id} value={i.id}>{i.ad}</option>)}
         </select>
-        <button type="button" onClick={onYenile} aria-label="Yenile" title="Yenile" style={{ ...btn, padding: 10 }}>
+        <button type="button" className="btn btn-secondary btn-icon" onClick={onYenile} aria-label="Yenile" title="Yenile">
           <RefreshCw size={15} className={yukleniyor ? 'animate-spin' : ''} />
         </button>
-      </header>
-
-      <div role="group" aria-label="Durum filtresi" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {([['tum', 'Tümü'], ['gonderildi', 'Denetimde'], ['iade', 'İade edildi'], ['yok', 'Göndermedi'], ['onaylandi', 'Onaylandı']] as [OkulFiltre, string][]).map(([f, ad]) => (
-          <button key={f} type="button" onClick={() => setFiltre(f)} aria-pressed={filtre === f}
-            style={{ padding: '6px 12px', borderRadius: 20, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', fontWeight: filtre === f ? 700 : 500,
-              border: filtre === f ? 'none' : '1px solid var(--border)', background: filtre === f ? '#1f3a2a' : 'var(--surface)', color: filtre === f ? '#ffffff' : 'var(--text2)' }}>
-            {ad} ({say(f)})
-          </button>
-        ))}
       </div>
 
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 720 }}>
-          <thead>
-            <tr style={{ textAlign: 'left', color: 'var(--text2)', fontSize: 12 }}>
-              <th scope="col" style={{ padding: '10px 18px', fontWeight: 600 }}>Okul</th>
-              <th scope="col" style={{ padding: '10px 8px', fontWeight: 600 }}>Evrak</th>
-              <th scope="col" style={{ padding: '10px 8px', fontWeight: 600 }}>Durum</th>
-              <th scope="col" style={{ padding: '10px 8px', fontWeight: 600 }}>Gönderim</th>
-              <th scope="col" style={{ padding: '10px 8px', fontWeight: 600 }}>Son işlem</th>
-              <th scope="col" style={{ padding: '10px 18px' }}><span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>İşlem</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {liste.map(s => {
-              const oran = toplamMadde ? Math.min(1, (s.d?.doluMadde || 0) / toplamMadde) : 0
-              return (
-                <tr key={s.id} style={{ borderTop: '1px solid var(--border-light)' }}>
-                  <td style={{ padding: '12px 18px' }}>
-                    <div style={{ fontWeight: 600 }}>{s.ad}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text3)' }}>{s.ogrenci_sayisi ?? 0} öğrenci · {s.personel_sayisi ?? 0} personel</div>
-                  </td>
-                  <td style={{ padding: '12px 8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 80, height: 6, borderRadius: 6, background: 'var(--surface2)' }} aria-hidden="true">
-                        <div style={{ width: `${oran * 100}%`, height: 6, borderRadius: 6, background: oran >= 1 ? '#2347D9' : '#c98a2e' }} />
-                      </div>
-                      <span style={{ fontSize: 12 }}>{s.d?.doluMadde || 0}/{toplamMadde}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '12px 8px' }}><DurumRozeti durum={s.d?.teslim?.durum} /></td>
-                  <td style={{ padding: '12px 8px', fontSize: 13, color: 'var(--text2)' }}>{s.d?.teslim?.gonderim_tarihi ? goreceTarih(s.d.teslim.gonderim_tarihi) : '—'}</td>
-                  <td style={{ padding: '12px 8px', fontSize: 13, color: 'var(--text2)' }}>{goreceTarih(s.son_islem)}</td>
-                  <td style={{ padding: '12px 18px', textAlign: 'right' }}>
-                    <button type="button" onClick={() => onIncele(s.id, idler)} style={{ ...btn, padding: '7px 14px', background: s.grup === 'gonderildi' ? 'var(--accent)' : 'var(--surface2)', color: s.grup === 'gonderildi' ? '#ffffff' : 'var(--text)', border: 'none' }}>
-                      {s.grup === 'gonderildi' ? 'İncele' : 'Aç'}
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
-            {liste.length === 0 && (
-              <tr><td colSpan={6} style={{ padding: 32, textAlign: 'center', color: 'var(--text3)' }}>{yukleniyor ? 'Yükleniyor...' : 'Okul bulunamadı.'}</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <section className="yk-kart">
+        <div className="yk-kart-bas">
+          <h2>İldeki okullar</h2>
+          <div className="yk-kart-sag">
+            <Filtre<OkulFiltre> etiket="Durum filtresi" deger={filtre} onDegis={setFiltre}
+              secenekler={([['tum', 'Tümü'], ['gonderildi', 'Denetimde'], ['iade', 'İade edildi'], ['yok', 'Göndermedi'], ['onaylandi', 'Onaylandı']] as [OkulFiltre, string][]).map(([id, ad]) => ({ id, ad, sayi: say(id) }))} />
+          </div>
+        </div>
+        <div className="yk-tablo">
+          <table className="data-table" style={{ minWidth: 720 }}>
+            <thead>
+              <tr>
+                <th scope="col">Okul</th>
+                <th scope="col">Evrak</th>
+                <th scope="col">Durum</th>
+                <th scope="col">Gönderim</th>
+                <th scope="col">Son işlem</th>
+                <th scope="col"><span className="sr-only">İşlem</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {liste.map(s => {
+                const oran = toplamMadde ? Math.min(1, (s.d?.doluMadde || 0) / toplamMadde) : 0
+                return (
+                  <tr key={s.id}>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{s.ad}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text3)' }}>{s.ogrenci_sayisi ?? 0} öğrenci · {s.personel_sayisi ?? 0} personel</div>
+                    </td>
+                    <td><EvrakIlerleme dolu={s.d?.doluMadde || 0} toplam={toplamMadde} oran={oran} /></td>
+                    <td><DurumRozeti durum={s.d?.teslim?.durum} /></td>
+                    <td style={{ color: 'var(--text2)' }}>{s.d?.teslim?.gonderim_tarihi ? goreceTarih(s.d.teslim.gonderim_tarihi) : '—'}</td>
+                    <td style={{ color: 'var(--text2)' }}>{goreceTarih(s.son_islem)}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button type="button" className={`btn btn-sm ${s.grup === 'gonderildi' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => onIncele(s.id, idler)}>
+                        {s.grup === 'gonderildi' ? 'İncele' : 'Aç'}
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+              {liste.length === 0 && (
+                <tr><td colSpan={6} style={{ padding: 32, textAlign: 'center', color: 'var(--text3)' }}>{yukleniyor ? 'Yükleniyor...' : 'Okul bulunamadı.'}</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   )
 }
@@ -221,14 +313,15 @@ export function bulgulardanNot(s: HesapKontrolSonuc): string {
   return [...genel, ...kisi].join('\n')
 }
 
-export function OkulIncelemeBasligi({ okulId, okulAd, yil, ay, durum, toplamMadde, hesap, sekme, onSekme, geriAd, onGeri, gezinme, onKararVerildi }: {
-  okulId: number; okulAd: string; yil: number; ay: number
+export function OkulIncelemeBasligi({ okulId, yil, ay, durum, toplamMadde, hesap, sekme, onSekme, geriAd, onGeri, gezinme, onKararVerildi, sekmeSag }: {
+  okulId: number; yil: number; ay: number
   durum?: OkulDonemDurumu; toplamMadde: number
   hesap: HesapKontrolVeri
   sekme: OkulSekme; onSekme: (s: OkulSekme) => void
   geriAd: string; onGeri: () => void
   gezinme: { sira: number; toplam: number; onOnceki?: () => void; onSonraki?: () => void }
   onKararVerildi: () => void
+  sekmeSag?: React.ReactNode   // sekme satırının sağı (ör. okul verileri alt seçimi)
 }) {
   const teslim: DenetimTeslim | null = durum?.teslim || null
   const t = teslim?.durum
@@ -264,65 +357,55 @@ export function OkulIncelemeBasligi({ okulId, okulAd, yil, ay, durum, toplamMadd
   const dolu = durum?.doluMadde ?? 0
   const bekleme = gunFarki(teslim?.gonderim_tarihi)
 
-  const ozetKart = (hedef: OkulSekme, baslik: string, deger: string, alt: string, ton: 'notr' | 'ok' | 'uyari' | 'hata') => {
-    const renk = { notr: ['var(--surface2)', 'var(--text)', 'var(--text2)'], ok: ['var(--success-light)', '#1a6b34', '#1a6b34'], uyari: ['var(--warn-light)', '#8a5a00', '#8a5a00'], hata: ['var(--danger-light)', 'var(--danger)', 'var(--danger)'] }[ton]
-    return (
-      <button type="button" onClick={() => onSekme(hedef)}
-        style={{ flex: '1 1 170px', textAlign: 'left', background: renk[0], border: '1px solid transparent', borderRadius: 10, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
-        <div style={{ fontSize: 11.5, color: renk[2], fontWeight: 600 }}>{baslik}</div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 16, fontWeight: 800, color: renk[1] }}>{deger}</span>
-          <span style={{ fontSize: 12, color: renk[2] }}>{alt}</span>
-        </div>
-      </button>
-    )
-  }
-
-  const sekmeler: { id: OkulSekme; ad: string; icon: typeof Inbox; rozet?: number }[] = [
-    { id: 'evrak', ad: 'Evrak', icon: FolderOpen },
-    { id: 'hesap', ad: 'Hesap Kontrolü', icon: ShieldCheck, rozet: hata || undefined },
-    { id: 'veri', ad: 'Okul Verileri', icon: Database },
+  // Evrak doluluğu ve hesap kontrolü sonucu sekme rozetlerinde durur (ayrı özet satırı ekranda yer kaplıyordu)
+  const evrakTam = toplamMadde > 0 && dolu >= toplamMadde
+  const hesapRozet: { metin: string; ton: string; ipucu: string } | undefined =
+    hesap.yukleniyor ? { metin: '…', ton: 'notr', ipucu: 'Kontrol ediliyor' }
+    : !s ? undefined
+    : hata ? { metin: String(hata), ton: '', ipucu: `${hata} hata${uyari ? `, ${uyari} uyarı` : ''}` }
+    : uyari ? { metin: String(uyari), ton: 'uyari', ipucu: `${uyari} uyarı` }
+    : { metin: '✓', ton: 'ok', ipucu: 'Sorun yok' }
+  const sekmeler: { id: OkulSekme; ad: string; icon: typeof Inbox; rozet?: { metin: string; ton: string; ipucu: string } }[] = [
+    { id: 'evrak', ad: 'Evrak', icon: FolderOpen, rozet: toplamMadde ? { metin: `${dolu}/${toplamMadde}`, ton: evrakTam ? 'ok' : 'notr', ipucu: evrakTam ? 'Tüm maddeler dolu' : `${toplamMadde - dolu} madde boş` } : undefined },
+    { id: 'hesap', ad: 'Hesap kontrolü', icon: ShieldCheck, rozet: hesapRozet },
+    { id: 'veri', ad: 'Okul verileri', icon: Database },
   ]
 
   return (
-    <div style={{ flexShrink: 0, background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '14px 24px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* Satır 1: geri · okul · durum · gezinme | karar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <button type="button" onClick={onGeri} style={{ ...btn, padding: '7px 10px', background: 'var(--surface2)', border: 'none' }}>
+    <div className="dn-baslik">
+      {/* Satır 1: geri · durum · gezinme | karar (okul adı kabuğun başlığında) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={onGeri}>
           <ArrowLeft size={14} aria-hidden="true" /> {geriAd}
         </button>
-        <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800 }}>{okulAd}</h1>
         <DurumRozeti durum={t} />
         {t === 'gonderildi' && teslim?.gonderim_tarihi && (
           <span title={new Date(teslim.gonderim_tarihi).toLocaleString('tr-TR')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 8, fontSize: 13,
-              background: bekleme >= 3 ? 'var(--warn-light)' : 'var(--surface2)', color: bekleme >= 3 ? '#8a5a00' : 'var(--text)' }}>
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 6, fontSize: 12.5,
+              background: bekleme >= 3 ? 'var(--warn-light)' : 'var(--surface2)', color: bekleme >= 3 ? '#8a5200' : 'var(--text)' }}>
             <Clock size={14} aria-hidden="true" />
             <span>
               <b>{bekleme <= 0 ? 'Bugün' : bekleme === 1 ? 'Dün' : `${bekleme} gün önce`}</b> gönderildi
-              <span style={{ color: bekleme >= 3 ? '#8a5a00' : 'var(--text2)' }}> · {new Date(teslim.gonderim_tarihi).toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}</span>
               {bekleme >= 3 && <b> · incelenmeyi bekliyor</b>}
             </span>
           </span>
         )}
         {gezinme.toplam > 1 && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 12.5, color: 'var(--text2)' }}>
-            <button type="button" aria-label="Önceki okul" disabled={!gezinme.onOnceki} onClick={gezinme.onOnceki}
-              style={{ ...btn, padding: 5, border: 'none', background: 'transparent', opacity: gezinme.onOnceki ? 1 : 0.35 }}><ChevronLeft size={16} /></button>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, color: 'var(--text2)', fontVariantNumeric: 'tabular-nums' }}>
+            <button type="button" className="btn btn-secondary btn-icon" aria-label="Önceki okul" disabled={!gezinme.onOnceki} onClick={gezinme.onOnceki}><ChevronLeft size={16} /></button>
             {gezinme.sira} / {gezinme.toplam}
-            <button type="button" aria-label="Sonraki okul" disabled={!gezinme.onSonraki} onClick={gezinme.onSonraki}
-              style={{ ...btn, padding: 5, border: 'none', background: 'transparent', opacity: gezinme.onSonraki ? 1 : 0.35 }}><ChevronRight size={16} /></button>
+            <button type="button" className="btn btn-secondary btn-icon" aria-label="Sonraki okul" disabled={!gezinme.onSonraki} onClick={gezinme.onSonraki}><ChevronRight size={16} /></button>
           </span>
         )}
 
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {(t === 'gonderildi' || t === 'onaylandi') ? (
             <>
-              <button type="button" style={btnIade} disabled={!!islem} onClick={() => setIadeNot(n => n === null ? (teslim?.denetci_notu || '') : null)} aria-expanded={iadeNot !== null}>
+              <button type="button" className="btn btn-secondary dn-iade" disabled={!!islem} onClick={() => setIadeNot(n => n === null ? (teslim?.denetci_notu || '') : null)} aria-expanded={iadeNot !== null}>
                 <Undo2 size={14} aria-hidden="true" /> {t === 'onaylandi' ? 'Onayı geri al, iade et' : 'İade et'}
               </button>
               {t === 'gonderildi' && (
-                <button type="button" style={btnOnay} disabled={!!islem} onClick={() => karar('onaylandi')}>
+                <button type="button" className="btn btn-success" disabled={!!islem} onClick={() => karar('onaylandi')}>
                   <CheckCircle2 size={14} aria-hidden="true" /> Dosyayı onayla
                 </button>
               )}
@@ -336,19 +419,18 @@ export function OkulIncelemeBasligi({ okulId, okulAd, yil, ay, durum, toplamMadd
       </div>
 
       {iadeNot !== null && (
-        <div style={{ padding: 14, borderRadius: 12, border: '1px solid #e8b48f', background: '#fff8f1', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <label htmlFor="dosyaIadeNot" style={{ fontSize: 13, fontWeight: 700, color: '#7a3a12' }}>Okula iade notu (okulun ekranında görünür)</label>
-          <textarea id="dosyaIadeNot" autoFocus value={iadeNot} onChange={e => setIadeNot(e.target.value)} rows={4}
-            style={{ padding: 10, borderRadius: 10, border: '1px solid var(--border)', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }} />
+        <div style={{ padding: 14, borderRadius: 10, border: '1px solid var(--warn-border)', background: 'var(--warn-light)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <label htmlFor="dosyaIadeNot" className="form-label" style={{ margin: 0, fontWeight: 600, color: '#8a5200' }}>Okula iade notu (okulun ekranında görünür)</label>
+          <textarea id="dosyaIadeNot" className="form-input" autoFocus value={iadeNot} onChange={e => setIadeNot(e.target.value)} rows={4} style={{ resize: 'vertical' }} />
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             {s && (hata > 0 || uyari > 0) && (
-              <button type="button" style={btn} onClick={() => setIadeNot(n => [n?.trim(), 'Hesap kontrolü bulguları:', bulgulardanNot(s)].filter(Boolean).join('\n'))}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIadeNot(n => [n?.trim(), 'Hesap kontrolü bulguları:', bulgulardanNot(s)].filter(Boolean).join('\n'))}>
                 <ShieldCheck size={14} aria-hidden="true" /> Hesap kontrolü bulgularını ekle
               </button>
             )}
             <span style={{ flex: 1 }} />
-            <button type="button" style={btn} onClick={() => setIadeNot(null)}>Vazgeç</button>
-            <button type="button" style={{ ...btnIade, background: '#9a3412', color: '#ffffff', border: 'none' }} disabled={!!islem} onClick={() => karar('iade', iadeNot)}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIadeNot(null)}>Vazgeç</button>
+            <button type="button" className="btn btn-warn btn-sm" disabled={!!islem} onClick={() => karar('iade', iadeNot)}>
               <Undo2 size={14} aria-hidden="true" /> İade et
             </button>
           </div>
@@ -356,36 +438,27 @@ export function OkulIncelemeBasligi({ okulId, okulAd, yil, ay, durum, toplamMadd
       )}
 
       {(msg || islem) && (
-        <div role="status" style={{ padding: '10px 12px', borderRadius: 10, fontSize: 13, display: 'flex', alignItems: 'center', gap: 10,
-          background: islem ? 'var(--info-light)' : msg?.tip === 'ok' ? 'var(--success-light)' : 'var(--danger-light)', color: islem ? '#1a5b8a' : msg?.tip === 'ok' ? '#1a6b34' : 'var(--danger)' }}>
+        <div role="status" style={{ padding: '10px 12px', borderRadius: 8, fontSize: 13, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          background: islem ? 'var(--info-light)' : msg?.tip === 'ok' ? 'var(--success-light)' : 'var(--danger-light)', color: islem ? 'var(--info)' : msg?.tip === 'ok' ? 'var(--success)' : 'var(--danger)' }}>
           <span style={{ flex: 1 }}>{islem || msg?.text}</span>
           {!islem && msg?.tip === 'ok' && gezinme.onSonraki && (
-            <button type="button" style={btnOnay} onClick={gezinme.onSonraki}>Sıradaki okul <ArrowRight size={14} aria-hidden="true" /></button>
+            <button type="button" className="btn btn-success btn-sm" onClick={gezinme.onSonraki}>Sıradaki okul <ArrowRight size={14} aria-hidden="true" /></button>
           )}
         </div>
       )}
 
-      {/* Satır 2: özet şeridi */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        {ozetKart('evrak', 'Evrak', `${dolu} / ${toplamMadde}`, dolu >= toplamMadde ? 'tüm maddeler dolu' : `${toplamMadde - dolu} madde boş`, dolu >= toplamMadde && toplamMadde > 0 ? 'ok' : 'notr')}
-        {ozetKart('hesap', 'Hesap kontrolü',
-          hesap.yukleniyor ? '…' : !s ? '—' : hata ? `${hata} hata` : uyari ? `${uyari} uyarı` : 'Sorun yok',
-          hesap.yukleniyor ? 'kontrol ediliyor' : !s ? (hesap.hataMsg ? 'kontrol yapılamadı' : '') : hata && uyari ? `${uyari} uyarı` : `${s.kisiler.length} personel`,
-          !s ? 'notr' : hata ? 'hata' : uyari ? 'uyari' : 'ok')}
+      {/* Satır 2: sekmeler (rozetlerde evrak ve hesap özeti) · sağda sekmeye özel seçim */}
+      <div className="dn-sekme-satir">
+        <nav aria-label="İnceleme sekmeleri" className="dn-sekmeler">
+          {sekmeler.map(x => (
+            <button key={x.id} type="button" className={sekme === x.id ? 'on' : ''} onClick={() => onSekme(x.id)} aria-current={sekme === x.id ? 'page' : undefined}>
+              <x.icon size={14} aria-hidden="true" /> {x.ad}
+              {x.rozet ? <em className={x.rozet.ton || undefined} title={x.rozet.ipucu}>{x.rozet.metin}<span className="sr-only"> · {x.rozet.ipucu}</span></em> : null}
+            </button>
+          ))}
+        </nav>
+        {sekmeSag && <div className="dn-sekme-sag">{sekmeSag}</div>}
       </div>
-
-      {/* Satır 3: sekmeler */}
-      <nav aria-label="İnceleme sekmeleri" style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        {sekmeler.map(x => (
-          <button key={x.id} type="button" onClick={() => onSekme(x.id)} aria-current={sekme === x.id ? 'page' : undefined}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', border: 'none', background: 'transparent', cursor: 'pointer',
-              fontSize: 14, fontWeight: sekme === x.id ? 700 : 500, fontFamily: 'inherit',
-              color: sekme === x.id ? 'var(--accent)' : 'var(--text2)', borderBottom: sekme === x.id ? '2px solid var(--accent)' : '2px solid transparent' }}>
-            <x.icon size={14} aria-hidden="true" /> {x.ad}
-            {x.rozet ? <span style={{ background: 'var(--danger)', color: '#ffffff', borderRadius: 20, padding: '0 7px', fontSize: 11, fontWeight: 800 }}>{x.rozet}</span> : null}
-          </button>
-        ))}
-      </nav>
     </div>
   )
 }
@@ -393,16 +466,8 @@ export function OkulIncelemeBasligi({ okulId, okulAd, yil, ay, durum, toplamMadd
 /** Okul Verileri sekmesindeki alt seçim (ham, salt okunur veriler) */
 export type VeriSekme = 'bordro' | 'bilanco' | 'ders-programi' | 'sinif-defteri'
 export function VeriSecici({ secili, onSec }: { secili: VeriSekme; onSec: (v: VeriSekme) => void }) {
-  const ogeler: [VeriSekme, string][] = [['bordro', 'Bordro'], ['bilanco', 'Bilanço'], ['ders-programi', 'Ders Programı'], ['sinif-defteri', 'Sınıf Defteri']]
   return (
-    <div role="group" aria-label="Okul verisi" style={{ display: 'inline-flex', gap: 2, padding: 3, borderRadius: 10, background: 'var(--surface2)' }}>
-      {ogeler.map(([id, ad]) => (
-        <button key={id} type="button" onClick={() => onSec(id)} aria-pressed={secili === id}
-          style={{ padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: secili === id ? 700 : 500,
-            background: secili === id ? 'var(--surface)' : 'transparent', color: secili === id ? 'var(--text)' : 'var(--text2)', boxShadow: secili === id ? '0 1px 2px rgba(0,0,0,0.08)' : 'none' }}>
-          {ad}
-        </button>
-      ))}
-    </div>
+    <Filtre<VeriSekme> etiket="Okul verisi" deger={secili} onDegis={onSec}
+      secenekler={[{ id: 'bordro', ad: 'Bordro' }, { id: 'bilanco', ad: 'Bilanço' }, { id: 'ders-programi', ad: 'Ders programı' }, { id: 'sinif-defteri', ad: 'Sınıf defteri' }]} />
   )
 }

@@ -3,18 +3,20 @@ import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { RefreshCw, BarChart2, Calendar, UserCheck, ClipboardList, Activity } from 'lucide-react'
+import { Filtre } from '@/components/yonetim/ortak'
 import DenetciDenetimDosyasi from '@/components/DenetciDenetimDosyasi'
 import DenetciHesapKontrol, { useHesapKontrol } from '@/components/DenetciHesapKontrol'
 import { DenetimMaddeEditor } from '@/components/DenetimEvrakYonetimi'
 import { DenetimIsKuyrugu, useDonemDurumlari, varsayilanDonem } from '@/components/DenetimPanel'
-import { DenetimUstBar, DenetimOkullar, OkulIncelemeBasligi, VeriSecici, Bolum, OkulSekme, VeriSekme } from '@/components/DenetimDuzen'
-import { gunSayisi, tatilMi } from '@/lib/hesaplama'
+import { DenetimKabuk, DenetimOkullar, OkulIncelemeBasligi, VeriSecici, Bolum, OkulSekme, VeriSekme } from '@/components/DenetimDuzen'
+import { AYLAR, gunSayisi } from '@/lib/hesaplama'
 import { DersProgrami, SinifDefteri, Sinif, Tatil } from '@/lib/types'
 import { useYukleme } from '@/lib/useYukleme'
 import { useDegisince } from '@/lib/useDegisince'
-import BilancoIcerik, { actionBtn, type BilancoVerisi } from '@/components/denetim/BilancoIcerik'
+import BilancoIcerik, { type BilancoVerisi } from '@/components/denetim/BilancoIcerik'
 import BordroInceleme, { type BordroSatir } from '@/components/denetim/BordroInceleme'
-import { loadingOverlay, emptyView, dpTh, dpTd } from '@/components/denetim/stiller'
+import AylikIzgara from '@/components/denetim/AylikIzgara'
+import { loadingOverlay, emptyView } from '@/components/denetim/stiller'
 
 interface OkulSatir { 
   id: number; 
@@ -378,34 +380,37 @@ export default function DenetimPage() {
   )
 
 
+  const donemAd = `${AYLAR[selAy]} ${selYil}`
+  const ekranBaslik: Record<Bolum | 'okul', [string, string]> = {
+    kuyruk: ['İş kuyruğu', `${il?.ad ? `${il.ad} İl Milli Eğitim Müdürlüğü` : 'İl Milli Eğitim Müdürlüğü'} · ${donemAd}`],
+    okullar: ['Okullar', `İldeki okulların ${donemAd} dosyaları`],
+    kayitlar: ['İşlem kayıtları', 'Tüm kurumların işlem dökümü (canlı)'],
+    ayarlar: ['Ayarlar', ayarSekme === 'profil' ? `${il?.ad || ''} ili denetçisi`.trim() : 'İlinizdeki okulların göreceği evrak listesi'],
+    okul: [selectedOkul?.ad || 'Okul', `${donemAd} dosyası`],
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-sans)', overflow: 'hidden' }}>
-
-      <DenetimUstBar
-        bolum={bolum}
-        onBolum={bolumSec}
-        donem={secilenAyKey}
-        onDonem={setSecilenAyKey}
-        bekleyen={bekleyenSayisi}
-        ilAd={il?.ad}
-        kullaniciAd={[profil?.ad, profil?.soyad].filter(Boolean).join(' ')}
-        onCikis={signOut}
-      />
-
-      {/* ── İÇERİK ── */}
-      <main style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-
-        {/* İŞ KUYRUĞU (ana sayfa) */}
+    <DenetimKabuk
+      bolum={bolum}
+      onBolum={bolumSec}
+      donem={secilenAyKey}
+      onDonem={setSecilenAyKey}
+      bekleyen={bekleyenSayisi}
+      ilAd={il?.ad}
+      kullaniciAd={[profil?.ad, profil?.soyad].filter(Boolean).join(' ')}
+      onCikis={signOut}
+      baslik={ekranBaslik[ekran][0]}
+      alt={ekranBaslik[ekran][1]}
+    >
+        {/* İŞ KUYRUĞU (ana sayfa) */}        {/* İŞ KUYRUĞU (ana sayfa) */}
         {ekran === 'kuyruk' && (
           <DenetimIsKuyrugu
             okullar={okullar}
-            yil={selYil}
             ay={selAy}
             durumlar={donemDurumlari.durumlar}
             toplamMadde={donemDurumlari.toplamMadde}
             yukleniyor={donemDurumlari.yukleniyor || okulYukleniyor}
             sonHareketler={sonHareketler}
-            ilAd={il?.ad}
             ilceler={ilceler}
             filtreIlceId={filtreIlceId}
             onIlce={setFiltreIlceId}
@@ -421,8 +426,6 @@ export default function DenetimPage() {
             durumlar={donemDurumlari.durumlar}
             toplamMadde={donemDurumlari.toplamMadde}
             yukleniyor={donemDurumlari.yukleniyor || okulYukleniyor}
-            yil={selYil}
-            ay={selAy}
             ilceler={ilceler}
             filtreIlceId={filtreIlceId}
             onIlce={setFiltreIlceId}
@@ -432,15 +435,9 @@ export default function DenetimPage() {
         )}
 
         {ekran === 'ayarlar' && (
-          <div role="group" aria-label="Ayarlar" style={{ flexShrink: 0, padding: '16px 28px 0', display: 'flex', gap: 2 }}>
-            {([['evrak-listesi', 'Evrak listesi'], ['profil', 'Profilim']] as const).map(([id, ad]) => (
-              <button key={id} type="button" onClick={() => setAyarSekme(id)} aria-pressed={ayarSekme === id}
-                style={{ padding: '8px 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14,
-                  fontWeight: ayarSekme === id ? 700 : 500, color: ayarSekme === id ? 'var(--accent)' : 'var(--text2)',
-                  borderBottom: ayarSekme === id ? '2px solid var(--accent)' : '2px solid transparent' }}>
-                {ad}
-              </button>
-            ))}
+          <div className="dn-alt-arac">
+            <Filtre<'evrak-listesi' | 'profil'> etiket="Ayarlar" deger={ayarSekme} onDegis={setAyarSekme}
+              secenekler={[{ id: 'evrak-listesi', ad: 'Evrak listesi' }, { id: 'profil', ad: 'Profilim' }]} />
           </div>
         )}
 
@@ -450,84 +447,45 @@ export default function DenetimPage() {
 
         {/* TÜM LOGLAR GÖRÜNÜMÜ (TAM SAYFA) */}
         {ekran === 'kayitlar' && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
-             {/* Sticky Header */}
-             <div style={{ 
-               padding: '20px 40px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', 
-               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-               position: 'sticky', top: 0, zIndex: 50, boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
-             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                   <div>
-                      <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', margin: 0 }}>İşlem Kayıtları</h1>
-                      <p style={{ color: 'var(--text3)', fontSize: 12, margin: 0, fontWeight: 500 }}>Tüm kurumların işlem dökümü (Canlı)</p>
-                   </div>
+          <div className="dn-sayfa">
+            <section className="yk-kart">
+              <div className="yk-kart-bas">
+                <h2>Son işlemler</h2>
+                <div className="yk-kart-sag">
+                  <span className="badge badge-blue">{sonHareketler.length} kayıt listeleniyor</span>
+                  <button type="button" className="btn btn-secondary btn-icon" onClick={okullarGetir} disabled={okulYukleniyor} aria-label="Yenile" title="Yenile">
+                    <RefreshCw size={14} className={okulYukleniyor ? 'animate-spin' : ''} />
+                  </button>
                 </div>
-                <div style={{ display: 'flex', gap: 12 }}>
-                   <div style={{ background: 'var(--accent-lighter)', padding: '6px 14px', borderRadius: 8, fontSize: 12, color: 'var(--accent)', fontWeight: 800, border: '1px solid var(--accent-light)' }}>
-                      {sonHareketler.length} Kayıt Listeleniyor
-                   </div>
-                   <button 
-                     onClick={okullarGetir} 
-                     disabled={okulYukleniyor}
-                     style={{ ...actionBtn, padding: '8px 12px', opacity: okulYukleniyor ? 0.5 : 1 }}
-                   >
-                     <RefreshCw size={14} className={okulYukleniyor ? 'animate-spin' : ''} />
-                   </button>
-                </div>
-             </div>
-
-             {/* Full Width Table Content */}
-             <div style={{ flex: 1, overflow: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-                   <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                      <tr style={{ background: 'var(--surface2)', textAlign: 'left' }}>
-                         <th style={{ padding: '16px 40px', color: 'var(--text3)', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', width: '180px', borderBottom: '1px solid var(--border)' }}>Tarih / Saat</th>
-                         <th style={{ padding: '16px 20px', color: 'var(--text3)', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', width: '220px', borderBottom: '1px solid var(--border)' }}>Kurum Adı</th>
-                         <th style={{ padding: '16px 20px', color: 'var(--text3)', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', width: '120px', borderBottom: '1px solid var(--border)' }}>İşlem</th>
-                         <th style={{ padding: '16px 40px', color: 'var(--text3)', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', borderBottom: '1px solid var(--border)' }}>Açıklama</th>
-                      </tr>
-                   </thead>
-                   <tbody>
-                      {sonHareketler.length === 0 ? (
-                         <tr><td colSpan={4} style={{ padding: 100, textAlign: 'center', color: 'var(--text3)', background: 'var(--surface)' }}>Kayıt bulunamadı.</td></tr>
-                      ) : (
-                         sonHareketler.map((log, idx) => (
-                            <tr key={log.id} style={{ 
-                               background: idx % 2 === 0 ? 'var(--surface)' : 'var(--bg)', 
-                               borderBottom: '1px solid var(--border-light)',
-                               transition: 'background 0.2s'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
-                            onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? 'var(--surface)' : 'var(--bg)'}
-                            >
-                               <td style={{ padding: '20px 40px', fontSize: 13, color: 'var(--text3)', fontWeight: 500 }}>
-                                  {new Date(log.created_at).toLocaleString('tr-TR')}
-                               </td>
-                               <td style={{ padding: '20px 20px', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
-                                  {log.okullar?.ad}
-                               </td>
-                               <td style={{ padding: '20px 20px' }}>
-                                  <span style={{ 
-                                    fontSize: 10, background: 'var(--accent-lighter)', color: 'var(--accent)', 
-                                    padding: '4px 10px', borderRadius: 6, fontWeight: 800, textTransform: 'uppercase',
-                                    border: '1px solid var(--accent-light)'
-                                  }}>
-                                     {log.islem}
-                                  </span>
-                               </td>
-                               <td style={{ padding: '20px 40px', fontSize: 14, color: 'var(--text2)', lineHeight: 1.5, fontWeight: 500 }}>
-                                  {log.aciklama}
-                               </td>
-                            </tr>
-                         ))
-                      )}
-                   </tbody>
+              </div>
+              <div className="yk-tablo">
+                <table className="data-table" style={{ minWidth: 720 }}>
+                  <thead>
+                    <tr>
+                      <th scope="col" style={{ width: 170 }}>Tarih / saat</th>
+                      <th scope="col" style={{ width: 220 }}>Kurum</th>
+                      <th scope="col" style={{ width: 130 }}>İşlem</th>
+                      <th scope="col">Açıklama</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sonHareketler.length === 0 ? (
+                      <tr><td colSpan={4} style={{ padding: 48, textAlign: 'center', color: 'var(--text3)' }}>Kayıt bulunamadı.</td></tr>
+                    ) : (
+                      sonHareketler.map(log => (
+                        <tr key={log.id}>
+                          <td style={{ color: 'var(--text3)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{new Date(log.created_at).toLocaleString('tr-TR')}</td>
+                          <td style={{ fontWeight: 600 }}>{log.okullar?.ad}</td>
+                          <td><span className="badge badge-blue">{log.islem}</span></td>
+                          <td style={{ color: 'var(--text2)', lineHeight: 1.5 }}>{log.aciklama}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
                 </table>
-                <div style={{ padding: 40, textAlign: 'center', color: 'var(--text3)', fontSize: 12, fontWeight: 500 }}>
-                   Listenin sonuna ulaşıldı.
-                </div>
-             </div>
+              </div>
+              {sonHareketler.length > 0 && <div className="yk-sayfalama"><span>Listenin sonuna ulaşıldı.</span></div>}
+            </section>
           </div>
         )}
 
@@ -537,7 +495,6 @@ export default function DenetimPage() {
             <OkulIncelemeBasligi
               key={`${secilenOkulId}-${secilenAyKey}`}
               okulId={secilenOkulId}
-              okulAd={selectedOkul?.ad || ''}
               yil={selYil}
               ay={selAy}
               durum={donemDurumlari.durumlar.get(secilenOkulId)}
@@ -554,22 +511,17 @@ export default function DenetimPage() {
                 onSonraki: sonrakiOkul ? () => okulIncele(sonrakiOkul) : undefined,
               }}
               onKararVerildi={() => { setDurumYenile(x => x + 1); setKararYenile(x => x + 1) }}
+              sekmeSag={okulSekme === 'veri' ? <VeriSecici secili={veriSekme} onSec={setVeriSekme} /> : undefined}
             />
-
-            {okulSekme === 'veri' && (
-              <div style={{ flexShrink: 0, padding: '12px 24px', borderBottom: '1px solid var(--border-light)' }}>
-                <VeriSecici secili={veriSekme} onSec={setVeriSekme} />
-              </div>
-            )}
 
         {/* BORDRO GÖRÜNÜMÜ */}
         {aktifVeri === 'bordro' && <BordroInceleme satirlar={satirlar} yukleniyor={yukleniyor} bilVeri={bilVeri} />}
 
         {/* BİLANÇO GÖRÜNÜMÜ */}
         {aktifVeri === 'bilanco' && (
-          <div style={{ flex: 1, overflowY: 'auto', padding: '28px 48px' }}>
+          <div className="dn-kaydir">
              {yukleniyor ? (
-                <div style={loadingOverlay}><RefreshCw size={24} className="animate-spin" color="#3b82f6" /></div>
+                <div style={loadingOverlay}><RefreshCw size={24} className="animate-spin" color="var(--accent)" /></div>
              ) : !bilVeri ? (
                 <div style={emptyView}>
                    <BarChart2 size={48} color="var(--border)" />
@@ -581,184 +533,28 @@ export default function DenetimPage() {
           </div>
         )}
 
-        {/* DERS PROGRAMI GÖRÜNÜMÜ */}
-        {aktifVeri === 'ders-programi' && (
-          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
-            {yukleniyor ? (
-              <div style={loadingOverlay}><RefreshCw size={24} className="animate-spin" color="var(--accent)" /></div>
-            ) : siniflar.length === 0 ? (
+        {/* DERS PROGRAMI ve SINIF DEFTERİ: tek sınıf, ekrana sığan aylık ızgara */}
+        {(aktifVeri === 'ders-programi' || aktifVeri === 'sinif-defteri') && (
+          yukleniyor ? (
+            <div className="dn-kaydir"><div style={loadingOverlay}><RefreshCw size={24} className="animate-spin" color="var(--accent)" /></div></div>
+          ) : siniflar.length === 0 ? (
+            <div className="dn-kaydir">
               <div style={emptyView}>
-                <Calendar size={48} color="var(--border)" />
-                <p style={{ marginTop: 16, color: 'var(--text3)', fontWeight: 600 }}>Bu dönem için ders programı bulunamadı.</p>
+                {aktifVeri === 'ders-programi' ? <Calendar size={48} color="var(--border)" /> : <ClipboardList size={48} color="var(--border)" />}
+                <p style={{ marginTop: 16, color: 'var(--text3)', fontWeight: 600 }}>Bu dönem için {aktifVeri === 'ders-programi' ? 'ders programı' : 'sınıf defteri'} bulunamadı.</p>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-                {siniflar.map(sinif => {
-                  const gunSayisiAy = gunSayisi(selYil, selAy)
-                  const gunler = Array.from({ length: gunSayisiAy }, (_, i) => i + 1)
-                  return (
-                    <div key={sinif.id} style={{ background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
-                      <div style={{ padding: '10px 18px', background: 'var(--surface2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <Calendar size={14} color="var(--accent)" />
-                        <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>{sinif.ad}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text3)' }}>{sinif.yas_grubu}</span>
-                      </div>
-                      <div style={{ overflowX: 'auto' }}>
-                        <table style={{ borderCollapse: 'collapse', fontSize: 10, minWidth: '100%' }}>
-                          <thead>
-                            <tr style={{ background: 'var(--th-bg)' }}>
-                              <th style={dpTh(80)}>Ders</th>
-                              {gunler.map(g => {
-                                const hg = new Date(selYil, selAy - 1, g, 12).getDay()
-                                const isHS = hg === 0 || hg === 6
-                                const isTatil = tatilMi(selAy, g, selYil, tatiller)
-                                const ad = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
-                                return (
-                                  <th key={g} style={{ ...dpTh(52), background: (isHS || isTatil) ? 'var(--th-off-bg)' : 'var(--th-bg)', color: (isHS || isTatil) ? 'var(--th-off-fg)' : 'var(--th-fg)' }}>
-                                    {ad}<br /><span style={{ fontSize: 11, fontWeight: 800 }}>{g}</span>
-                                  </th>
-                                )
-                              })}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {[1,2,3,4,5,6].map((dersNo, idx) => (
-                              <tr key={dersNo} style={{ background: idx % 2 === 0 ? 'var(--surface)' : 'var(--bg)' }}>
-                                <td style={{ ...dpTd, fontWeight: 700, textAlign: 'center' }}>{dersNo}. Ders</td>
-                                {gunler.map(g => {
-                                  const hg = new Date(selYil, selAy - 1, g, 12).getDay()
-                                  const isHS = hg === 0 || hg === 6
-                                  const isTatil = tatilMi(selAy, g, selYil, tatiller)
-                                  const kayit = dersProgrami.find(p =>
-                                    p.kulup_adi === sinif.ad && (p.ders_no || 1) === dersNo && p.gun === g
-                                  )
-                                  const ogr = kayit?.ogretmen
-                                  return (
-                                    <td key={g} style={{ ...dpTd, background: (isHS || isTatil) ? 'var(--border-light)' : kayit ? 'var(--accent-lighter)' : undefined, textAlign: 'center' }}>
-                                      {isHS || isTatil
-                                        ? <span style={{ fontSize: 8, color: 'var(--text3)', fontWeight: 700 }}>{isTatil ? 'TATİL' : 'H.S.'}</span>
-                                        : ogr ? <span style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 9 }}>{ogr.ad}</span>
-                                        : null}
-                                    </td>
-                                  )
-                                })}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* SINIF DEFTERİ GÖRÜNÜMÜ */}
-        {aktifVeri === 'sinif-defteri' && (
-          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
-            {yukleniyor ? (
-              <div style={loadingOverlay}><RefreshCw size={24} className="animate-spin" color="var(--accent)" /></div>
-            ) : siniflar.length === 0 ? (
-              <div style={emptyView}>
-                <ClipboardList size={48} color="var(--border)" />
-                <p style={{ marginTop: 16, color: 'var(--text3)', fontWeight: 600 }}>Bu dönem için sınıf defteri bulunamadı.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-                {siniflar.map(sinif => {
-                  const gunSayisiAy = gunSayisi(selYil, selAy)
-                  const gunler = Array.from({ length: gunSayisiAy }, (_, i) => i + 1)
-
-                  const gunBasliklari = gunler.map(g => {
-                    const hg = new Date(selYil, selAy - 1, g, 12).getDay()
-                    const isHS = hg === 0 || hg === 6
-                    const isTatil = tatilMi(selAy, g, selYil, tatiller)
-                    const ad = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][hg]
-                    return { g, hg, isHS, isTatil, ad }
-                  })
-
-                  const renderDefterTablosu = (
-                    baslik: string,
-                    renk: string,
-                    satirlar: { no: number; etiket: string }[],
-                    koord: boolean
-                  ) => (
-                    <div style={{ marginBottom: koord ? 0 : 16 }}>
-                      <div style={{ padding: '6px 14px', background: renk, color: '#fff', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                        {baslik}
-                      </div>
-                      <div style={{ overflowX: 'auto' }}>
-                        <table style={{ borderCollapse: 'collapse', fontSize: 10, minWidth: '100%' }}>
-                          <thead>
-                            <tr style={{ background: renk }}>
-                              <th style={dpTh(80)}>Saat</th>
-                              {gunBasliklari.map(({ g, isHS, isTatil, ad }) => (
-                                <th key={g} style={{ ...dpTh(56), background: (isHS || isTatil) ? '#888' : renk }}>
-                                  {ad}<br /><span style={{ fontSize: 11, fontWeight: 800 }}>{g}</span>
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {satirlar.map(({ no, etiket }, idx) => (
-                              <tr key={no} style={{ background: idx % 2 === 0 ? 'var(--surface)' : 'var(--bg)' }}>
-                                <td style={{ ...dpTd, fontWeight: 700, textAlign: 'center', color: koord ? 'var(--info)' : 'var(--text)' }}>{etiket}</td>
-                                {gunBasliklari.map(({ g, isHS, isTatil }) => {
-                                  const kayit = sinifDefteri.find(p =>
-                                    p.kulup_adi === sinif.ad && p.ders_no === no && p.gun === g
-                                  )
-                                  const ogr = kayit?.ogretmen
-                                  const geldi = kayit?.durum === 'geldi'
-                                  return (
-                                    <td key={g} style={{ ...dpTd, background: (isHS || isTatil) ? 'var(--border-light)' : undefined, textAlign: 'center', verticalAlign: 'middle' }}>
-                                      {isHS || isTatil
-                                        ? <span style={{ fontSize: 8, color: 'var(--text3)', fontWeight: 700 }}>{isTatil ? 'TATİL' : 'H.S.'}</span>
-                                        : ogr ? (
-                                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                                            <span style={{ fontWeight: 700, color: 'var(--text)', fontSize: 9, lineHeight: 1.2 }}>{ogr.ad}</span>
-                                            <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 4px', borderRadius: 4, background: geldi ? renk : '#c53030', color: '#fff' }}>
-                                              {geldi ? '✓' : '✕'}
-                                            </span>
-                                          </div>
-                                        ) : null}
-                                    </td>
-                                  )
-                                })}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )
-
-                  return (
-                    <div key={sinif.id} style={{ background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
-                      <div style={{ padding: '10px 18px', background: 'var(--surface2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <ClipboardList size={14} color="var(--accent)" />
-                        <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>{sinif.ad}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text3)' }}>{sinif.yas_grubu} — Öğretmen Devam Takibi</span>
-                      </div>
-                      {renderDefterTablosu(
-                        '🏫 Öğretmen Defteri',
-                        'var(--accent)',
-                        [1,2,3,4,5,6].map((no, i) => ({ no, etiket: `${i+1}. Ders` })),
-                        false
-                      )}
-                      {renderDefterTablosu(
-                        '👔 Koordinatör Defteri',
-                        'var(--info)',
-                        [11,12,13,14,15,16].map((no, i) => ({ no, etiket: `Koord ${i+1}` })),
-                        true
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <AylikIzgara
+              key={`${secilenOkulId}-${aktifVeri}`}
+              tur={aktifVeri === 'ders-programi' ? 'program' : 'defter'}
+              siniflar={siniflar}
+              kayitlar={aktifVeri === 'ders-programi' ? dersProgrami : sinifDefteri}
+              yil={selYil}
+              ay={selAy}
+              tatiller={tatiller}
+            />
+          )
         )}
 
         {okulSekme === 'hesap' && <DenetciHesapKontrol veri={hesapVeri} />}
@@ -778,106 +574,80 @@ export default function DenetimPage() {
 
         {/* ── PROFİL ── */}
         {ekran === 'ayarlar' && ayarSekme === 'profil' && (
-          <div style={{ flex: 1, overflow: 'auto', padding: 32 }}>
-            <div style={{ maxWidth: 560, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-              {/* Başlık */}
-              <div>
-                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 800, color: 'var(--text)', margin: 0 }}>Profilim</h2>
-                <p style={{ fontSize: 13, color: 'var(--text3)', marginTop: 4 }}>{il?.ad} İli Denetçisi</p>
-              </div>
+          <div className="dn-sayfa">
+            <div style={{ width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 18 }}>
 
               {/* Ad Soyad Güncelle */}
-              <div style={{ background: 'var(--surface)', borderRadius: 20, padding: 28, border: '1px solid var(--border)' }}>
-                <h3 style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <UserCheck size={16} color="var(--accent)" /> Kişisel Bilgiler
-                </h3>
-                <form onSubmit={handleProfilGuncelle} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <section className="yk-kart">
+                <div className="yk-kart-bas">
+                  <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><UserCheck size={16} color="var(--accent)" aria-hidden="true" /> Kişisel bilgiler</h2>
+                </div>
+                <form onSubmit={handleProfilGuncelle} style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '0 18px 18px' }}>
+                  <div className="yk-grid2">
                     <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase' }}>Ad</label>
-                      <input
-                        type="text" value={profilAd} onChange={e => setProfilAd(e.target.value)}
-                        style={{ width: '100%', height: 42, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', padding: '0 12px', fontSize: 14, boxSizing: 'border-box' }}
-                      />
+                      <label className="form-label">Ad</label>
+                      <input className="form-input" type="text" value={profilAd} onChange={e => setProfilAd(e.target.value)} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase' }}>Soyad</label>
-                      <input
-                        type="text" value={profilSoyad} onChange={e => setProfilSoyad(e.target.value)}
-                        style={{ width: '100%', height: 42, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', padding: '0 12px', fontSize: 14, boxSizing: 'border-box' }}
-                      />
+                      <label className="form-label">Soyad</label>
+                      <input className="form-input" type="text" value={profilSoyad} onChange={e => setProfilSoyad(e.target.value)} />
                     </div>
                   </div>
                   {profilMesaj && (
-                    <div style={{ padding: '10px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                    <div role="status" style={{ padding: '10px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600,
                       background: profilMesaj.tip === 'ok' ? 'var(--success-light)' : 'var(--danger-light)',
                       color: profilMesaj.tip === 'ok' ? 'var(--success)' : 'var(--danger)',
                       border: `1px solid ${profilMesaj.tip === 'ok' ? 'var(--success-border)' : 'var(--danger-border)'}`,
                     }}>{profilMesaj.text}</div>
                   )}
-                  <button type="submit" disabled={profilKaydediliyor} style={{
-                    height: 42, borderRadius: 10, border: 'none', background: 'var(--accent)',
-                    color: 'white', fontWeight: 700, fontSize: 14, cursor: 'pointer',
-                    opacity: profilKaydediliyor ? 0.7 : 1,
-                  }}>
-                    {profilKaydediliyor ? 'Kaydediliyor...' : 'Kaydet'}
-                  </button>
+                  <div>
+                    <button type="submit" className="btn btn-primary" disabled={profilKaydediliyor}>
+                      {profilKaydediliyor ? 'Kaydediliyor...' : 'Kaydet'}
+                    </button>
+                  </div>
                 </form>
-              </div>
+              </section>
 
               {/* Şifre Değiştir */}
-              <div style={{ background: 'var(--surface)', borderRadius: 20, padding: 28, border: '1px solid var(--border)' }}>
-                <h3 style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Activity size={16} color="var(--accent)" /> Şifre Değiştir
-                </h3>
-                <form onSubmit={handleSifreDegistir} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase' }}>Mevcut Şifre</label>
-                    <input
-                      type="password" required value={eskiSifre} onChange={e => setEskiSifre(e.target.value)}
-                      style={{ width: '100%', height: 42, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', padding: '0 12px', fontSize: 14, boxSizing: 'border-box' }}
-                    />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <section className="yk-kart">
+                <div className="yk-kart-bas">
+                  <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Activity size={16} color="var(--accent)" aria-hidden="true" /> Şifre değiştir</h2>
+                </div>
+                <form onSubmit={handleSifreDegistir} style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '0 18px 18px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase' }}>Yeni Şifre</label>
-                      <input
-                        type="password" required value={yeniSifre} onChange={e => setYeniSifre(e.target.value)}
-                        style={{ width: '100%', height: 42, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', padding: '0 12px', fontSize: 14, boxSizing: 'border-box' }}
-                      />
+                      <label className="form-label">Mevcut şifre</label>
+                      <input className="form-input" type="password" required value={eskiSifre} onChange={e => setEskiSifre(e.target.value)} />
+                    </div>
+                  <div className="yk-grid2">
+                    <div>
+                      <label className="form-label">Yeni şifre</label>
+                      <input className="form-input" type="password" required value={yeniSifre} onChange={e => setYeniSifre(e.target.value)} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase' }}>Şifre Tekrar</label>
-                      <input
-                        type="password" required value={yeniSifreTekrar} onChange={e => setYeniSifreTekrar(e.target.value)}
-                        style={{ width: '100%', height: 42, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', padding: '0 12px', fontSize: 14, boxSizing: 'border-box' }}
-                      />
+                      <label className="form-label">Şifre tekrar</label>
+                      <input className="form-input" type="password" required value={yeniSifreTekrar} onChange={e => setYeniSifreTekrar(e.target.value)} />
                     </div>
                   </div>
                   {sifreMesaj && (
-                    <div style={{ padding: '10px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                    <div role="status" style={{ padding: '10px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600,
                       background: sifreMesaj.tip === 'ok' ? 'var(--success-light)' : 'var(--danger-light)',
                       color: sifreMesaj.tip === 'ok' ? 'var(--success)' : 'var(--danger)',
                       border: `1px solid ${sifreMesaj.tip === 'ok' ? 'var(--success-border)' : 'var(--danger-border)'}`,
                     }}>{sifreMesaj.text}</div>
                   )}
-                  <button type="submit" disabled={sifreKaydediliyor} style={{
-                    height: 42, borderRadius: 10, border: 'none', background: 'var(--accent)',
-                    color: 'white', fontWeight: 700, fontSize: 14, cursor: 'pointer',
-                    opacity: sifreKaydediliyor ? 0.7 : 1,
-                  }}>
-                    {sifreKaydediliyor ? 'Değiştiriliyor...' : 'Şifreyi Değiştir'}
-                  </button>
+                  <div>
+                    <button type="submit" className="btn btn-primary" disabled={sifreKaydediliyor}>
+                      {sifreKaydediliyor ? 'Değiştiriliyor...' : 'Şifreyi değiştir'}
+                    </button>
+                  </div>
                 </form>
-              </div>
+              </section>
 
             </div>
           </div>
         )}
 
-      </main>
-    </div>
+    </DenetimKabuk>
   )
 }
 

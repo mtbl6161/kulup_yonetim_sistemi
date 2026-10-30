@@ -349,7 +349,8 @@ export default function PuantajPage() {
                         width: 28, 
                         minWidth: 28, 
                         fontSize: 10,
-                        background: isWeekend ? '#ccc' : '#fff' 
+                        background: isWeekend ? 'var(--th-off-bg)' : 'var(--surface)',
+                        color: isWeekend ? 'var(--th-off-fg)' : undefined
                       }}>
                         {d}
                       </th>

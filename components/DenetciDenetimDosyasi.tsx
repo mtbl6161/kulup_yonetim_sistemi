@@ -13,18 +13,18 @@ import { useYukleme } from '@/lib/useYukleme'
 
 const RENK: Record<string, { bg: string; fg: string }> = {
   taslak: { bg: 'var(--surface2)', fg: 'var(--text2)' },
-  gonderildi: { bg: 'var(--info-light)', fg: '#1a5b8a' },
-  onaylandi: { bg: 'var(--success-light)', fg: '#1a6b34' },
-  iade: { bg: '#fdecdc', fg: '#9a4a12' },
+  gonderildi: { bg: 'var(--info-light)', fg: 'var(--info)' },
+  onaylandi: { bg: 'var(--success-light)', fg: 'var(--success)' },
+  iade: { bg: '#fff1d6', fg: '#8a5200' },
   bekliyor: { bg: 'var(--surface2)', fg: 'var(--text2)' },
 }
 const rozet = (d: string, metin: string) => (
-  <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: RENK[d]?.bg, color: RENK[d]?.fg, whiteSpace: 'nowrap' }}>{metin}</span>
+  <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 5, fontSize: 11.5, fontWeight: 600, background: RENK[d]?.bg, color: RENK[d]?.fg, whiteSpace: 'nowrap' }}>{metin}</span>
 )
-const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
+const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
 const ozetCip: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 8, background: 'var(--surface2)', color: 'var(--text)', fontSize: 12.5, whiteSpace: 'nowrap' }
-const btnOnay: React.CSSProperties = { ...btn, background: '#2d6a3e', color: '#ffffff', border: 'none' }
-const btnIade: React.CSSProperties = { ...btn, color: '#9a3412', borderColor: '#e8b48f' }
+const btnOnay: React.CSSProperties = { ...btn, background: 'var(--success)', color: '#ffffff', borderColor: '#085c38' }
+const btnIade: React.CSSProperties = { ...btn, color: '#8a5200', borderColor: 'var(--warn-border)' }
 
 /** Önizlemede gösterilen öğe: yüklenmiş/kopyalanmış bir belge ya da güncel veriden üretilmiş sistem belgesi */
 type Onizleme =
@@ -52,7 +52,7 @@ const LISTE_CSS = `
 .dd-belge .dd-ac { opacity: .75; transition: opacity .12s, transform .12s; }
 .dd-belge:hover .dd-ac, .dd-belge[aria-pressed="true"] .dd-ac { opacity: 1; transform: translateX(2px); }
 .dd-belge:hover .dd-ad { text-decoration: underline; }
-.dd-guncel:hover { background: #eef3f7 !important; }
+.dd-guncel:hover { background: var(--accent-lighter) !important; }
 `
 
 const tarayicidaAcilir = (mime?: string | null, ad?: string) =>
@@ -175,7 +175,7 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
   return (
     <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
       {/* ── Liste ── */}
-      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '18px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="dn-sayfa" style={{ minWidth: 0, gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 220, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13 }}>
             {rozet(durum, TESLIM_DURUM_ETIKET[durum])}
@@ -183,13 +183,13 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
               <span style={{ color: 'var(--text2)' }}>Madde</span>
               <b>{doluMadde} / {maddeler.length}</b>
               <span aria-hidden="true" style={{ width: 54, height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
-                <span style={{ display: 'block', height: '100%', width: `${maddeler.length ? Math.round(doluMadde / maddeler.length * 100) : 0}%`, background: doluMadde >= maddeler.length ? '#2d6a3e' : 'var(--accent)' }} />
+                <span style={{ display: 'block', height: '100%', width: `${maddeler.length ? Math.round(doluMadde / maddeler.length * 100) : 0}%`, background: doluMadde >= maddeler.length ? 'var(--success)' : 'var(--accent)' }} />
               </span>
             </span>
             {kararVerilebilir && (
               bekleyenBelge > 0
-                ? <span style={{ ...ozetCip, background: 'var(--warn-light)', color: '#8a5a00' }}><b>{bekleyenBelge}</b> belge karar bekliyor</span>
-                : <span style={{ ...ozetCip, background: 'var(--success-light)', color: '#1a6b34' }}><CheckCircle2 size={13} aria-hidden="true" /> Tüm belgelere karar verildi</span>
+                ? <span style={{ ...ozetCip, background: 'var(--warn-light)', color: '#8a5200' }}><b>{bekleyenBelge}</b> belge karar bekliyor</span>
+                : <span style={{ ...ozetCip, background: 'var(--success-light)', color: 'var(--success)' }}><CheckCircle2 size={13} aria-hidden="true" /> Tüm belgelere karar verildi</span>
             )}
             {teslim?.gonderim_tarihi && (
               <span style={ozetCip} title={new Date(teslim.gonderim_tarihi).toLocaleString('tr-TR')}>
@@ -212,7 +212,7 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
             Okul bu dosyayı henüz denetime göndermedi. Yüklenen belgeleri ve sistem belgelerinin güncel hâlini görebilirsiniz; karar gönderimden sonra verilir.
           </div>
         )}
-        {msg && <div role="status" style={{ padding: 12, borderRadius: 10, fontSize: 13, background: msg.tip === 'ok' ? 'var(--success-light)' : 'var(--danger-light)', color: msg.tip === 'ok' ? '#1a6b34' : 'var(--danger)' }}>{msg.text}</div>}
+        {msg && <div role="status" style={{ padding: 12, borderRadius: 10, fontSize: 13, background: msg.tip === 'ok' ? 'var(--success-light)' : 'var(--danger-light)', color: msg.tip === 'ok' ? 'var(--success)' : 'var(--danger)' }}>{msg.text}</div>}
         {islem && <div role="status" style={{ padding: 12, borderRadius: 10, fontSize: 13, background: 'var(--info-light)' }}>⏳ {islem}</div>}
 
         <style>{LISTE_CSS}</style>
@@ -222,14 +222,14 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
           </div>
         )}
         {/* flexShrink: 0 — overflow:hidden bir flex öğesi küçülüp içeriği kesiyor, kaydırma çıkmıyordu */}
-        <ol style={{ listStyle: 'none', margin: 0, padding: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', flexShrink: 0 }}>
+        <ol style={{ listStyle: 'none', margin: 0, padding: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
           {maddeler.map(m => {
             const mb = maddeBelgeleri(m)
             const guncelSecili = onizleme?.tur === 'guncel' && onizleme.madde.id === m.id
             return (
               <li key={m.id} style={{ display: 'flex', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border-light)' }}>
                 <span aria-hidden="true" style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12,
-                  background: mb.length ? 'var(--success-light)' : m.tip === 'otomatik' ? 'var(--info-light)' : 'var(--danger-light)', color: mb.length ? '#1a6b34' : m.tip === 'otomatik' ? '#1a5b8a' : 'var(--danger)' }}>{m.sira_no}</span>
+                  background: mb.length ? 'var(--success-light)' : m.tip === 'otomatik' ? 'var(--info-light)' : 'var(--danger-light)', color: mb.length ? 'var(--success)' : m.tip === 'otomatik' ? 'var(--info)' : 'var(--danger)' }}>{m.sira_no}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 8px', fontWeight: 600, fontSize: 13.5 }}>
                     <span><span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{m.sira_no}. </span>{m.baslik}</span>
@@ -261,12 +261,12 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
                   {m.tip === 'otomatik' && (
                     <button type="button" className="dd-guncel" onClick={() => guncelGoster(m)} disabled={!!islem} aria-pressed={guncelSecili}
                       style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, padding: '6px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#35566f',
-                        background: guncelSecili ? '#eef3f7' : 'transparent', border: '1px dashed #9fb6c9' }}>
+                        background: guncelSecili ? 'var(--accent-lighter)' : 'transparent', border: '1px dashed var(--accent-light)' }}>
                       <FileSearch size={14} aria-hidden="true" />
                       {mb.some(b => b.kaynak === 'otomatik') ? 'Gönderilen hâli okulun şu anki verisiyle yan yana karşılaştır' : 'Gönderim kopyası yok — okulun şu anki verisinden görüntüle'}
                     </button>
                   )}
-                  {mb.filter(b => b.denetci_notu).map(b => <div key={`n${b.id}`} style={{ fontSize: 12, color: '#9a3412', marginTop: 4 }}>Not ({b.dosya_adi}): {b.denetci_notu}</div>)}
+                  {mb.filter(b => b.denetci_notu).map(b => <div key={`n${b.id}`} style={{ fontSize: 12, color: '#8a5200', marginTop: 4 }}>Not ({b.dosya_adi}): {b.denetci_notu}</div>)}
                 </div>
               </li>
             )
@@ -279,7 +279,7 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
         <div role="presentation" {...perdeKapat(onizlemeKapat)}
           style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15, 23, 20, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(8px, 3vh, 32px) clamp(8px, 3vw, 40px)' }}>
         <aside role="dialog" aria-modal="true" aria-label="Belge önizleme" onClick={e => e.stopPropagation()}
-          style={{ width: 'min(1200px, 100%)', height: '100%', background: 'var(--surface)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,.3)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          style={{ width: 'min(1200px, 100%)', height: '100%', background: 'var(--surface)', borderRadius: 12, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,.3)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12, color: 'var(--text2)' }}>
@@ -305,12 +305,12 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
             <button type="button" aria-label="Önizlemeyi kapat" title="Kapat" style={{ ...btn, padding: 8 }} onClick={onizlemeKapat}><X size={15} /></button>
           </div>
 
-          <div style={{ flex: 1, minHeight: 0, background: '#e9ebee', display: 'flex' }}>
+          <div style={{ flex: 1, minHeight: 0, background: 'var(--bg2)', display: 'flex' }}>
             {onizleme.tur === 'guncel' && onizleme.kopya ? (
               <div style={{ flex: 1, display: 'flex', gap: 2, minWidth: 0 }}>
                 {([
-                  ['Gönderim anındaki kopya', teslim?.gonderim_tarihi ? new Date(teslim.gonderim_tarihi).toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : onizleme.kopya.belge.dosya_adi, onizleme.kopya.url, 'var(--info-light)', '#1a5b8a'],
-                  ['Okulun şu anki verisi', 'şimdi üretildi', onizleme.url, 'var(--success-light)', '#1a6b34'],
+                  ['Gönderim anındaki kopya', teslim?.gonderim_tarihi ? new Date(teslim.gonderim_tarihi).toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : onizleme.kopya.belge.dosya_adi, onizleme.kopya.url, 'var(--info-light)', 'var(--info)'],
+                  ['Okulun şu anki verisi', 'şimdi üretildi', onizleme.url, 'var(--success-light)', 'var(--success)'],
                 ] as const).map(([baslik, alt, url, bg, fg]) => (
                   <div key={baslik} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                     <div style={{ padding: '6px 12px', background: bg, color: fg, fontSize: 12.5, fontWeight: 700, display: 'flex', gap: 8, alignItems: 'baseline' }}>

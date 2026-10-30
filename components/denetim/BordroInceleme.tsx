@@ -44,7 +44,8 @@ export default function BordroInceleme({ satirlar, yukleniyor, bilVeri }: {
          )}
       </div>}
 
-      <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
+      {/* Tablo kendi kutusunda kayar: başlık satırı ve ad sütunları yerinde kalır, sayfa kaymaz */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '14px 28px 18px' }}>
         {yukleniyor ? (
           <div style={loadingOverlay}><RefreshCw size={24} className="animate-spin" color="var(--accent)" /></div>
         ) : satirlar.length === 0 ? (
@@ -53,8 +54,8 @@ export default function BordroInceleme({ satirlar, yukleniyor, bilVeri }: {
              <p style={{ marginTop: 16, color: 'var(--text3)', fontWeight: 600 }}>Bu dönem için bordro kaydı bulunamadı.</p>
           </div>
         ) : (
-          <div style={{ background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflowX: 'auto', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', zoom: 0.85 }}>
-            <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'auto' }}>
+          <div style={{ flex: '0 1 auto', minHeight: 0, overflow: 'auto', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
+            <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', tableLayout: 'auto' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr style={{ background: 'var(--surface2)' }}>
                   <th colSpan={4} style={thGrup}>PERSONEL BİLGİLERİ</th>
@@ -65,7 +66,7 @@ export default function BordroInceleme({ satirlar, yukleniyor, bilVeri }: {
                   <th style={{ ...thGrup, borderBottom: '1px solid var(--border)' }}>TOPLAM</th>
                   <th colSpan={5} style={{ ...thGrup, borderBottom: '1px solid var(--border)', borderRight: 'none' }}>İŞVEREN SGK DETAYLARI</th>
                 </tr>
-                <tr style={{ background: 'var(--surface)', borderBottom: '2px solid var(--accent)' }}>
+                <tr>
                   {[
                     { l: 'S.N.', a: 'center', w: 30, sticky: 0 },
                     { l: 'GÖREVİ', a: 'left', w: 100, sticky: 30 },
@@ -86,9 +87,9 @@ export default function BordroInceleme({ satirlar, yukleniyor, bilVeri }: {
                     { l: 'İşs.\n%1', a: 'center', w: 40 },
                     { l: 'Kes.\nTop.', a: 'center', w: 50, bold: true },
                     { l: 'NET\nÖDENECEK', a: 'center', w: 65, bold: true, success: true },
-                    { l: 'Kısa\n.25', a: 'center', w: 35 },
+                    { l: 'Kısa V.\n%2,25', a: 'center', w: 44 },
                     { l: 'Em.\n%20', a: 'center', w: 35 },
-                    { l: 'Sağ.\n.5', a: 'center', w: 35 },
+                    { l: 'Sağlık\n%12,5', a: 'center', w: 44 },
                     { l: 'İşs.\n%3', a: 'center', w: 35 },
                     { l: 'İşv.\nTop.', a: 'center', w: 55, bold: true },
                   ].map((h, i) => (
@@ -98,9 +99,10 @@ export default function BordroInceleme({ satirlar, yukleniyor, bilVeri }: {
                       minWidth: h.w, 
                       color: h.success ? 'var(--accent)' : 'var(--text2)', 
                       fontWeight: h.bold ? 800 : 700,
-                      position: h.sticky !== undefined ? 'sticky' : 'relative',
+                      position: 'sticky', top: 37,
                       left: h.sticky,
-                      zIndex: h.sticky !== undefined ? 20 : 1
+                      zIndex: h.sticky !== undefined ? 20 : 11,
+                      borderBottom: '2px solid var(--accent)'
                     }}>{h.l}</th>
                   ))}
                 </tr>

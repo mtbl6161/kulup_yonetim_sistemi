@@ -1,11 +1,13 @@
 'use client'
 // Denetim paneli: "İş Kuyruğu" ana sayfası ve ortak dönem/durum yardımcıları.
-// Üst bar, Okullar sayfası ve okul inceleme başlığı DenetimDuzen.tsx'tedir.
+// Kabuk, Okullar sayfası ve okul inceleme başlığı DenetimDuzen.tsx'tedir.
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AYLAR } from '@/lib/hesaplama'
 import { DenetimTeslim, TeslimDurum, egitimYiliBaslangic, belgeDonemde, DenetimMadde } from '@/lib/denetimDosyasi'
 import { AlertTriangle, Clock, RefreshCw } from 'lucide-react'
+import { Filtre as SegmentFiltre } from '@/components/yonetim/ortak'
+
 
 /** Son 12 ay, en yeni önce: "2026-9" biçiminde anahtarlar */
 export function donemSecenekleri(): { key: string; ad: string }[] {
@@ -23,17 +25,27 @@ export function varsayilanDonem(): string {
   return `${t.getFullYear()}-${t.getMonth() + 1}`
 }
 
-const DURUM: Record<TeslimDurum | 'yok', { ad: string; bg: string; fg: string }> = {
-  yok: { ad: 'Göndermedi', bg: 'var(--surface2)', fg: 'var(--text2)' },
-  taslak: { ad: 'Göndermedi', bg: 'var(--surface2)', fg: 'var(--text2)' },
-  gonderildi: { ad: 'Denetimde', bg: 'var(--info-light)', fg: '#1a5b8a' },
-  iade: { ad: 'İade edildi', bg: '#fdecdc', fg: '#9a4a12' },
-  onaylandi: { ad: 'Onaylandı', bg: 'var(--success-light)', fg: '#1a6b34' },
+const DURUM: Record<TeslimDurum | 'yok', { ad: string; rozet: string }> = {
+  yok: { ad: 'Göndermedi', rozet: 'badge-gray' },
+  taslak: { ad: 'Göndermedi', rozet: 'badge-gray' },
+  gonderildi: { ad: 'Denetimde', rozet: 'badge-blue' },
+  iade: { ad: 'İade edildi', rozet: 'badge-orange' },
+  onaylandi: { ad: 'Onaylandı', rozet: 'badge-green' },
 }
 
 export function DurumRozeti({ durum }: { durum?: TeslimDurum | null }) {
   const d = DURUM[durum || 'yok']
-  return <span style={{ fontSize: 11, fontWeight: 700, background: d.bg, color: d.fg, borderRadius: 20, padding: '3px 9px', whiteSpace: 'nowrap' }}>{d.ad}</span>
+  return <span className={`badge ${d.rozet}`} style={{ whiteSpace: 'nowrap' }}>{d.ad}</span>
+}
+
+/** Evrak doluluğu: ince çubuk + "dolu/toplam" */
+export function EvrakIlerleme({ dolu, toplam, oran }: { dolu: number; toplam: number; oran: number }) {
+  return (
+    <span className="dn-ilerleme">
+      <span aria-hidden="true"><span style={{ width: `${oran * 100}%`, background: oran >= 1 ? 'var(--success)' : 'var(--warn)' }} /></span>
+      <span>{dolu}/{toplam}</span>
+    </span>
+  )
 }
 
 // ============================================================
@@ -104,12 +116,11 @@ function beklemeMetni(iso?: string | null) {
 // ============================================================
 type Filtre = 'gonderildi' | 'iade' | 'yok' | 'onaylandi'
 
-export function DenetimIsKuyrugu({ okullar, yil, ay, durumlar, toplamMadde, yukleniyor, sonHareketler, ilAd, ilceler, filtreIlceId, onIlce, onIncele, onTumKayitlar, onYenile }: {
+export function DenetimIsKuyrugu({ okullar, ay, durumlar, toplamMadde, yukleniyor, sonHareketler, ilceler, filtreIlceId, onIlce, onIncele, onTumKayitlar, onYenile }: {
   okullar: { id: number; ad: string }[]
-  yil: number; ay: number
+  ay: number
   durumlar: Map<number, OkulDonemDurumu>; toplamMadde: number; yukleniyor: boolean
   sonHareketler: { id: number; created_at: string; aciklama?: string; okullar?: { ad?: string } }[]
-  ilAd?: string
   ilceler: { id: number; ad: string }[]; filtreIlceId: number | null; onIlce: (id: number | null) => void
   onIncele: (okulId: number, liste?: number[]) => void; onTumKayitlar: () => void; onYenile: () => void
 }) {
@@ -135,70 +146,54 @@ export function DenetimIsKuyrugu({ okullar, yil, ay, durumlar, toplamMadde, yukl
   ]
 
   const kart = (baslik: string, deger: number, alt: string, renk: string, f: Filtre) => (
-    <button type="button" onClick={() => setFiltre(f)} aria-pressed={filtre === f}
-      style={{ textAlign: 'left', background: 'var(--surface)', borderRadius: 14, padding: 18, cursor: 'pointer', fontFamily: 'inherit',
-        border: filtre === f ? `2px solid ${renk}` : '1px solid var(--border)' }}>
-      <div style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600 }}>{baslik}</div>
-      <div style={{ fontSize: 30, fontWeight: 800, color: renk, marginTop: 6, lineHeight: 1.1 }}>{deger}</div>
-      <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{alt}</div>
+    <button type="button" onClick={() => setFiltre(f)} aria-pressed={filtre === f} className={filtre === f ? 'on' : ''}>
+      <div className="ad">{baslik}</div>
+      <div className="deger" style={{ color: renk }}>{deger}</div>
+      <div className="alt">{alt}</div>
     </button>
   )
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '28px 36px', display: 'flex', flexDirection: 'column', gap: 22 }}>
-      <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16 }}>
-        <div>
-          <div style={{ fontSize: 13, color: 'var(--text2)' }}>{ilAd ? `${ilAd} İl Milli Eğitim Müdürlüğü` : 'İl Milli Eğitim Müdürlüğü'} · {AYLAR[ay]} {yil}</div>
-          <h1 style={{ margin: '4px 0 0', fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: 'var(--text)' }}>
-            {say('gonderildi') > 0 ? `${say('gonderildi')} dosya incelemenizi bekliyor` : 'İnceleme bekleyen dosya yok'}
-          </h1>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-          <label style={{ display: 'flex', flexDirection: 'column', fontSize: 11, color: 'var(--text2)', gap: 4, fontWeight: 600 }}>İlçe
-            <select value={filtreIlceId || ''} onChange={e => onIlce(e.target.value ? Number(e.target.value) : null)}
-              style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 14, fontFamily: 'inherit', color: 'var(--text)' }}>
-              <option value="">Tüm ilçeler</option>
-              {ilceler.map(i => <option key={i.id} value={i.id}>{i.ad}</option>)}
-            </select>
-          </label>
-          <button type="button" onClick={onYenile} aria-label="Yenile" title="Yenile"
-            style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            <RefreshCw size={16} className={yukleniyor ? 'animate-spin' : ''} />
-          </button>
-        </div>
-      </header>
+    <div className="dn-sayfa">
+      <div className="yk-arac">
+        <h2 style={{ margin: 0, flex: '1 1 260px', fontSize: 18, fontWeight: 700 }}>
+          {say('gonderildi') > 0 ? `${say('gonderildi')} dosya incelemenizi bekliyor` : 'İnceleme bekleyen dosya yok'}
+        </h2>
+        <select aria-label="İlçe" className="form-select dn-secim" value={filtreIlceId || ''} onChange={e => onIlce(e.target.value ? Number(e.target.value) : null)}>
+          <option value="">Tüm ilçeler</option>
+          {ilceler.map(i => <option key={i.id} value={i.id}>{i.ad}</option>)}
+        </select>
+        <button type="button" className="btn btn-secondary btn-icon" onClick={onYenile} aria-label="Yenile" title="Yenile">
+          <RefreshCw size={15} className={yukleniyor ? 'animate-spin' : ''} />
+        </button>
+      </div>
 
-      <section aria-label="Özet" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
-        {kart('İnceleme bekleyen', say('gonderildi'), enEski !== undefined ? `en eskisi ${enEski <= 0 ? 'bugün' : `${enEski} gündür`} bekliyor` : 'kuyruk boş', '#1f5f8b', 'gonderildi')}
-        {kart('Göndermeyen okul', say('yok'), `${okullar.length} okuldan`, '#a3531f', 'yok')}
-        {kart('İade edilen', say('iade'), 'okul düzeltmesi bekleniyor', '#7a4a1a', 'iade')}
-        {kart('Onaylanan', say('onaylandi'), 'bu dönem', '#2347D9', 'onaylandi')}
+      <section aria-label="Özet" className="yk-kpi">
+        {kart('İnceleme bekleyen', say('gonderildi'), enEski !== undefined ? `en eskisi ${enEski <= 0 ? 'bugün' : `${enEski} gündür`} bekliyor` : 'kuyruk boş', 'var(--accent)', 'gonderildi')}
+        {kart('Göndermeyen okul', say('yok'), `${okullar.length} okuldan`, 'var(--warn)', 'yok')}
+        {kart('İade edilen', say('iade'), 'okul düzeltmesi bekleniyor', '#8a5200', 'iade')}
+        {kart('Onaylanan', say('onaylandi'), 'bu dönem', 'var(--success)', 'onaylandi')}
       </section>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 22, alignItems: 'flex-start' }}>
-        <section aria-labelledby="kuyrukBaslik" style={{ flex: '999 1 560px', minWidth: 0, background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border)', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '16px 20px', borderBottom: '1px solid var(--border-light)' }}>
-            <h2 id="kuyrukBaslik" style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
+      <div className="yk-iki">
+        <section aria-labelledby="kuyrukBaslik" className="yk-kart genis">
+          <div className="yk-kart-bas">
+            <h2 id="kuyrukBaslik">
               {filtre === 'gonderildi' ? 'İnceleme kuyruğu' : filtre === 'iade' ? 'İade edilen dosyalar' : filtre === 'yok' ? 'Göndermeyen okullar' : 'Onaylanan dosyalar'}
             </h2>
-            <div role="group" aria-label="Filtre" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {([['gonderildi', 'Bekleyen'], ['iade', 'İade'], ['yok', 'Göndermedi'], ['onaylandi', 'Onaylanan']] as [Filtre, string][]).map(([f, ad]) => (
-                <button key={f} type="button" onClick={() => setFiltre(f)} aria-pressed={filtre === f}
-                  style={{ padding: '7px 12px', borderRadius: 20, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', fontWeight: filtre === f ? 700 : 500,
-                    border: filtre === f ? 'none' : '1px solid var(--border)', background: filtre === f ? '#1f3a2a' : 'var(--surface)', color: filtre === f ? '#ffffff' : 'var(--text2)' }}>
-                  {ad} ({say(f)})
-                </button>
-              ))}
+            <div className="yk-kart-sag">
+              <SegmentFiltre<Filtre> etiket="Filtre" deger={filtre} onDegis={setFiltre}
+                secenekler={([['gonderildi', 'Bekleyen'], ['iade', 'İade'], ['yok', 'Göndermedi'], ['onaylandi', 'Onaylanan']] as [Filtre, string][]).map(([id, ad]) => ({ id, ad, sayi: say(id) }))} />
             </div>
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 600 }}>
+          <div className="yk-tablo">
+            <table className="data-table" style={{ minWidth: 600 }}>
               <thead>
-                <tr style={{ textAlign: 'left', color: 'var(--text2)', fontSize: 12 }}>
-                  <th scope="col" style={{ padding: '10px 20px', fontWeight: 600 }}>Okul</th>
-                  <th scope="col" style={{ padding: '10px 8px', fontWeight: 600 }}>Evrak</th>
-                  <th scope="col" style={{ padding: '10px 8px', fontWeight: 600 }}>{filtre === 'gonderildi' ? 'Bekleme' : 'Durum'}</th>
-                  <th scope="col" style={{ padding: '10px 20px', fontWeight: 600, textAlign: 'right' }}><span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>İşlem</span></th>
+                <tr>
+                  <th scope="col">Okul</th>
+                  <th scope="col">Evrak</th>
+                  <th scope="col">{filtre === 'gonderildi' ? 'Bekleme' : 'Durum'}</th>
+                  <th scope="col" style={{ textAlign: 'right' }}><span className="sr-only">İşlem</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -206,29 +201,20 @@ export function DenetimIsKuyrugu({ okullar, yil, ay, durumlar, toplamMadde, yukl
                   const oran = toplamMadde ? Math.min(1, (s.d?.doluMadde || 0) / toplamMadde) : 0
                   const bekleme = gunFarki(s.d?.teslim?.gonderim_tarihi)
                   return (
-                    <tr key={s.id} style={{ borderTop: '1px solid var(--border-light)' }}>
-                      <td style={{ padding: '14px 20px' }}>
+                    <tr key={s.id}>
+                      <td>
                         <div style={{ fontWeight: 600 }}>{s.ad}</div>
-                        {s.bordroDegisti && <div style={{ fontSize: 12, color: '#a3531f', marginTop: 2 }}>Bordro gönderimden sonra değişti</div>}
+                        {s.bordroDegisti && <div style={{ fontSize: 12, color: '#8a5200', marginTop: 2 }}>Bordro gönderimden sonra değişti</div>}
                         {s.grup === 'iade' && s.d?.teslim?.denetci_notu && <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>Not: {s.d.teslim.denetci_notu}</div>}
                       </td>
-                      <td style={{ padding: '14px 8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 90, height: 6, borderRadius: 6, background: 'var(--surface2)' }} aria-hidden="true">
-                            <div style={{ width: `${oran * 100}%`, height: 6, borderRadius: 6, background: oran >= 1 ? '#2347D9' : '#c98a2e' }} />
-                          </div>
-                          <span style={{ fontSize: 12 }}>{s.d?.doluMadde || 0}/{toplamMadde}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '14px 8px' }}>
+                      <td><EvrakIlerleme dolu={s.d?.doluMadde || 0} toplam={toplamMadde} oran={oran} /></td>
+                      <td>
                         {filtre === 'gonderildi'
-                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: bekleme >= 3 ? '#a3531f' : 'var(--text)', fontWeight: bekleme >= 3 ? 700 : 400 }}><Clock size={13} aria-hidden="true" />{beklemeMetni(s.d?.teslim?.gonderim_tarihi)}</span>
+                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: bekleme >= 3 ? '#8a5200' : 'var(--text)', fontWeight: bekleme >= 3 ? 600 : 400 }}><Clock size={13} aria-hidden="true" />{beklemeMetni(s.d?.teslim?.gonderim_tarihi)}</span>
                           : <DurumRozeti durum={s.d?.teslim?.durum} />}
                       </td>
-                      <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                        <button type="button" onClick={() => onIncele(s.id, liste.map(x => x.id))}
-                          style={{ padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
-                            background: filtre === 'gonderildi' ? 'var(--accent)' : 'var(--surface2)', color: filtre === 'gonderildi' ? '#ffffff' : 'var(--text)' }}>
+                      <td style={{ textAlign: 'right' }}>
+                        <button type="button" className={`btn btn-sm ${filtre === 'gonderildi' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => onIncele(s.id, liste.map(x => x.id))}>
                           {filtre === 'gonderildi' ? 'İncele' : 'Aç'}
                         </button>
                       </td>
@@ -245,41 +231,47 @@ export function DenetimIsKuyrugu({ okullar, yil, ay, durumlar, toplamMadde, yukl
           </div>
         </section>
 
-        <aside aria-label="Uyarılar ve hareketler" style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <section style={{ background: '#fff7e8', border: '1px solid #f0d9ae', borderRadius: 16, padding: 18 }}>
-            <h2 style={{ margin: '0 0 10px', fontSize: 15, fontWeight: 700, color: '#6b3a12', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AlertTriangle size={16} aria-hidden="true" /> Dikkat gerektirenler
-            </h2>
-            {dikkat.length === 0 ? (
-              <div style={{ fontSize: 13, color: '#5a4a3a' }}>Şu an dikkat gerektiren bir durum yok.</div>
-            ) : (
-              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {dikkat.slice(0, 8).map((x, i) => (
-                  <li key={i}>
-                    <button type="button" onClick={() => onIncele(x.id)}
-                      style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: '#4a3a2a', fontSize: 13, lineHeight: 1.5, fontFamily: 'inherit', textDecoration: 'underline', textDecorationColor: '#e2c48f' }}>
-                      {x.metin}
-                    </button>
-                  </li>
-                ))}
-                {dikkat.length > 8 && <li style={{ fontSize: 12, color: '#6b5a4a' }}>+{dikkat.length - 8} uyarı daha</li>}
-              </ul>
-            )}
+        <aside aria-label="Uyarılar ve hareketler" className="dar">
+          <section className="yk-kart" style={{ background: 'var(--warn-light)', borderColor: 'var(--warn-border)' }}>
+            <div className="yk-kart-bas">
+              <h2 style={{ color: '#8a5200', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <AlertTriangle size={16} aria-hidden="true" /> Dikkat gerektirenler
+              </h2>
+            </div>
+            <div style={{ padding: '0 18px 16px' }}>
+              {dikkat.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--text2)' }}>Şu an dikkat gerektiren bir durum yok.</div>
+              ) : (
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {dikkat.slice(0, 8).map((x, i) => (
+                    <li key={i}>
+                      <button type="button" onClick={() => onIncele(x.id)}
+                        style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: 'var(--text)', fontSize: 13, lineHeight: 1.5, fontFamily: 'inherit', textDecoration: 'underline', textDecorationColor: 'var(--warn-border)' }}>
+                        {x.metin}
+                      </button>
+                    </li>
+                  ))}
+                  {dikkat.length > 8 && <li style={{ fontSize: 12, color: 'var(--text3)' }}>+{dikkat.length - 8} uyarı daha</li>}
+                </ul>
+              )}
+            </div>
           </section>
-          <section style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 }}>
-            <h2 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700 }}>Son hareketler</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
-              {sonHareketler.length === 0 && <div style={{ color: 'var(--text3)' }}>Kayıt yok.</div>}
+          <section className="yk-kart">
+            <div className="yk-kart-bas"><h2>Son hareketler</h2></div>
+            <div style={{ display: 'flex', flexDirection: 'column', fontSize: 13 }}>
+              {sonHareketler.length === 0 && <div style={{ color: 'var(--text3)', padding: '0 18px 12px' }}>Kayıt yok.</div>}
               {sonHareketler.slice(0, 6).map(l => (
-                <div key={l.id}>
+                <div key={l.id} style={{ padding: '10px 18px', borderTop: '1px solid var(--border-light)' }}>
                   <div style={{ fontWeight: 600 }}>{l.okullar?.ad}</div>
-                  <div style={{ color: 'var(--text2)' }}>{l.aciklama} · {new Date(l.created_at).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+                  <div style={{ color: 'var(--text2)' }}>{l.aciklama} · <span style={{ color: 'var(--text3)' }}>{new Date(l.created_at).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span></div>
                 </div>
               ))}
             </div>
-            <button type="button" onClick={onTumKayitlar} style={{ marginTop: 12, background: 'none', border: 'none', padding: 0, color: 'var(--accent)', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
-              Tüm kayıtlar →
-            </button>
+            <div style={{ padding: '10px 18px 14px', borderTop: '1px solid var(--border-light)' }}>
+              <button type="button" onClick={onTumKayitlar} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Tüm kayıtlar →
+              </button>
+            </div>
           </section>
         </aside>
       </div>

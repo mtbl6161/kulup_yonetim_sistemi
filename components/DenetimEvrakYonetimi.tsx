@@ -5,11 +5,10 @@ import { DenetimMadde, MaddeTip, OtomatikKod, OTOMATIK_KODLAR } from '@/lib/dene
 import { Plus, Save } from 'lucide-react'
 import { useYukleme } from '@/lib/useYukleme'
 
-const kutu: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }
+const kutu: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }
 const th: React.CSSProperties = { padding: '10px 12px', fontSize: 11, fontWeight: 800, color: 'var(--text3)', textAlign: 'left', textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }
 const td: React.CSSProperties = { padding: '8px 12px', fontSize: 13, borderBottom: '1px solid var(--border-light)', verticalAlign: 'middle' }
 const inp: React.CSSProperties = { padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, width: '100%', background: 'var(--surface)', color: 'var(--text)' }
-const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text2)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }
 
 // ============================================================
 // Evrak listesi düzenleyici (il bazında). Silme yok: pasife alınır,
@@ -68,18 +67,18 @@ export function DenetimMaddeEditor({ ilId }: { ilId: number }) {
   const degisenVar = satirlar.some(s => s.degisti)
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
+    <div className="dn-kaydir">
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-        <div style={{ fontSize: 18, fontWeight: 800, flex: 1 }}>Denetim Evrak Listesi</div>
-        <button style={btn} onClick={ekle}><Plus size={14} /> Madde Ekle</button>
-        <button style={{ ...btn, background: degisenVar ? 'var(--accent)' : 'var(--surface2)', color: degisenVar ? '#fff' : 'var(--text3)', border: 'none' }} disabled={!degisenVar || kaydediliyor} onClick={kaydet}>
-          <Save size={14} /> {kaydediliyor ? 'Kaydediliyor...' : 'Kaydet'}
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, flex: 1 }}>Denetim evrak listesi</h2>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={ekle}><Plus size={14} aria-hidden="true" /> Madde ekle</button>
+        <button type="button" className="btn btn-primary btn-sm" disabled={!degisenVar || kaydediliyor} onClick={kaydet}>
+          <Save size={14} aria-hidden="true" /> {kaydediliyor ? 'Kaydediliyor...' : 'Kaydet'}
         </button>
       </div>
       <p style={{ fontSize: 12, color: 'var(--text3)', margin: '0 0 14px' }}>
         İlinizdeki tüm okullar bu listeyi görür. &quot;Sistemden otomatik&quot; maddeler okulun verisinden PDF olarak üretilir. Kaldırmak istediğiniz maddeyi pasife alın; geçmiş belgeler korunur.
       </p>
-      {msg && <div style={{ padding: 12, borderRadius: 10, marginBottom: 14, fontSize: 13, background: msg.tip === 'ok' ? 'var(--success-light)' : 'var(--danger-light)', color: msg.tip === 'ok' ? '#1a7a3a' : 'var(--danger)' }}>{msg.text}</div>}
+      {msg && <div style={{ padding: 12, borderRadius: 10, marginBottom: 14, fontSize: 13, background: msg.tip === 'ok' ? 'var(--success-light)' : 'var(--danger-light)', color: msg.tip === 'ok' ? 'var(--success)' : 'var(--danger)' }}>{msg.text}</div>}
       <div style={kutu}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>
