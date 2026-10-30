@@ -585,14 +585,6 @@ export function hesapKontrolEt(girdi: {
       }
     }
 
-    if (!b.odendi) {
-      bulgular.push({
-        baslik: 'Ödeme işaretlenmemiş', durum: 'uyari',
-        aciklama: `Bordro "ödendi" olarak işaretlenmemiş; net ${tl(Number(b.net || 0))} tutarın personele ödendiği sistemde görünmüyor.`,
-        oneri: 'Ödeme yapıldıysa banka dekontu denetim dosyasında olmalı ve bordro "ödendi" olarak işaretlenmeli.',
-      })
-    }
-
     // Başka kurumda çalışma işaretleri (Excel'de kulübün beyanıyla gelir; burada veriden çıkarılır)
     const baskaKurum: string[] = []
     const digerOkullar = girdi.digerOkulKayitlari?.get(b.personel_id) || []
