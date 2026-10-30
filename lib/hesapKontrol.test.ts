@@ -29,13 +29,15 @@ describe('asgari ücret istisnası kontrolü', () => {
     expect(bulgular.filter(x => x.durum === 'hata').map(x => x.baslik)).toEqual(['Gelir vergisi istisnası fazla uygulanmış', 'Damga vergisi istisnası fazla uygulanmış'])
   })
 
-  it('istisna ayarı saklanmamış eski bordroda karta göre kontrol eder ama hata yerine uyarı verir', () => {
+  it('istisna ayarı saklanmamış eski bordroda, istisna uygulanmışsa o ay açık kabul eder (kartı sonradan kapatmak hata doğurmaz)', () => {
     const bulgular = istisnaBulgulari(satir())
-    const gv = bulgular.find(x => x.baslik === 'Gelir vergisi istisnası fazla uygulanmış')
-    expect(gv?.durum).toBe('uyari')
-    expect(gv?.aciklama).toContain('Kart bordrodan sonra değiştirildiyse')
-    // Bordroda istisna uygulanmışken "hiç uygulanmamış" denmez
-    expect(bulgular.map(x => x.baslik)).not.toContain('İstisna başka işverende kullanılıyor olabilir')
+    expect(bulgular).toHaveLength(0)
+  })
+
+  it('eski bordroda da yasal üst sınırı aşan istisnayı hata sayar', () => {
+    // Eylül GV istisna sınırı ~5.615 TL; hesaplanan vergiyi (1.471,86) aşan istisna olamaz
+    const bulgular = istisnaBulgulari(satir({ gv_istisna_tutari: 2000 }))
+    expect(bulgular.filter(x => x.durum === 'hata').map(x => x.baslik)).toContain('Gelir vergisi istisnası fazla uygulanmış')
   })
 
   it('kayıt, kartın istisna ayarını alır', () => {

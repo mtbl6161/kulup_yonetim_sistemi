@@ -363,10 +363,11 @@ export function hesapKontrolEt(girdi: {
     const p = b.personel
     const gorev = p?.gorev || ''
     // İstisna ayarı bordro kaydedilirken saklanır; personel kartı sonradan (ör. sonraki ay için) değişmiş olabilir.
-    // Eski bordrolarda bu kayıt yoksa bugünkü kart kullanılır ve uyumsuzluk "hata" yerine "uyarı" sayılır.
-    const kartKayitli = !!b.istisna_karti
-    const kart = b.istisna_karti ?? istisnaKartiOlustur(p)
-    const kartNotu = kartKayitli ? '' : ' Bu bordro, personelin istisna ayarı kaydedilmeden önce hesaplanmış; kontrol personel kartının bugünkü hâline göre yapıldı. Kart bordrodan sonra değiştirildiyse (ör. sonraki ay için) bu uyarı geçersizdir. Bu nedenle geçmiş ayın bordrosunu yeniden hesaplamayın; yeni ayarla hesaplanır.'
+    // Bu kaydı taşımayan eski bordrolarda kartın o ayki hâli bilinemez: bordroda istisna uygulanmışsa o ay açık
+    // kabul edilir (yasal üst sınır yine denetlenir), uygulanmamışsa bugünkü kart kullanılır.
+    const uygulananIstisna = Number(b.gv_istisna_tutari || 0) + Number(b.dv_istisna_tutari || 0)
+    const kart: IstisnaKarti = b.istisna_karti
+      ?? (uygulananIstisna > ARITMETIK_TOL ? { vergi_istisnasi: true, tip: 'tam', gv: 0, dv: 0 } : istisnaKartiOlustur(p))
     const bulgular: KontrolBulgu[] = []
     const brut = Number(b.brut || 0)
     const tavan = tavanHesapla(gorev, tavanKatsayi, p ? !!p.sgk_li : undefined)
@@ -538,13 +539,13 @@ export function hesapKontrolEt(girdi: {
       const dvEksik = r2(Math.max(0, (dvHes - dvIzin) - Number(b.damga_tutar || 0)))
       if (gvIst > gvIzin + ARITMETIK_TOL) {
         bulgular.push({
-          baslik: 'Gelir vergisi istisnası fazla uygulanmış', durum: kartKayitli ? 'hata' : 'uyari', beklenen: gvIzin, bulunan: gvIst,
+          baslik: 'Gelir vergisi istisnası fazla uygulanmış', durum: 'hata', beklenen: gvIzin, bulunan: gvIst,
           aciklama: (istisnaKapali
             ? `Personel kartında asgari ücret istisnası kapalı olduğu halde ${tl(gvIst)} GV istisnası uygulanmış.`
             : `${tl(gvIst)} GV istisnası uygulanmış; uygulanabilecek en fazla ${tl(gvIzin)} (${tutarTipi ? `personele özel tanımlı ${tl(gvSinir)}` : `ayın istisna sınırı ${tl(gvSinir)}`} ile hesaplanan GV ${tl(gvHes)} tutarından küçük olanı).`)
             + (gvEksik > ARITMETIK_TOL
               ? ` Bu nedenle ${tl(gvEksik)} gelir vergisi eksik kesilmiş (kesilmesi gereken ${tl(r2(gvHes - gvIzin))}, kesilen ${tl(Number(b.gv_tutar || 0))}).`
-              : ' Kesilen vergi tutarı etkilenmemiş, ancak bordroda ve muhtasar beyannamede istisna olduğundan fazla görünür.') + kartNotu,
+              : ' Kesilen vergi tutarı etkilenmemiş, ancak bordroda ve muhtasar beyannamede istisna olduğundan fazla görünür.'),
           kural: gvKural,
           oneri: gvEksik > ARITMETIK_TOL
             ? 'Eksik kesilen vergi muhtasar beyannamede düzeltilmeli; personel istisnayı başka işverende kullanıyorsa kartında istisna kapatılmalı.'
@@ -553,13 +554,13 @@ export function hesapKontrolEt(girdi: {
       }
       if (dvIst > dvIzin + ARITMETIK_TOL) {
         bulgular.push({
-          baslik: 'Damga vergisi istisnası fazla uygulanmış', durum: kartKayitli ? 'hata' : 'uyari', beklenen: dvIzin, bulunan: dvIst,
+          baslik: 'Damga vergisi istisnası fazla uygulanmış', durum: 'hata', beklenen: dvIzin, bulunan: dvIst,
           aciklama: (istisnaKapali
             ? `Personel kartında asgari ücret istisnası kapalı olduğu halde ${tl(dvIst)} DV istisnası uygulanmış.`
             : `${tl(dvIst)} DV istisnası uygulanmış; uygulanabilecek en fazla ${tl(dvIzin)} (${tutarTipi ? `personele özel tanımlı ${tl(dvSinir)}` : `istisna sınırı ${tl(dvSinir)}`} ile hesaplanan DV ${tl(dvHes)} tutarından küçük olanı).`)
             + (dvEksik > ARITMETIK_TOL
               ? ` Bu nedenle ${tl(dvEksik)} damga vergisi eksik kesilmiş.`
-              : ' Kesilen damga vergisi etkilenmemiş, ancak istisna olduğundan fazla görünür.') + kartNotu,
+              : ' Kesilen damga vergisi etkilenmemiş, ancak istisna olduğundan fazla görünür.'),
           kural: dvKural,
           oneri: dvEksik > ARITMETIK_TOL
             ? 'Eksik kesilen damga vergisi muhtasar beyannamede düzeltilmeli.'
