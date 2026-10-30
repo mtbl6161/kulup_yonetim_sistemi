@@ -18,6 +18,7 @@ export interface Okul {
   id: number
   ad: string
   il_id?: number
+  ilce_id?: number
   lisans_bitis?: string // ISO Tarih formatı
   odeme_durumu?: 'aktif' | 'borclu' | 'kapali' | 'deneme' | 'pasif'
   created_at?: string

@@ -20,6 +20,7 @@ import { useYukleme } from '@/lib/useYukleme'
 import { useDegisince } from '@/lib/useDegisince'
 import { bugunISO, OdemeTipi, ParsedRow, parseTutar, parseTarih, cellStr, ekstreBasligiBul, ColMap, autoDetect, FormState, bosForm, DefterTablo, turBtn } from './yardimcilar'
 import EkstreModal from '@/app/isletme-defteri/EkstreModal'
+import { defterKapagi, makamSatirlari, BIRIM_HESAP_ADI, type KapakVerisi } from './kapakPdf'
 
 // Kulüp defterinin kendiliğinden gelen satırları: Hesap Hareketleri (Ödeme Takibi aidatları ve dağıtım giderleri)
 // ile kulüp tahsilat takibi ödemeleri. Kimlikler negatiftir; elle girilen isletme_defteri satırlarıyla çakışmaz.
@@ -189,12 +190,39 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
     else { setDevreden(v); bilgi('✅ Devreden tutar kaydedildi.') }
   }
 
-  // ── Resmî İşletme Hesabı Defteri PDF (çift taraflı, nakli toplam devirli) ──
+  // Kapak başlığındaki makam satırları için okulun ilçe/il adı yalnızca PDF üretilirken sorgulanır
+  async function kapakVerisi(): Promise<KapakVerisi> {
+    const [ilce, il] = await Promise.all([
+      okul?.ilce_id ? supabase.from('ilceler').select('ad').eq('id', okul.ilce_id).maybeSingle() : null,
+      okul?.il_id ? supabase.from('iller').select('ad').eq('id', okul.il_id).maybeSingle() : null,
+    ])
+    return {
+      makam: makamSatirlari(il?.data?.ad, ilce?.data?.ad),
+      okulAdi: okul?.ad || ayarlar?.kurum_adi || '',
+      hesapAdi: BIRIM_HESAP_ADI[birim],
+      yil, devreden, aylar: aylikOzet,
+    }
+  }
+
+  async function kapakPdf() {
+    bilgi('⌛ Kapak PDF hazırlanıyor...', 0)
+    try {
+      const [{ pdf, autoTable }, kapak] = await Promise.all([pdfHazirla('portrait'), kapakVerisi()])
+      defterKapagi(pdf, autoTable, kapak)
+      pdfAc(pdf, 'İşletme hesabı defteri kapağı', false)
+      bilgi('✅ Kapak PDF hazırlandı.')
+    } catch (err) {
+      bilgi('❌ PDF hatası: ' + (hataMesaji(err, 'Bilinmiyor')), 5000)
+    }
+  }
+
+  // ── Resmî İşletme Hesabı Defteri PDF (kapak + çift taraflı, nakli toplam devirli) ──
   async function defterPdf() {
     if (!hareketler.length) { bilgi('⚠️ Bu yıl için defter hareketi yok.'); return }
     bilgi('⌛ Defter PDF hazırlanıyor...', 0)
     try {
-      const { pdf, autoTable } = await pdfHazirla('portrait')
+      const [{ pdf, autoTable }, kapak] = await Promise.all([pdfHazirla('portrait'), kapakVerisi()])
+      defterKapagi(pdf, autoTable, kapak)
 
       const PW = pdf.internal.pageSize.getWidth()
       const M = PDF_KENAR
@@ -232,7 +260,8 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
       }
 
       // Gerçek defter mantığı: açık defterde solda GİDER, sağda GELİR sayfası karşılıklı durur.
-      // Sayfalar çift çift dizilir (Gider 1, Gelir 1, Gider 2, Gelir 2 …); bir taraf daha kısa
+      // Kapaktan sonra sayfalar çift çift dizilir (Gider 1, Gelir 1, Gider 2, Gelir 2 …); çift taraflı
+      // basımda kapak sağ sayfa olduğundan GİDER hep sola, GELİR hep sağa düşer. Bir taraf daha kısa
       // kalsa da karşısına aynı numaralı boş sayfa gelir. Her sayfa RPP satırlık sabit cetveldir;
       // sıra no ve Nakli Toplam/Toplam sayfadan sayfaya devam eder. GELİR devreden'den, GİDER 0'dan başlar.
       const taraflar = [
@@ -243,7 +272,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
 
       for (let p = 0; p < nPages; p++) {
         for (const t of taraflar) {
-          if (p > 0 || t.title === 'GELİR') pdf.addPage()
+          pdf.addPage()
           const y0 = pdfBaslik(pdf, { kurum: birimKurumAdi(birim, ayarlar, okul?.ad), baslik: 'İşletme hesabı defteri', alt: `${t.title} · ${yil}` })
           // Defter sayfa numarası: sağ üstte yalnızca rakam, kalın ve büyük
           pdf.setFont('NotoSans', 'bold'); pdf.setFontSize(16); pdf.setTextColor(...PDF_RENK.metin)
@@ -577,7 +606,10 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
 
             {/* Aylık tablo */}
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div className="card-title" style={{ padding: '14px 18px', marginBottom: 0, borderBottom: '1px solid var(--border)' }}>{yil} Yılı Aylık Özet</div>
+              <div className="card-title" style={{ padding: '14px 18px', marginBottom: 0, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                {yil} Yılı Aylık Özet
+                <button className="btn btn-pdf btn-sm" onClick={kapakPdf}><Download size={14} /> Kapak PDF</button>
+              </div>
               <div style={{ overflowX: 'auto' }}>
                 <table className="data-table" style={{ width: '100%' }}>
                   <thead>
