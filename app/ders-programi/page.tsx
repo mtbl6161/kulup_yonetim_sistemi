@@ -17,6 +17,8 @@ import ConfirmModal from '@/components/ConfirmModal'
 import { hataMesaji } from '@/lib/hata'
 import { useYukleme } from '@/lib/useYukleme'
 import { useDegisince } from '@/lib/useDegisince'
+import { onayla } from '@/lib/diyalog'
+import { tavaniAsanKoordinatorler, tavanAciklamasi } from '@/lib/koordinatorTavan'
 
 interface VisibleDay {
   day: number
@@ -412,7 +414,26 @@ export default function DersProgramiPage() {
       else await supabase.from('sinif_defteri').insert({ ...payload, durum: 'geldi' })
 
       const koordDersNo = (payload.ders_no || 1) + 10
-      if (secilenOgretmen?.koordinator_id) {
+      // Koordinatör tavan ücrete ulaştıysa yeni koordinatörlük saati yazılmadan önce sorulur (ders her durumda atanır).
+      // Aynı slotta aynı koordinatörün saati zaten varsa saat artmaz, sorulmaz.
+      let koordYaz = !!secilenOgretmen?.koordinator_id
+      const koordId = secilenOgretmen?.koordinator_id
+      if (koordId && koordId !== oldKoordinatorId) {
+        try {
+          const asanlar = await tavaniAsanKoordinatorler({ ayarlar, okulId: currentOkulId, ay: pk.month, yil: pk.year, tatiller, ekSaat: new Map([[koordId, 1]]) })
+          if (asanlar.length) koordYaz = await onayla(
+            `${secilenOgretmen?.ad} adlı öğretmenin bu dersi için koordinatörlük saati de yazılacak.
+
+${tavanAciklamasi(asanlar)}
+
+Ders her durumda atanır. Koordinatörlük saati de yazılsın mı?`,
+            { baslik: 'Koordinatör tavan ücrete ulaştı', onayMetni: 'Evet, yazılsın', iptalMetni: 'Hayır, yazılmasın' },
+          )
+        } catch (e) {
+          console.error('Koordinatör tavan kontrolü yapılamadı:', e)
+        }
+      }
+      if (secilenOgretmen?.koordinator_id && koordYaz) {
         const { data: existingKoord } = await supabase.from('sinif_defteri').select('id').match({ gun: pk.day, ay: pk.month, yil: pk.year, kulup_adi: kulupAdi, ders_no: koordDersNo, okul_id: currentOkulId }).maybeSingle()
         if (existingKoord) await supabase.from('sinif_defteri').update({ ogretmen_id: secilenOgretmen.koordinator_id, durum: 'geldi' }).eq('id', existingKoord.id)
         else await supabase.from('sinif_defteri').insert({ ...payload, ogretmen_id: secilenOgretmen.koordinator_id, ders_no: koordDersNo, durum: 'geldi' })
@@ -579,6 +600,42 @@ export default function DersProgramiPage() {
             }
           }
         }
+      }
+
+      // Koordinatörlerin bu ayki saatleri tavan ücreti aşacaksa bir kez sorulur; "yazılmasın" denirse
+      // tavanı aşan koordinatörlük saatleri (ilk günlerden başlayarak sığanlar kalır) yazılmaz, dersler her durumda aktarılır
+      const saatOf = (d: Record<string, unknown>) => Number(d.etkinlik_saati) || 1
+      const koordIdleri = new Set(personel.map(p => p.koordinator_id).filter((x): x is number => !!x))
+      const ekSaat = new Map<number, number>()
+      for (const d of defterInserts) {
+        const id = Number(d.ogretmen_id)
+        if (koordIdleri.has(id)) ekSaat.set(id, (ekSaat.get(id) || 0) + saatOf(d))
+      }
+      try {
+        const asanlar = await tavaniAsanKoordinatorler({ ayarlar, okulId, ay, yil, tatiller, ekSaat, haricGunler: hedefGunler })
+        if (asanlar.length && !(await onayla(
+          `Program aya aktarılınca bazı koordinatörler tavan ücreti aşıyor:
+
+${tavanAciklamasi(asanlar)}
+
+Dersler her durumda aktarılır. Tavanı aşan koordinatörlük saatleri de yazılsın mı?`,
+          { baslik: 'Koordinatör tavan ücrete ulaşıyor', onayMetni: 'Evet, hepsi yazılsın', iptalMetni: 'Hayır, aşanlar yazılmasın' },
+        ))) {
+          const cikar = new Set<Record<string, unknown>>()
+          for (const k of asanlar) {
+            const kendi = defterInserts.filter(d => Number(d.ogretmen_id) === k.id && Number(d.ders_no) < 11)
+            let kalan = k.sinir - k.mevcut - kendi.reduce((t, d) => t + saatOf(d), 0)
+            const koordSatirlari = defterInserts.filter(d => Number(d.ogretmen_id) === k.id && Number(d.ders_no) >= 11)
+              .sort((a, b) => Number(a.gun) - Number(b.gun))
+            for (const d of koordSatirlari) {
+              if (kalan >= saatOf(d)) kalan -= saatOf(d)
+              else cikar.add(d)
+            }
+          }
+          defterInserts.splice(0, defterInserts.length, ...defterInserts.filter(d => !cikar.has(d)))
+        }
+      } catch (e) {
+        console.error('Koordinatör tavan kontrolü yapılamadı:', e)
       }
 
       if (dpInserts.length > 0) {

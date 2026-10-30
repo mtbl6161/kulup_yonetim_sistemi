@@ -7,6 +7,7 @@ export interface DiyalogIstegi {
   baslik?: string
   mesaj: string
   onayMetni?: string
+  iptalMetni?: string
   tehlikeli?: boolean
   sonuc: (evet: boolean) => void
 }
@@ -24,6 +25,6 @@ export function uyari(mesaj: string, baslik = 'Bilgi'): Promise<void> {
 }
 
 /** Onay penceresi; kullanıcı onaylarsa true döner. */
-export function onayla(mesaj: string, o: { baslik?: string; onayMetni?: string; tehlikeli?: boolean } = {}): Promise<boolean> {
-  return ac({ tur: 'onay', mesaj, baslik: o.baslik ?? 'Emin misiniz?', onayMetni: o.onayMetni ?? 'Devam et', tehlikeli: o.tehlikeli ?? false })
+export function onayla(mesaj: string, o: { baslik?: string; onayMetni?: string; iptalMetni?: string; tehlikeli?: boolean } = {}): Promise<boolean> {
+  return ac({ tur: 'onay', mesaj, baslik: o.baslik ?? 'Emin misiniz?', onayMetni: o.onayMetni ?? 'Devam et', iptalMetni: o.iptalMetni, tehlikeli: o.tehlikeli ?? false })
 }

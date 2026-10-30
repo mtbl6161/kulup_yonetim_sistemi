@@ -22,7 +22,7 @@ export default function GlobalDiyalog() {
       baslik={aktif.baslik}
       mesaj={aktif.mesaj}
       onayMetni={aktif.tur === 'uyari' ? 'Tamam' : aktif.onayMetni}
-      iptalMetni={aktif.tur === 'uyari' ? '' : 'Vazgeç'}
+      iptalMetni={aktif.tur === 'uyari' ? '' : (aktif.iptalMetni ?? 'Vazgeç')}
       tehlikeli={aktif.tur === 'onay' && !!aktif.tehlikeli}
       onOnayla={() => kapat(true)}
       onIptal={() => kapat(false)}

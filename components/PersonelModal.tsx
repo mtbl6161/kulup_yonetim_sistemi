@@ -9,6 +9,9 @@ import ConfirmModal from '@/components/ConfirmModal'
 import SayiInput from '@/components/SayiInput'
 import { useDegisince } from '@/lib/useDegisince'
 import { useYukleme } from '@/lib/useYukleme'
+import { useAy } from '@/lib/AyContext'
+import { onayla } from '@/lib/diyalog'
+import { aylikSaatler, tavaniAsanKoordinatorler, tavanAciklamasi } from '@/lib/koordinatorTavan'
 
 interface Props {
   editItem: Personel | null
@@ -37,6 +40,7 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
   const [koordinatorler, setKoordinatorler] = useState<{ id: number; ad: string }[]>([])
   const [matrahConfirmData, setMatrahConfirmData] = useState<{ val: number, msg: string } | null>(null)
   const [lastAskedMatrah, setLastAskedMatrah] = useState<number | null>(null)
+  const { ay, yil } = useAy()
 
   async function loadKoordinatorler() {
     const { data } = await supabase
@@ -113,6 +117,29 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
         msg: `Girdiğiniz ₺${matrah.toLocaleString('tr-TR')} tutarından SGK Kişi Payı (%${kisiPay * 100}) ve İşsizlik Payı (%${issizlikPay * 100}) düşülsün mü?`,
       })
       return
+    }
+
+    // Öğretmene koordinatör bağlanınca koordinatörün bu ayki saatleri öğretmenin ders saatleri kadar artar;
+    // tavan ücreti aşacaksa (aşan saatler ödenmez) kullanıcıya sorulur
+    const yeniKoordinator = form.koordinator_id || null
+    if (editItem && yeniKoordinator && yeniKoordinator !== (editItem.koordinator_id || null)) {
+      try {
+        const ogretmenSaati = (await aylikSaatler([editItem.id], okulId, ay, yil)).get(editItem.id) || 0
+        const asanlar = await tavaniAsanKoordinatorler({ ayarlar, okulId, ay, yil, ekSaat: new Map([[yeniKoordinator, ogretmenSaati]]) })
+        if (asanlar.length && !(await onayla(
+          `${form.ad || editItem.ad} bu ay ${ogretmenSaati} saat derse giriyor; koordinatörüne de aynı kadar koordinatörlük saati yazılacak.
+
+${tavanAciklamasi(asanlar)}
+
+Yine de bağlansın mı?`,
+          { baslik: 'Koordinatör tavan ücrete ulaşıyor', onayMetni: 'Yine de bağla' },
+        ))) {
+          setMsg('Koordinatör ataması kaydedilmedi.')
+          return
+        }
+      } catch (e) {
+        console.error('Koordinatör tavan kontrolü yapılamadı:', e) // kontrol yapılamazsa kayıt engellenmez
+      }
     }
 
     setSaving(true)
