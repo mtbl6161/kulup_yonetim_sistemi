@@ -567,7 +567,7 @@ export default function DenetimPage() {
         {okulSekme === 'hesap' && <DenetciHesapKontrol veri={hesapVeri} />}
 
         {okulSekme === 'rapor' && (
-          <DenetimRaporu key={`${secilenOkulId}-${secilenAyKey}`} okulId={secilenOkulId} yil={selYil} ay={selAy} hesap={hesapVeri}
+          <DenetimRaporu key={`rapor-${secilenOkulId}-${secilenAyKey}`} okulId={secilenOkulId} yil={selYil} ay={selAy} hesap={hesapVeri}
             denetciAd={[profil?.ad, profil?.soyad].filter(Boolean).join(' ')} />
         )}
 
