@@ -3,25 +3,25 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
-import { ayLabel, isGunuSayisi, tatilMi, RESMI_TATILLER } from '@/lib/hesaplama'
+import { ayLabel, isGunuSayisi, RESMI_TATILLER, AYLAR } from '@/lib/hesaplama'
 import { Ogrenci, Tahsilat, HesapHareketi, Ayarlar, Personel, kulupOgrencisi, Sinif, Bordro, Puantaj, Tatil } from '@/lib/types'
+import { kulupAySonuBakiye } from '@/lib/isletmeDefteri'
+import { belgeDonemde, donemBelgeleriniGetir, TESLIM_DURUM_ETIKET, type DenetimMadde, type DenetimBelge, type DenetimTeslim } from '@/lib/denetimDosyasi'
 import Link from 'next/link'
 
 import { useAuth } from '@/lib/AuthContext'
 import { uyari } from '@/lib/diyalog'
 import {
-  TrendingUp, CheckCircle2, PlusCircle, Settings, FileText, Clock, UserCheck, AlertTriangle, Megaphone, GraduationCap, ShieldCheck, Search, Info,
+  CheckCircle2, PlusCircle, UserCheck, AlertTriangle, Megaphone, GraduationCap, ShieldCheck, Search, Info,
 } from 'lucide-react'
 import { useYukleme } from '@/lib/useYukleme'
 
-// Saat kendi bileşeninde güncellenir: tüm panel her saniye yeniden çizilmesin
-function Saat() {
-  const [t, setT] = useState(() => new Date())
-  useEffect(() => {
-    const timer = setInterval(() => setT(new Date()), 15000)
-    return () => clearInterval(timer)
-  }, [])
-  return <>{t.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</>
+/** Vergi/SGK son günü hafta sonuna ya da resmî tatile denk gelirse ilk iş gününe kayar */
+function isGununeKaydir(yil: number, ay: number, gun: number): Date {
+  const d = new Date(yil, ay - 1, gun)
+  const tatil = (t: Date) => t.getDay() === 0 || t.getDay() === 6 || RESMI_TATILLER.includes(`${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`)
+  while (tatil(d)) d.setDate(d.getDate() + 1)
+  return d
 }
 
 function Banner({ color, bg, border, icon, title, children, action }: { color: string; bg: string; border: string; icon: React.ReactNode; title: string; children?: React.ReactNode; action?: React.ReactNode }) {
@@ -48,9 +48,11 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [personel, setPersonel] = useState<Personel[]>([])
   const [siniflar, setSiniflar] = useState<Pick<Sinif, 'kapasite'>[]>([])
-  const [bordrolar, setBordrolar] = useState<Pick<Bordro, 'personel_id' | 'odendi'>[]>([])
-  const [puantajlar, setPuantajlar] = useState<Pick<Puantaj, 'personel_id' | 'tarih' | 'saat'>[]>([])
+  const [bordrolar, setBordrolar] = useState<Pick<Bordro, 'personel_id'>[]>([])
   const [tatiller, setTatiller] = useState<Tatil[]>([])
+  const [puantajliPersonel, setPuantajliPersonel] = useState<Set<number>>(new Set())
+  const [banka, setBanka] = useState<{ bakiye: number; ayNet: number } | null>(null)
+  const [denetim, setDenetim] = useState<{ maddeler: DenetimMadde[]; teslim: DenetimTeslim | null; belgeler: DenetimBelge[] } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
   // Denetçi Durumu State
@@ -86,7 +88,9 @@ export default function DashboardPage() {
       { data: tat },
       { data: per },
       { data: sin },
-      { data: brd }
+      { data: brd },
+      bankaDurumu,
+      denetimDurumu,
     ] = await Promise.all([
       supabase.from('ogrenciler').select('id,ad,soyad,aktif,ucretsiz_mi,kardes_indirimi,gunluk_saat,ogrenci_turu').eq('okul_id', okul?.id),
       supabase.from('tahsilat').select('ogrenci_id,tutar').eq('ay', ay).eq('yil', yil).eq('okul_id', okul?.id),
@@ -96,7 +100,18 @@ export default function DashboardPage() {
       supabase.from('tatiller').select('*').or(`okul_id.eq.${okul?.id ?? 0},okul_id.is.null`),
       supabase.from('personel').select('id,ad,aktif,iban,tc').eq('okul_id', okul?.id),
       supabase.from('siniflar').select('kapasite').eq('aktif', true).eq('okul_id', okul?.id),
-      supabase.from('bordro').select('personel_id,odendi').eq('ay', ay).eq('yil', yil).eq('okul_id', okul?.id)
+      supabase.from('bordro').select('personel_id').eq('ay', ay).eq('yil', yil).eq('okul_id', okul?.id),
+      // Kartlardan biri yüklenemezse (ör. migration eksik) panelin geri kalanı yine açılır
+      kulupAySonuBakiye(yil, ay).catch(() => null),
+      (async () => {
+        const [m, t, b] = await Promise.all([
+          supabase.from('denetim_maddeleri').select('*').eq('aktif', true).order('sira_no'),
+          supabase.from('denetim_teslimleri').select('*').eq('okul_id', okul.id).eq('yil', yil).eq('ay', ay).maybeSingle(),
+          donemBelgeleriniGetir(okul.id, yil, ay),
+        ])
+        if (m.error) throw m.error
+        return { maddeler: (m.data || []) as DenetimMadde[], teslim: (t.data as DenetimTeslim) || null, belgeler: b }
+      })().catch(() => null),
     ])
 
     let pua: Pick<Puantaj, 'personel_id' | 'tarih' | 'saat'>[] = []
@@ -131,7 +146,9 @@ export default function DashboardPage() {
     setPersonel(filteredPer as unknown as Personel[])
     setSiniflar(sin || [])
     setBordrolar(brd || [])
-    setPuantajlar(pua || [])
+    setPuantajliPersonel(new Set(pua.filter(x => Number(x.saat) > 0).map(x => x.personel_id)))
+    setBanka(bankaDurumu)
+    setDenetim(denetimDurumu)
     setLoading(false)
   }, [ay, yil, okul?.id])
 
@@ -253,9 +270,8 @@ export default function DashboardPage() {
   const aktifOgrenci = ogrenciler.filter(o => o.aktif !== false).length
   const kapasiteYuzdesi = toplamKapasite > 0 ? Math.round((aktifOgrenci / toplamKapasite) * 100) : 0
 
-  const bordroDurumu = bordrolar.length > 0 ? (bordrolar.every(b => b.odendi) ? 2 : 1) : 0
-
-  const netBakiye = Math.round(hareketler.reduce((s, h) => (h.tur === 'gelir' ? s + Number(h.tutar) : s - Number(h.tutar)), 0) * 100) / 100
+  // Bordro ekranında "ödendi" işaretlenmediği için yalnızca tahakkuk var/yok ayrımı yapılır
+  const bordroDurumu = bordrolar.length > 0 ? 1 : 0
 
   const lisansBitisBanner = (() => {
     if (!okul?.lisans_bitis) return null
@@ -270,17 +286,13 @@ export default function DashboardPage() {
     return null
   })()
 
-  const uyarilar: { text: string; type: string; link?: string }[] = []
-  const borcluSayisi = ogrenciler.filter(o => {
-    if (o.aktif === false) return false
-    const gereken = getGereken(o)
-    if (gereken <= 0) return false
-    return (gereken - odenen(o)) > 1
-  }).length
-
-  if (borcluSayisi > 0) uyarilar.push({ text: `${borcluSayisi} öğrencinin ödemesi gecikmiş.`, type: 'warn', link: '/odeme' })
-  if (personel.some(p => !p.iban || !p.tc)) uyarilar.push({ text: `Personel bilgilerinde eksikler var.`, type: 'info', link: '/personel' })
-  if (bordroDurumu === 0 && new Date().getDate() > 20) uyarilar.push({ text: `Ay sonu yaklaşıyor, bordro tahakkuk edilmedi.`, type: 'alert', link: '/bordro' })
+  const borclular = ogrenciler
+    .filter(o => o.aktif !== false)
+    .map(o => { const gereken = getGereken(o), od = odenen(o); return { o, gereken, odenen: od, borc: gereken - od } })
+    .filter(b => b.gereken > 0 && b.borc > 1)
+    .sort((a, b) => b.borc - a.borc)
+  const borcluSayisi = borclular.length
+  const toplamBorc = borclular.reduce((s, b) => s + b.borc, 0)
 
   if (loading) {
      return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', color: 'var(--text3)' }}>Yükleniyor...</div>
@@ -308,19 +320,77 @@ export default function DashboardPage() {
   const GRAFIK_H = 200
   const tlTam = (v: number) => `₺${Math.round(v).toLocaleString('tr-TR')}`
 
-  const tatilListesi = (() => {
-    const dbTatiller = tatiller.filter(t => new Date(t.baslangic_tarihi).getMonth() + 1 === ay && new Date(t.baslangic_tarihi).getFullYear() === yil).map(t => ({ ad: t.ad, gun: new Date(t.baslangic_tarihi).getDate(), tip: 'Tatil / etkinlik' }))
+  const tatilListesi: { ad: string; gun: number; tip: string; sonGun?: boolean }[] = (() => {
+    const buAy = tatiller.filter(t => new Date(t.baslangic_tarihi).getMonth() + 1 === ay && new Date(t.baslangic_tarihi).getFullYear() === yil)
+    const ayGun = (gun: number) => `${String(ay).padStart(2, '0')}-${String(gun).padStart(2, '0')}`
+    const dbTatiller = buAy.map(t => {
+      const gun = new Date(t.baslangic_tarihi).getDate()
+      return { ad: t.ad, gun, tip: RESMI_TATILLER.includes(ayGun(gun)) ? 'Resmi tatil' : 'Tatil / etkinlik' }
+    })
+    // Aynı günü kapsayan kayıtlı tatil varsa (ör. "29 Ekim Cumhuriyet Bayramı") sabit listedeki resmî tatil ikinci kez gösterilmez
+    const kayitli = (gun: number) => {
+      const iso = `${yil}-${ayGun(gun)}`
+      return buAy.some(t => t.baslangic_tarihi.slice(0, 10) <= iso && iso <= (t.bitis_tarihi || t.baslangic_tarihi).slice(0, 10))
+    }
     const rtNames: Record<string, string> = { '01-01': 'Yılbaşı', '04-23': '23 Nisan Çocuk B.', '05-01': '1 Mayıs', '05-19': '19 Mayıs', '07-15': '15 Temmuz', '08-30': '30 Ağustos', '10-29': '29 Ekim' }
-    const rtList = RESMI_TATILLER.filter(rt => Number(rt.split('-')[0]) === ay).map(rt => ({ ad: rtNames[rt] || 'Resmi tatil', gun: Number(rt.split('-')[1]), tip: 'Resmi tatil' }))
-    return [...dbTatiller, ...rtList].sort((a, b) => a.gun - b.gun).slice(0, 4)
+    const rtList = RESMI_TATILLER.filter(rt => Number(rt.split('-')[0]) === ay && !kayitli(Number(rt.split('-')[1]))).map(rt => ({ ad: rtNames[rt] || 'Resmi tatil', gun: Number(rt.split('-')[1]), tip: 'Resmi tatil' }))
+    return [...dbTatiller, ...rtList]
   })()
+  // Takvim: tatiller + önceki ayın muhtasar ve prim hizmet beyannamesi (MUHSGK) son günü (ayın 26'sı, iş gününe kayar)
+  const muhsgk = isGununeKaydir(yil, ay, 26)
+  const takvim = [
+    ...tatilListesi,
+    ...(muhsgk.getMonth() + 1 === ay ? [{ ad: `${AYLAR[ay === 1 ? 12 : ay - 1]} MUHSGK beyannamesi`, gun: muhsgk.getDate(), tip: 'Muhtasar ve SGK son gün', sonGun: true }] : []),
+  ].sort((a, b) => a.gun - b.gun).slice(0, 5)
+  const kalanGun = (gun: number) => {
+    const bugun = new Date(); bugun.setHours(0, 0, 0, 0)
+    return Math.round((new Date(yil, ay - 1, gun).getTime() - bugun.getTime()) / 86400000)
+  }
   const ayKisa = ayLabel(ay, yil).split(' ')[0].slice(0, 3).toLocaleUpperCase('tr-TR')
 
-  const personelKarnesi = personel.map(p => ({
-    ...p,
-    pSaat: puantajlar.filter(x => x.personel_id === p.id && !tatilMi(ay, new Date(x.tarih).getDate(), yil, tatiller)).reduce((s, x) => s + (Number(x.saat) || 0), 0),
-  })).filter(p => p.pSaat > 0).sort((a, b) => b.pSaat - a.pSaat).slice(0, 5)
-  const maxSaat = Math.max(...personelKarnesi.map(p => p.pSaat), 1)
+  // Denetim dosyası: evrak sayfasındaki "x/y madde hazır" ile aynı sayım
+  const denetimOzet = (() => {
+    if (!denetim || denetim.maddeler.length === 0) return null
+    const { maddeler, teslim, belgeler } = denetim
+    const acik = !teslim || teslim.durum === 'taslak' || teslim.durum === 'iade'
+    const yuklu = (m: DenetimMadde) => belgeler.some(b => b.madde_id === m.id && belgeDonemde(b, m, yil, ay))
+    const tamam = maddeler.filter(m => yuklu(m) || (m.tip === 'otomatik' && acik)).length
+    const eksik = maddeler.filter(m => m.tip === 'yukleme' && m.zorunlu && !yuklu(m))
+    const durum = teslim?.durum ?? 'taslak'
+    return { tamam, toplam: maddeler.length, eksik, durum, not: teslim?.denetci_notu }
+  })()
+
+  // Akıllı takip: seçili ayın durumuna göre maddeler. Ayın ilk günlerinde erken uyarı vermemek için
+  // zamana bağlı kurallar geçmiş aylarda hemen, içinde bulunulan ayda ancak ilgili günden sonra devreye girer.
+  const simdi = new Date()
+  const buAyMi = ay === simdi.getMonth() + 1 && yil === simdi.getFullYear()
+  const gecmisAy = yil < simdi.getFullYear() || (yil === simdi.getFullYear() && ay < simdi.getMonth() + 1)
+  const gunGecti = (gun: number) => gecmisAy || (buAyMi && simdi.getDate() > gun)
+  const uyarilar: { text: string; type: 'alert' | 'warn' | 'info'; link?: string }[] = []
+
+  if (denetimOzet?.durum === 'iade') uyarilar.push({ text: `Denetim dosyası iade edildi${denetimOzet.not ? `: ${denetimOzet.not}` : '.'}`, type: 'alert', link: '/evrak-dosyasi' })
+  if (banka && banka.bakiye < 0) uyarilar.push({ text: `Bankada kalan eksiye düştü (${tlTam(banka.bakiye)}); işletme defterini kontrol edin.`, type: 'alert', link: '/kulup/isletme-defteri' })
+  if (buAyMi && muhsgk.getMonth() + 1 === ay) {
+    const k = kalanGun(muhsgk.getDate())
+    if (k >= 0 && k <= 7) uyarilar.push({ text: `${AYLAR[ay === 1 ? 12 : ay - 1]} MUHSGK beyannamesinin son günü ${k === 0 ? 'bugün' : `${k} gün sonra`} (${muhsgk.getDate()} ${AYLAR[ay]}).`, type: k <= 3 ? 'alert' : 'warn', link: '/bordro' })
+  }
+  if (bordroDurumu === 0 && gunGecti(20)) uyarilar.push({ text: `${AYLAR[ay]} bordrosu tahakkuk edilmedi.`, type: 'alert', link: '/bordro' })
+  if (borcluSayisi > 0) {
+    const erken = buAyMi && simdi.getDate() <= 10
+    uyarilar.push({ text: `${borcluSayisi} öğrencinin ${AYLAR[ay]} aidatı ${erken ? 'bekleniyor' : 'gecikmiş'} (toplam ${tlTam(toplamBorc)}).`, type: erken ? 'info' : 'warn', link: '/odeme' })
+  }
+  if (prevToplamTahsilat > 0 && tahsilatTrendi <= -20 && gunGecti(20)) uyarilar.push({ text: `Tahsilat geçen aya göre %${Math.abs(tahsilatTrendi)} düşük.`, type: 'warn', link: '/odeme' })
+  const puantajsiz = personel.filter(p => p.aktif !== false && !puantajliPersonel.has(p.id)).length
+  if (puantajsiz > 0 && gunGecti(20)) uyarilar.push({ text: `${puantajsiz} aktif personelin ${AYLAR[ay]} puantajı girilmedi.`, type: 'warn', link: '/puantaj' })
+  if (denetimOzet?.durum === 'taslak') {
+    if (denetimOzet.eksik.length > 0 && gunGecti(20)) uyarilar.push({ text: `Denetim dosyasında ${denetimOzet.eksik.length} zorunlu belge eksik.`, type: 'warn', link: '/evrak-dosyasi' })
+    else if (denetimOzet.eksik.length === 0 && gunGecti(0)) uyarilar.push({ text: 'Denetim dosyası hazır, denetime gönderilebilir.', type: 'info', link: '/evrak-dosyasi' })
+  }
+  if (toplamKapasite > 0 && aktifOgrenci > toplamKapasite) uyarilar.push({ text: `Kontenjan aşıldı: ${aktifOgrenci} aktif öğrenci, ${toplamKapasite} kişilik kapasite.`, type: 'warn', link: '/siniflar' })
+  const eksikBilgili = personel.filter(p => p.aktif !== false && (!p.iban || !p.tc)).length
+  if (eksikBilgili > 0) uyarilar.push({ text: `${eksikBilgili} personelin IBAN veya TC bilgisi eksik.`, type: 'info', link: '/personel' })
+  const onem = { alert: 0, warn: 1, info: 2 }
+  uyarilar.sort((a, b) => onem[a.type] - onem[b.type])
 
   const kpis = [
     {
@@ -336,16 +406,16 @@ export default function DashboardPage() {
       sub: toplamKapasite > aktifOgrenci ? `${toplamKapasite - aktifOgrenci} boş kontenjan` : 'Kontenjan dolu',
     },
     {
-      label: 'Bordro döngüsü', value: bordroDurumu === 2 ? 'Ödendi' : bordroDurumu === 1 ? 'Tahakkuk edildi' : 'Bekleniyor',
+      label: 'Bordro', value: bordroDurumu ? 'Tahakkuk edildi' : 'Bekleniyor',
       chip: `${bordrolar.length} kayıt`, chipOk: bordroDurumu > 0 ? true : null,
-      bar: bordroDurumu === 2 ? 100 : bordroDurumu === 1 ? 60 : 8, barColor: bordroDurumu > 0 ? 'var(--success)' : 'var(--warn)',
+      bar: bordroDurumu ? 100 : 8, barColor: bordroDurumu > 0 ? 'var(--success)' : 'var(--warn)',
       sub: bordroDurumu > 0 ? `${ayLabel(ay, yil)} dönemi` : 'Veri girişi bekleniyor',
     },
     {
-      label: 'Net bakiye', value: tlTam(netBakiye),
-      chip: `${buAyNet >= 0 ? '+' : '−'}${tlTam(Math.abs(buAyNet))}`, chipOk: buAyNet >= 0,
+      label: 'Bankada kalan', value: banka ? tlTam(banka.bakiye) : '—',
+      chip: banka ? `${banka.ayNet >= 0 ? '+' : '−'}${tlTam(Math.abs(banka.ayNet))}` : '—', chipOk: banka ? banka.ayNet >= 0 : null,
       bar: -1, barColor: '',
-      sub: 'Tüm hareketlerin toplamı',
+      sub: `${AYLAR[ay]} sonu · kulüp işletme defterine göre`,
     },
   ]
 
@@ -405,10 +475,6 @@ export default function DashboardPage() {
                   ))}
                 </div>
               )}
-            </div>
-            <div className="tabular" style={{ ...panel, height: 36, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, borderRadius: 8, fontSize: 14, fontWeight: 500 }}>
-              <Clock size={15} color="var(--text3)" />
-              <Saat />
             </div>
             <Link href="/odeme" className="btn btn-secondary" style={{ textDecoration: 'none' }}>Tahsilat al</Link>
             <Link href="/ogrenciler" className="btn btn-primary" style={{ textDecoration: 'none' }}><PlusCircle size={15} />Yeni öğrenci</Link>
@@ -539,73 +605,112 @@ export default function DashboardPage() {
           </section>
         </div>
 
-        {/* PERSONEL + HIZLI İŞLEMLER + TATİLLER */}
+        {/* GECİKEN ÖDEMELER + DENETİM DOSYASI + TAKVİM */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16, alignItems: 'start' }}>
           <section style={{ ...panel, gridColumn: 'span 2', overflow: 'hidden', minWidth: 0 }}>
-            <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
-              <h3 style={panelTitle}>Aktif personel karnesi</h3>
-              <Link href="/bordro" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>Tümünü gör →</Link>
+            <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <h3 style={panelTitle}>Ödemesi geciken öğrenciler</h3>
+                {borcluSayisi > 0 && <span className="tabular" style={chipStyle(false)}>{borcluSayisi} öğrenci · {tlTam(toplamBorc)}</span>}
+              </div>
+              <Link href="/odeme" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>Ödeme Takibi →</Link>
             </div>
-            {personelKarnesi.length === 0 ? (
-              <div style={{ padding: '28px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text3)' }}>Bu ay için puantaj girişi yok.</div>
+            {borcluSayisi === 0 ? (
+              <div style={{ padding: '28px 20px', textAlign: 'center', color: 'var(--text3)' }}>
+                <CheckCircle2 size={26} color="var(--success)" style={{ margin: '0 auto 8px' }} />
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Geciken ödeme yok</div>
+                <div style={{ fontSize: 12.5, marginTop: 2 }}>{ayLabel(ay, yil)} için ödemesi eksik öğrenci bulunmuyor.</div>
+              </div>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '32px 2fr 3fr 70px', gap: 12, padding: '8px 20px', background: '#f8f9fb', fontSize: 11, fontWeight: 600, letterSpacing: '0.7px', textTransform: 'uppercase', color: 'var(--text3)' }}>
-                  <span>#</span><span>Personel</span><span>Aylık ders saati</span><span style={{ textAlign: 'right' }}>Saat</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '32px 2fr 2fr 110px', gap: 12, padding: '8px 20px', background: '#f8f9fb', fontSize: 11, fontWeight: 600, letterSpacing: '0.7px', textTransform: 'uppercase', color: 'var(--text3)' }}>
+                  <span>#</span><span>Öğrenci</span><span>Ödenen / aidat</span><span style={{ textAlign: 'right' }}>Kalan</span>
                 </div>
-                {personelKarnesi.map((p, idx) => (
-                  <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '32px 2fr 3fr 70px', gap: 12, padding: '11px 20px', borderTop: '1px solid var(--border-light)', alignItems: 'center' }}>
+                {borclular.slice(0, 6).map((b, idx) => (
+                  <div key={b.o.id} style={{ display: 'grid', gridTemplateColumns: '32px 2fr 2fr 110px', gap: 12, padding: '10px 20px', borderTop: '1px solid var(--border-light)', alignItems: 'center' }}>
                     <span className="tabular" style={{ fontSize: 12, color: 'var(--text3)' }}>{String(idx + 1).padStart(2, '0')}</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                       <span style={{ width: 30, height: 30, borderRadius: '50%', background: '#eef0f4', color: 'var(--text2)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        {String(p.ad || '?').split(' ').map((w: string) => w[0]).filter(Boolean).slice(0, 2).join('').toLocaleUpperCase('tr-TR')}
+                        {[b.o.ad, b.o.soyad].map(w => (w || '').trim()[0]).filter(Boolean).join('').toLocaleUpperCase('tr-TR')}
                       </span>
-                      <span style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.ad}</span>
+                      <span style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.o.ad} {b.o.soyad}</span>
                     </span>
-                    <span style={{ height: 6, background: '#eef0f4', borderRadius: 3, overflow: 'hidden' }}>
-                      <span style={{ display: 'block', height: '100%', width: `${(p.pSaat / maxSaat) * 100}%`, background: 'var(--accent)', borderRadius: 3 }} />
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', height: 6, background: '#eef0f4', borderRadius: 3, overflow: 'hidden' }}>
+                        <span style={{ display: 'block', height: '100%', width: `${Math.min((b.odenen / b.gereken) * 100, 100)}%`, background: 'var(--accent)', borderRadius: 3 }} />
+                      </span>
+                      <span className="tabular" style={{ display: 'block', marginTop: 4, fontSize: 11.5, color: 'var(--text3)' }}>{tlTam(b.odenen)} / {tlTam(b.gereken)}</span>
                     </span>
-                    <span className="tabular" style={{ textAlign: 'right', fontWeight: 500 }}>{p.pSaat}</span>
+                    <span className="tabular" style={{ textAlign: 'right', fontWeight: 600, color: 'var(--danger)' }}>{tlTam(b.borc)}</span>
                   </div>
                 ))}
+                {borcluSayisi > 6 && (
+                  <Link href="/odeme" style={{ display: 'block', padding: '10px 20px', borderTop: '1px solid var(--border-light)', fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>
+                    +{borcluSayisi - 6} öğrenci daha →
+                  </Link>
+                )}
               </>
             )}
           </section>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
             <section style={{ ...panel, padding: '16px 18px' }}>
-              <h3 style={{ ...panelTitle, marginBottom: 12 }}>Hızlı işlemler</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {[
-                  { label: 'Öğrenci kaydı', icon: <PlusCircle size={16} />, link: '/ogrenciler', desc: 'Yeni kayıt' },
-                  { label: 'Tahsilat', icon: <TrendingUp size={16} />, link: '/odeme', desc: 'Aidat alımı' },
-                  { label: 'Bordro', icon: <FileText size={16} />, link: '/bordro', desc: 'Maaş işlemleri' },
-                  { label: 'Ayarlar', icon: <Settings size={16} />, link: '/ayarlar', desc: 'Parametreler' },
-                ].map(a => (
-                  <Link key={a.link} href={a.link} className="sidebar-link" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 11px', border: '1px solid var(--border)', borderRadius: 8, background: '#fbfbfc', color: 'var(--text)' }}>
-                    <span style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--accent-lighter)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{a.icon}</span>
-                    <span style={{ minWidth: 0 }}><span style={{ display: 'block', fontWeight: 600, fontSize: 13 }}>{a.label}</span><span style={{ fontSize: 11.5, color: 'var(--text3)' }}>{a.desc}</span></span>
-                  </Link>
-                ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <h3 style={panelTitle}>Denetim dosyası</h3>
+                {denetimOzet && (
+                  <span style={chipStyle(denetimOzet.durum === 'onaylandi' ? true : denetimOzet.durum === 'iade' ? false : null)}>{TESLIM_DURUM_ETIKET[denetimOzet.durum]}</span>
+                )}
               </div>
+              {!denetimOzet ? (
+                <div style={{ fontSize: 13, color: 'var(--text3)' }}>{AYLAR[ay]} dosyası henüz hazırlanmadı.</div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span className="tabular" style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }}>{denetimOzet.tamam}/{denetimOzet.toplam}</span>
+                    <span style={{ fontSize: 12.5, color: 'var(--text3)' }}>madde hazır</span>
+                  </div>
+                  <div style={{ height: 4, borderRadius: 2, background: '#eef0f4', marginTop: 8, overflow: 'hidden' }}>
+                    <div style={{ width: `${(denetimOzet.tamam / denetimOzet.toplam) * 100}%`, height: '100%', background: denetimOzet.tamam === denetimOzet.toplam ? 'var(--success)' : 'var(--accent)', borderRadius: 2 }} />
+                  </div>
+                  <div style={{ marginTop: 10, fontSize: 12.5, lineHeight: 1.45, color: denetimOzet.durum === 'iade' ? 'var(--danger)' : 'var(--text2)' }}>
+                    {denetimOzet.durum === 'iade' ? `Denetçi iade etti${denetimOzet.not ? `: ${denetimOzet.not}` : '.'}`
+                      : denetimOzet.durum === 'gonderildi' ? 'Dosya denetçinin incelemesinde.'
+                      : denetimOzet.durum === 'onaylandi' ? 'Dosya onaylandı.'
+                      : denetimOzet.eksik.length === 0 ? 'Zorunlu belgeler tamam, denetime gönderilebilir.'
+                      : `${denetimOzet.eksik.length} zorunlu belge yüklenmedi:`}
+                  </div>
+                  {(denetimOzet.durum === 'taslak' || denetimOzet.durum === 'iade') && denetimOzet.eksik.slice(0, 3).map(m => (
+                    <div key={m.id} style={{ fontSize: 12, color: 'var(--text3)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {m.sira_no}. {m.baslik}
+                    </div>
+                  ))}
+                </>
+              )}
+              <Link href="/evrak-dosyasi" style={{ display: 'inline-block', marginTop: 12, fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>Dosyaya git →</Link>
             </section>
 
             <section style={{ ...panel, padding: '16px 18px' }}>
-              <h3 style={{ ...panelTitle, marginBottom: 6 }}>Bu ayın tatilleri</h3>
-              {tatilListesi.length === 0 ? (
-                <div style={{ fontSize: 13, color: 'var(--text3)', padding: '8px 0' }}>Bu ay için kayıtlı tatil yok.</div>
-              ) : tatilListesi.map((t, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderTop: i === 0 ? 'none' : '1px solid var(--border-light)' }}>
-                  <div style={{ width: 40, height: 44, border: '1px solid var(--border)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1.1, flexShrink: 0 }}>
-                    <span className="tabular" style={{ fontSize: 15, fontWeight: 500 }}>{t.gun}</span>
-                    <span style={{ fontSize: 9.5, letterSpacing: '0.6px', color: 'var(--text3)' }}>{ayKisa}</span>
+              <h3 style={{ ...panelTitle, marginBottom: 6 }}>Bu ayın takvimi</h3>
+              {takvim.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--text3)', padding: '8px 0' }}>Bu ay için tatil veya son gün yok.</div>
+              ) : takvim.map((t, i) => {
+                const kalan = t.sonGun ? kalanGun(t.gun) : null
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderTop: i === 0 ? 'none' : '1px solid var(--border-light)' }}>
+                    <div style={{ width: 40, height: 44, border: `1px solid ${t.sonGun ? 'var(--warn)' : 'var(--border)'}`, borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1.1, flexShrink: 0 }}>
+                      <span className="tabular" style={{ fontSize: 15, fontWeight: 500 }}>{t.gun}</span>
+                      <span style={{ fontSize: 9.5, letterSpacing: '0.6px', color: 'var(--text3)' }}>{ayKisa}</span>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.ad}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text3)' }}>{t.tip}</div>
+                    </div>
+                    {kalan != null && kalan >= 0 && kalan <= 31 && (
+                      <span className="tabular" style={chipStyle(kalan <= 3 ? false : null)}>{kalan === 0 ? 'Bugün' : `${kalan} gün`}</span>
+                    )}
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.ad}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text3)' }}>{t.tip}</div>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </section>
           </div>
         </div>
