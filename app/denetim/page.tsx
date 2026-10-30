@@ -33,6 +33,20 @@ interface OkulSatir {
 
 export default function DenetimPage() {
   const { profil, il, loading, signOut, refresh } = useAuth()
+  // Oturum çerezde tutulur ve tarayıcı başına tektir: aynı tarayıcıda başka sekmede okul hesabıyla giriş yapılırsa
+  // bu sekmenin istekleri de o hesapla gider. Sekmeye dönüldüğünde oturum değişmişse sayfayı yenile ki eski
+  // denetçi görünümüyle işlem yapılmasın.
+  useEffect(() => {
+    if (!profil?.id) return
+    const kontrol = async () => {
+      if (document.visibilityState !== 'visible') return
+      const { data } = await supabase.auth.getSession()
+      if (data.session?.user.id !== profil.id) window.location.reload()
+    }
+    window.addEventListener('focus', kontrol)
+    document.addEventListener('visibilitychange', kontrol)
+    return () => { window.removeEventListener('focus', kontrol); document.removeEventListener('visibilitychange', kontrol) }
+  }, [profil?.id])
   // Ekran: menü bölümleri ya da açık bir okulun inceleme ekranı
   const [ekran, setEkran] = useState<Bolum | 'okul'>('kuyruk')
   const [geriBolum, setGeriBolum] = useState<Bolum>('kuyruk')   // okul ekranından dönülecek bölüm

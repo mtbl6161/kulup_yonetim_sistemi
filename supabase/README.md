@@ -33,6 +33,7 @@ bir kısmı tek seferlik veri düzeltmesidir.
    okul bildirimleri; önce `migration_denetim_dosyasi.sql` çalışmış olmalı)
    → `migration_bordro_istisna_karti.sql` (bordroyla birlikte o ayın istisna ayarını saklar)
    → `migration_denetim_gonderilmeden_gizle.sql` (okul göndermeden denetçi o ayın belgelerini göremez)
+   → `migration_denetim_karar_mesajlari.sql` (onay/iade yetki hatalarında nedeni söyler)
 
 `debug_sinif_defteri.sql` yalnızca inceleme sorgusudur; çalıştırılması gerekmez.
 
