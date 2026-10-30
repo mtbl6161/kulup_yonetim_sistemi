@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
 import { ayLabel, isGunuSayisi, RESMI_TATILLER, AYLAR, isOgretmen } from '@/lib/hesaplama'
-import { Ogrenci, Tahsilat, HesapHareketi, Ayarlar, Personel, kulupOgrencisi, Sinif, Bordro, Puantaj, Tatil } from '@/lib/types'
+import { Ogrenci, Tahsilat, HesapHareketi, Ayarlar, Personel, kulupOgrencisi, Sinif, Bordro, Puantaj, Tatil, type OkulBildirimi } from '@/lib/types'
 import { kulupAySonuBakiye } from '@/lib/isletmeDefteri'
 import { belgeDonemde, donemBelgeleriniGetir, TESLIM_DURUM_ETIKET, type DenetimMadde, type DenetimBelge, type DenetimTeslim } from '@/lib/denetimDosyasi'
 import Link from 'next/link'
@@ -45,6 +45,7 @@ export default function DashboardPage() {
   const [hareketler, setHareketler] = useState<HesapHareketi[]>([])
   const [ayarlar, setAyarlar] = useState<Ayarlar | null>(null)
   const [duyuru, setDuyuru] = useState<{ baslik: string; icerik: string; tur: 'info' | 'warning' | 'danger' | string } | null>(null)
+  const [bildirimler, setBildirimler] = useState<OkulBildirimi[]>([])
   const [loading, setLoading] = useState(true)
   const [personel, setPersonel] = useState<Personel[]>([])
   const [siniflar, setSiniflar] = useState<Pick<Sinif, 'kapasite'>[]>([])
@@ -232,6 +233,19 @@ export default function DashboardPage() {
     loadData()
     loadDuyuru()
   }, [loadData, loadDuyuru])
+
+  // Okula gelen bildirimler (migration_denetim_raporu.sql yoksa sessizce boş kalır)
+  useYukleme(async () => {
+    if (!okul?.id) return
+    const { data } = await supabase.from('okul_bildirimleri').select('*').eq('okul_id', okul.id).eq('okundu', false).order('created_at', { ascending: false })
+    const simdi = Date.now()
+    setBildirimler((data || []).filter(b => !b.son_tarih || new Date(b.son_tarih).getTime() > simdi))
+  }, [okul?.id])
+
+  async function bildirimOkundu(id: number) {
+    setBildirimler(x => x.filter(b => b.id !== id))
+    await supabase.rpc('okul_bildirimi_okundu', { p_id: id })
+  }
 
   useYukleme(() => {
     if (session?.access_token) checkDenetciDurumu(session.access_token)
@@ -483,8 +497,21 @@ export default function DashboardPage() {
         </header>
 
         {/* BİLDİRİMLER */}
-        {(duyuru || lisansBitisBanner || denetciDurumu === 'yok' || denetciDurumu === 'beklemede') && (
+        {(duyuru || bildirimler.length > 0 || lisansBitisBanner || denetciDurumu === 'yok' || denetciDurumu === 'beklemede') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* İl denetçisinin duyuruları ve "denetim tamamlandı" bildirimi: okul "Tamam" diyene ya da son tarih geçene kadar */}
+            {bildirimler.map(b => (
+              <Banner key={b.id}
+                color={b.kaynak === 'denetim_raporu' ? 'var(--success)' : 'var(--warn)'}
+                bg={b.kaynak === 'denetim_raporu' ? 'var(--success-light)' : 'var(--warn-light)'}
+                border={b.kaynak === 'denetim_raporu' ? '#BFE8D3' : 'var(--warn-border)'}
+                icon={b.kaynak === 'denetim_raporu' ? <ShieldCheck size={16} /> : <Megaphone size={16} />}
+                title={`${b.kaynak === 'duyuru' ? 'İl MEM duyurusu: ' : ''}${b.baslik}.`}
+                action={<button type="button" className="btn btn-secondary btn-sm" onClick={() => bildirimOkundu(b.id)}>Tamam</button>}
+              >
+                {b.icerik}{b.son_tarih ? <> <strong>Son tarih: {new Date(b.son_tarih).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></> : null}
+              </Banner>
+            ))}
             {duyuru && (
               <Banner
                 color={tone(duyuru.tur)}

@@ -463,3 +463,59 @@ export interface BordroSatir {
   odendi: boolean
   bordroId?: number
 }
+
+// ── EK-6 denetim raporu (migration_denetim_raporu.sql) ──
+export interface KulupBilgileri {
+  okul_id: number
+  kurum_kodu?: string | null
+  web_adresi?: string | null
+  ogretim_sekli?: string | null
+  acilis_onay_tarihi?: string | null
+  acilis_onay_sayisi?: string | null
+  faaliyet_turleri?: string | null
+  etkinlik_alanlari: string[]
+  etkinlik_alanlari_diger?: string | null
+  ek2_sozlesme?: boolean | null
+  ek4_kayit?: boolean | null
+  ek5_acil?: boolean | null
+  guncellendi?: string
+}
+
+export interface PersonelBelgesi {
+  id: number
+  okul_id: number
+  personel_id: number
+  ad: string
+  dosya_yolu: string
+  dosya_adi: string
+  boyut?: number | null
+  created_at: string
+}
+
+export type DenetimRaporDurum = 'taslak' | 'imzalandi' | 'teslim_edildi'
+export interface DenetimRaporu {
+  id: number
+  okul_id: number
+  yil: number
+  ay: number
+  denetim_tarihi: string
+  denetciler: { ad: string; unvan: string }[]
+  baskan_ad?: string | null
+  cevaplar: Record<string, string | boolean | null>
+  durum: DenetimRaporDurum
+  imzalandi_at?: string | null
+  teslim_at?: string | null
+  updated_at?: string
+}
+
+export interface OkulBildirimi {
+  id: number
+  okul_id: number
+  baslik: string
+  icerik: string
+  kaynak: 'duyuru' | 'denetim_raporu'
+  son_tarih?: string | null
+  okundu: boolean
+  grup?: string | null
+  created_at: string
+}

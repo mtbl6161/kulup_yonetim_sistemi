@@ -25,7 +25,8 @@ import {
   CheckCircle2,
   Loader2,
   FileCode2,
-  Download
+  Download,
+  ClipboardCheck
 } from 'lucide-react'
 import ConfirmModal from '@/components/ConfirmModal'
 import { Okul } from '@/lib/types'
@@ -35,6 +36,7 @@ import { useDegisince } from '@/lib/useDegisince'
 import LisansSekmesi from '@/components/ayarlar/LisansSekmesi'
 import GuvenlikSekmesi from '@/components/ayarlar/GuvenlikSekmesi'
 import TatilSekmesi from '@/components/ayarlar/TatilSekmesi'
+import KulupBilgileriSekmesi from '@/components/ayarlar/KulupBilgileriSekmesi'
 
 const DEFAULT_AYARLAR: Partial<Ayarlar> = {
   kurum_adi: '',
@@ -86,7 +88,7 @@ export default function AyarlarPage() {
   const [form, setForm] = useState<Partial<Ayarlar>>(DEFAULT_AYARLAR)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [activeTab, setActiveTab] = useState<'kurumsal' | 'mali' | 'vergi' | 'tatil' | 'guvenlik' | 'lisans'>('kurumsal')
+  const [activeTab, setActiveTab] = useState<'kurumsal' | 'mali' | 'vergi' | 'kulup' | 'tatil' | 'guvenlik' | 'lisans'>('kurumsal')
   // Tatil Yönetimi Durumu
   const [tatiller, setTatiller] = useState<Tatil[]>([])
   const [tatilForm, setTatilForm] = useState({ ad: '', bas: '', bit: '', tip: 'ozel' })
@@ -334,6 +336,7 @@ export default function AyarlarPage() {
     { id: 'kurumsal', label: 'Kurum bilgileri', desc: 'Adınız, adresiniz, yetkili kişiler, vergi ve SGK numaraları', kw: 'kurum ad adres telefon eposta müdür imza kaşe vergi sgk sicil bildirge', icon: <Building2 size={17} /> },
     { id: 'mali', label: 'Ücret ve kesintiler', desc: 'Saat ücreti, asgari ücret, SGK ve damga vergisi oranları', kw: 'saat ücreti katsayı gösterge yemek maaş sgk damga asgari tavan istisna aidat', icon: <Banknote size={17} /> },
     { id: 'vergi', label: 'Vergi dilimleri', desc: 'Yıllık vergi dilimleri ve oranları', kw: 'vergi dilim oran gelir yıllık', icon: <Scale size={17} /> },
+    { id: 'kulup', label: 'Kulüp bilgileri', desc: 'Denetim formu (EK-6) için kurum kodu, açılış onayı, etkinlik alanları', kw: 'kulüp denetim ek-6 ek6 form kurum kodu açılış onay faaliyet etkinlik alan bahçe sınıf oyun sözleşme', icon: <ClipboardCheck size={17} /> },
     { id: 'tatil', label: 'Takvim ve tatiller', desc: 'Kulübün başladığı gün, resmî ve özel tatiller', kw: 'tatil takvim başlangıç eğitim yılı bayram', icon: <Calendar size={17} /> },
     { id: 'lisans', label: 'Abonelik', desc: 'Deneme süresi, lisans durumu, plan yenileme', kw: 'lisans abonelik ödeme plan deneme süre yenile fatura', icon: <CreditCard size={17} /> },
     { id: 'guvenlik', label: 'Şifre', desc: 'Giriş şifrenizi değiştirin', kw: 'şifre parola güvenlik hesap profil', icon: <ShieldCheck size={17} /> },
@@ -741,6 +744,7 @@ export default function AyarlarPage() {
             )}
 
             {/* TAB 4: TATİL YÖNETİMİ */}
+            {activeTab === 'kulup' && <KulupBilgileriSekmesi okulId={okulData?.id} />}
             {activeTab === 'tatil' && <TatilSekmesi tatiller={tatiller} kbMevcut={kbMevcut} kbYil={kbYil} setKbYil={setKbYil} kbTarih={kbTarih} setKbTarih={setKbTarih} kbSaving={kbSaving} kulupBaslangicKaydet={kulupBaslangicKaydet} varsayilanEgitimYili={varsayilanEgitimYili} setTatilEkleAcik={setTatilEkleAcik} setTatilForm={setTatilForm} tatilSil={tatilSil} />}
 
             {/* TAB 6: LİSANS & ÖDEME */}

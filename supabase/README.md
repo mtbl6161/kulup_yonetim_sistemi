@@ -29,6 +29,8 @@ bir kısmı tek seferlik veri düzeltmesidir.
 5. **Ekim 2026:** `migration_denetim_dosyasi.sql` → `migration_denetim_maddeleri_mukerrer_duzelt.sql`,
    `migration_personel_tc_gorev_unique.sql`, `migration_denetim_banka_rls.sql`, `migration_islenen_odemeler.sql`,
    `migration_okul_aile_birligi.sql`
+6. **Kasım 2026:** `migration_denetim_raporu.sql` (EK-6 denetim raporu, kulüp bilgileri, personel belgeleri,
+   okul bildirimleri; önce `migration_denetim_dosyasi.sql` çalışmış olmalı)
 
 `debug_sinif_defteri.sql` yalnızca inceleme sorgusudur; çalıştırılması gerekmez.
 

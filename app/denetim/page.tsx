@@ -6,6 +6,8 @@ import { RefreshCw, BarChart2, Calendar, UserCheck, ClipboardList, Activity } fr
 import { Filtre } from '@/components/yonetim/ortak'
 import DenetciDenetimDosyasi from '@/components/DenetciDenetimDosyasi'
 import DenetciHesapKontrol, { useHesapKontrol } from '@/components/DenetciHesapKontrol'
+import DenetimRaporu from '@/components/denetim/DenetimRaporu'
+import DenetciDuyurulari from '@/components/denetim/DenetciDuyurulari'
 import { DenetimMaddeEditor } from '@/components/DenetimEvrakYonetimi'
 import { DenetimIsKuyrugu, useDonemDurumlari, varsayilanDonem } from '@/components/DenetimPanel'
 import { DenetimKabuk, DenetimOkullar, OkulIncelemeBasligi, VeriSecici, Bolum, OkulSekme, VeriSekme } from '@/components/DenetimDuzen'
@@ -384,6 +386,7 @@ export default function DenetimPage() {
   const ekranBaslik: Record<Bolum | 'okul', [string, string]> = {
     kuyruk: ['İş kuyruğu', `${il?.ad ? `${il.ad} İl Milli Eğitim Müdürlüğü` : 'İl Milli Eğitim Müdürlüğü'} · ${donemAd}`],
     okullar: ['Okullar', `İldeki okulların ${donemAd} dosyaları`],
+    duyurular: ['Duyurular', 'İldeki okullara uyarı ve duyuru gönderin'],
     kayitlar: ['İşlem kayıtları', 'Tüm kurumların işlem dökümü (canlı)'],
     ayarlar: ['Ayarlar', ayarSekme === 'profil' ? `${il?.ad || ''} ili denetçisi`.trim() : 'İlinizdeki okulların göreceği evrak listesi'],
     okul: [selectedOkul?.ad || 'Okul', `${donemAd} dosyası`],
@@ -432,6 +435,10 @@ export default function DenetimPage() {
             onIncele={okulIncele}
             onYenile={() => { okullarGetir(); setDurumYenile(x => x + 1) }}
           />
+        )}
+
+        {ekran === 'duyurular' && profil?.il_id && (
+          <DenetciDuyurulari ilId={profil.il_id} ilceler={ilceler} yil={selYil} ay={selAy} />
         )}
 
         {ekran === 'ayarlar' && (
@@ -558,6 +565,11 @@ export default function DenetimPage() {
         )}
 
         {okulSekme === 'hesap' && <DenetciHesapKontrol veri={hesapVeri} />}
+
+        {okulSekme === 'rapor' && (
+          <DenetimRaporu key={`${secilenOkulId}-${secilenAyKey}`} okulId={secilenOkulId} yil={selYil} ay={selAy} hesap={hesapVeri}
+            denetciAd={[profil?.ad, profil?.soyad].filter(Boolean).join(' ')} />
+        )}
 
         {okulSekme === 'evrak' && (
           <DenetciDenetimDosyasi

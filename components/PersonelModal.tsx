@@ -12,6 +12,7 @@ import { useYukleme } from '@/lib/useYukleme'
 import { useAy } from '@/lib/AyContext'
 import { onayla } from '@/lib/diyalog'
 import { aylikSaatler, tavaniAsanKoordinatorler, tavanAciklamasi } from '@/lib/koordinatorTavan'
+import PersonelBelgeleri from '@/components/PersonelBelgeleri'
 
 interface Props {
   editItem: Personel | null
@@ -374,6 +375,14 @@ Yine de bağlansın mı?`,
               <option value="">(Yok)</option>
               {koordinatorler.filter(p => p.id !== editItem?.id).map(p => <option key={p.id} value={p.id}>{p.ad}</option>)}
             </select>
+          </div>
+
+          {/* İşe başlama evrakları (PDF) — kayıtlı personel için */}
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid #f0f0f0' }}>
+            <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>İşe Başlama Evrakları (PDF)</label>
+            {editItem && (profilOkulId ?? ayarlar?.okul_id)
+              ? <PersonelBelgeleri personelId={editItem.id} okulId={(profilOkulId ?? ayarlar?.okul_id)!} />
+              : <div style={{ fontSize: 12.5, color: 'var(--text3)' }}>Belge yüklemek için önce personeli kaydedin, ardından düzenle ile açın.</div>}
           </div>
         </div>
 

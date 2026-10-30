@@ -13,11 +13,11 @@ import { HesapKontrolVeri } from '@/components/DenetciHesapKontrol'
 import { DurumRozeti, EvrakIlerleme, OkulDonemDurumu, donemSecenekleri } from '@/components/DenetimPanel'
 import {
   Inbox, Building2, ScrollText, Settings, LogOut, Search, RefreshCw, ArrowLeft, ChevronLeft, ChevronRight,
-  CheckCircle2, Undo2, FolderOpen, ShieldCheck, Database, ArrowRight, Clock, Menu, X,
+  CheckCircle2, Undo2, FolderOpen, ShieldCheck, Database, ArrowRight, Clock, Menu, X, FileSignature, Megaphone,
 } from 'lucide-react'
 
-export type Bolum = 'kuyruk' | 'okullar' | 'kayitlar' | 'ayarlar'
-export type OkulSekme = 'evrak' | 'hesap' | 'veri'
+export type Bolum = 'kuyruk' | 'okullar' | 'duyurular' | 'kayitlar' | 'ayarlar'
+export type OkulSekme = 'evrak' | 'hesap' | 'veri' | 'rapor'
 
 function gunFarki(iso?: string | null): number {
   if (!iso) return 0
@@ -37,6 +37,7 @@ function goreceTarih(iso?: string | null) {
 const MENU: { id: Bolum; ad: string; icon: typeof Inbox }[] = [
   { id: 'kuyruk', ad: 'İş kuyruğu', icon: Inbox },
   { id: 'okullar', ad: 'Okullar', icon: Building2 },
+  { id: 'duyurular', ad: 'Duyurular', icon: Megaphone },
   { id: 'kayitlar', ad: 'Kayıtlar', icon: ScrollText },
   { id: 'ayarlar', ad: 'Ayarlar', icon: Settings },
 ]
@@ -369,6 +370,7 @@ export function OkulIncelemeBasligi({ okulId, yil, ay, durum, toplamMadde, hesap
     { id: 'evrak', ad: 'Evrak', icon: FolderOpen, rozet: toplamMadde ? { metin: `${dolu}/${toplamMadde}`, ton: evrakTam ? 'ok' : 'notr', ipucu: evrakTam ? 'Tüm maddeler dolu' : `${toplamMadde - dolu} madde boş` } : undefined },
     { id: 'hesap', ad: 'Hesap kontrolü', icon: ShieldCheck, rozet: hesapRozet },
     { id: 'veri', ad: 'Okul verileri', icon: Database },
+    { id: 'rapor', ad: 'Denetim raporu (EK-6)', icon: FileSignature },
   ]
 
   return (
