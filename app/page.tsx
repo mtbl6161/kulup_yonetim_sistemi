@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
-import { ayLabel, isGunuSayisi, RESMI_TATILLER, AYLAR } from '@/lib/hesaplama'
+import { ayLabel, isGunuSayisi, RESMI_TATILLER, AYLAR, isOgretmen } from '@/lib/hesaplama'
 import { Ogrenci, Tahsilat, HesapHareketi, Ayarlar, Personel, kulupOgrencisi, Sinif, Bordro, Puantaj, Tatil } from '@/lib/types'
 import { kulupAySonuBakiye } from '@/lib/isletmeDefteri'
 import { belgeDonemde, donemBelgeleriniGetir, TESLIM_DURUM_ETIKET, type DenetimMadde, type DenetimBelge, type DenetimTeslim } from '@/lib/denetimDosyasi'
@@ -98,7 +98,7 @@ export default function DashboardPage() {
       supabase.from('hesap_hareketleri').select('tur,tutar,ay,yil').eq('okul_id', okul?.id),
       supabase.from('ayarlar').select('*').eq('okul_id', okul?.id).single(),
       supabase.from('tatiller').select('*').or(`okul_id.eq.${okul?.id ?? 0},okul_id.is.null`),
-      supabase.from('personel').select('id,ad,aktif,iban,tc').eq('okul_id', okul?.id),
+      supabase.from('personel').select('id,ad,aktif,iban,tc,gorev').eq('okul_id', okul?.id),
       supabase.from('siniflar').select('kapasite').eq('aktif', true).eq('okul_id', okul?.id),
       supabase.from('bordro').select('personel_id').eq('ay', ay).eq('yil', yil).eq('okul_id', okul?.id),
       // Kartlardan biri yüklenemezse (ör. migration eksik) panelin geri kalanı yine açılır
@@ -380,8 +380,9 @@ export default function DashboardPage() {
     uyarilar.push({ text: `${borcluSayisi} öğrencinin ${AYLAR[ay]} aidatı ${erken ? 'bekleniyor' : 'gecikmiş'} (toplam ${tlTam(toplamBorc)}).`, type: erken ? 'info' : 'warn', link: '/odeme' })
   }
   if (prevToplamTahsilat > 0 && tahsilatTrendi <= -20 && gunGecti(20)) uyarilar.push({ text: `Tahsilat geçen aya göre %${Math.abs(tahsilatTrendi)} düşük.`, type: 'warn', link: '/odeme' })
-  const puantajsiz = personel.filter(p => p.aktif !== false && !puantajliPersonel.has(p.id)).length
-  if (puantajsiz > 0 && gunGecti(20)) uyarilar.push({ text: `${puantajsiz} aktif personelin ${AYLAR[ay]} puantajı girilmedi.`, type: 'warn', link: '/puantaj' })
+  // Yalnızca saatle ücret alanlar (öğretmen, usta öğretici); başkan, muhasebe, temizlik ve denetim dağıtım payı alır, puantajı olmaz
+  const puantajsiz = personel.filter(p => p.aktif !== false && isOgretmen(p.gorev) && !puantajliPersonel.has(p.id)).length
+  if (puantajsiz > 0 && gunGecti(20)) uyarilar.push({ text: `${puantajsiz} öğretmenin ${AYLAR[ay]} puantajı girilmedi.`, type: 'warn', link: '/puantaj' })
   if (denetimOzet?.durum === 'taslak') {
     if (denetimOzet.eksik.length > 0 && gunGecti(20)) uyarilar.push({ text: `Denetim dosyasında ${denetimOzet.eksik.length} zorunlu belge eksik.`, type: 'warn', link: '/evrak-dosyasi' })
     else if (denetimOzet.eksik.length === 0 && gunGecti(0)) uyarilar.push({ text: 'Denetim dosyası hazır, denetime gönderilebilir.', type: 'info', link: '/evrak-dosyasi' })
