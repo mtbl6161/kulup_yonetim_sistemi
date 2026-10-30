@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { X, Save, UserPlus, GraduationCap } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { perdeKapat } from '@/lib/perdeKapat'
 import { logIslem } from '@/lib/audit'
 import { Ogrenci, Ayarlar, Personel, Sinif } from '@/lib/types'
 import { useDegisince } from '@/lib/useDegisince'
@@ -78,7 +79,7 @@ export default function OgrenciModal({ editItem, ayarlar, profilOkulId, siniflar
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" {...perdeKapat(onClose)}>
       <div 
         className="personel-modal-content" 
         onClick={e => e.stopPropagation()} 

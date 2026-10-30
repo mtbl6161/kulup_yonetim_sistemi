@@ -1,5 +1,6 @@
 'use client'
 import { CheckCircle2, Trash2, AlertTriangle } from 'lucide-react'
+import { perdeKapat } from '@/lib/perdeKapat'
 
 interface Props {
   baslik?: string
@@ -27,7 +28,7 @@ export default function ConfirmModal({
 }: Props) {
   return (
     <div
-      onClick={onKapat ?? onIptal}
+      {...perdeKapat(onKapat ?? onIptal)}
       style={{
         position: 'fixed', inset: 0,
         background: 'rgba(0,0,0,0.45)',

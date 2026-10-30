@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
+import { perdeKapat } from '@/lib/perdeKapat'
 import { supabase } from '@/lib/supabase'
 import { SinifDefteri, Personel, Tatil, Sinif, Ayarlar } from '@/lib/types'
 import { AYLAR, gunSayisi, tatilMi, ayLabel, haftaIciMi } from '@/lib/hesaplama'
@@ -835,7 +836,7 @@ export default function SinifDefteriPage() {
       </div>
 
       {picker && (
-        <div className="picker-overlay" onClick={() => setPicker(null)} style={{ position: 'fixed', inset: 0, zIndex: 9000 }}>
+        <div className="picker-overlay" {...perdeKapat(() => setPicker(null))} style={{ position: 'fixed', inset: 0, zIndex: 9000 }}>
           <div
             className="fast-picker"
             role="dialog"

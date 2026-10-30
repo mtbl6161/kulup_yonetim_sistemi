@@ -1,6 +1,7 @@
 'use client'
 import type React from 'react'
 import { kulupOgrencisi } from '@/lib/types'
+import { perdeKapat } from '@/lib/perdeKapat'
 import type { Birim, Ogrenci, TahsilatKategoriTip, TahsilatVeriKaynagi } from '@/lib/types'
 import { Users, RefreshCw, Search, X } from 'lucide-react'
 import { overlay, modalCard, TurRozet, secBtn, type FormState } from './yardimcilar'
@@ -24,7 +25,7 @@ export default function KategoriModal({ birim, editId, form, setForm, otomatikKi
   kaydet: () => void
 }) {
   return (
-    <div style={overlay} onClick={() => !saving && setModalAcik(false)}>
+    <div style={overlay} {...perdeKapat(() => !saving && setModalAcik(false))}>
       <div className="card" style={modalCard} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 700 }}>{editId ? 'Kategoriyi Düzenle' : 'Yeni Kategori'}</h2>

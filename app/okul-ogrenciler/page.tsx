@@ -4,6 +4,7 @@ import Topbar from '@/components/Topbar'
 import ImportModal from '@/components/ImportModal'
 import ConfirmModal from '@/components/ConfirmModal'
 import { supabase } from '@/lib/supabase'
+import { perdeKapat } from '@/lib/perdeKapat'
 import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
 import { Ogrenci, kulupOgrencisi } from '@/lib/types'
@@ -230,7 +231,7 @@ export default function OkulOgrencileriPage() {
       )}
 
       {modalAcik && (
-        <div style={overlay} onClick={() => !saving && setModalAcik(false)}>
+        <div style={overlay} {...perdeKapat(() => !saving && setModalAcik(false))}>
           <div className="card" style={modalCard} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
               <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 700 }}>{editId ? 'Okul Öğrencisini Düzenle' : 'Yeni Okul Öğrencisi'}</h2>

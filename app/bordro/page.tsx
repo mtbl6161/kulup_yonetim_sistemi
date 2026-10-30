@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
+import { perdeKapat } from '@/lib/perdeKapat'
 import { supabase } from '@/lib/supabase'
 import { pdfAc } from '@/lib/pdf'
 import {
@@ -972,7 +973,7 @@ return (
         </div>
 
         {selectedRow && (
-          <div className="modal-overlay" onClick={() => setSelectedRow(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, overflowY: 'auto', padding: 20 }}>
+          <div className="modal-overlay" {...perdeKapat(() => setSelectedRow(null))} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, overflowY: 'auto', padding: 20 }}>
             <div className="modal-content" onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 12, maxWidth: '210mm', width: '100%', position: 'relative' }}>
               <div className="no-print" style={{ position: 'absolute', top: 10, right: 10, display: 'flex', gap: 8 }}>
                 <button 

@@ -1,7 +1,8 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { X, Save, UserPlus, UserCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { perdeKapat } from '@/lib/perdeKapat'
 import { logIslem } from '@/lib/audit'
 import { Personel, Ayarlar } from '@/lib/types'
 import ConfirmModal from '@/components/ConfirmModal'
@@ -36,7 +37,6 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
   const [koordinatorler, setKoordinatorler] = useState<{ id: number; ad: string }[]>([])
   const [matrahConfirmData, setMatrahConfirmData] = useState<{ val: number, msg: string } | null>(null)
   const [lastAskedMatrah, setLastAskedMatrah] = useState<number | null>(null)
-  const overlayDown = useRef(false)
 
   async function loadKoordinatorler() {
     const { data } = await supabase
@@ -172,11 +172,7 @@ export default function PersonelModal({ editItem, ayarlar, profilOkulId, onClose
   return (
     <div
       className="modal-overlay"
-      // Yalnızca karartılmış alana basılıp orada bırakılırsa kapat.
-      // (Inputta metin seçerken fare dışarıda bırakılınca ya da onay penceresinin
-      //  arka planına tıklanınca form istemeden kapanıyordu.)
-      onMouseDown={e => { overlayDown.current = e.target === e.currentTarget }}
-      onClick={e => { if (overlayDown.current && e.target === e.currentTarget) onClose(); overlayDown.current = false }}
+      {...perdeKapat(onClose)}
     >
       <div 
         className="personel-modal-content" 

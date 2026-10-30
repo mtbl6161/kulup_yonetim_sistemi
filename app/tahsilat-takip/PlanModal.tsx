@@ -2,6 +2,7 @@
 import type { TahsilatKategori } from '@/lib/types'
 import type { PlanForm } from './yardimcilar'
 import { fmtTL } from '@/lib/hesaplama'
+import { perdeKapat } from '@/lib/perdeKapat'
 import { kulupOgrencisi } from '@/lib/types'
 import { sayiCoz } from '@/components/SayiInput'
 import { MAX_TAKSIT } from '@/lib/taksit'
@@ -22,7 +23,7 @@ export default function PlanModal({ f, setPlanForm, planFormHesapla, seciliKateg
   const toplamHedef = sayiCoz(f.toplam) || 0
   const fark = Math.round((toplamGirilen - toplamHedef) * 100) / 100
   return (
-    <div style={overlay} onClick={() => !planSaving && setPlanForm(null)}>
+    <div style={overlay} {...perdeKapat(() => !planSaving && setPlanForm(null))}>
       <div className="card" style={{ ...modalCard, maxWidth: 560 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>

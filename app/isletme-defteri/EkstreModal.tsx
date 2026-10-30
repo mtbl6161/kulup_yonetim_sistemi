@@ -1,6 +1,7 @@
 'use client'
 import type React from 'react'
 import type { Ogrenci } from '@/lib/types'
+import { perdeKapat } from '@/lib/perdeKapat'
 import type { ColMap, ParsedRow } from './yardimcilar'
 import { fmtTL, tarihFmt } from '@/lib/hesaplama'
 import { Save, X, FileSpreadsheet, CheckCircle2, AlertTriangle, UserCheck, ChevronDown, ChevronUp, Circle } from 'lucide-react'
@@ -30,7 +31,7 @@ export default function EkstreModal({ setImportOpen, importFileName, importReadi
   importKaydet: () => void
 }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(26,26,20,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} onClick={() => !importSaving && setImportOpen(false)}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(26,26,20,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} {...perdeKapat(() => !importSaving && setImportOpen(false))}>
       <div className="card" style={{ width: '100%', maxWidth: 960, maxHeight: '92vh', overflowY: 'auto', padding: '22px 24px', marginBottom: 0 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>

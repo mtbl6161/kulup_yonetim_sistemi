@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
+import { perdeKapat } from '@/lib/perdeKapat'
 import { pdfHazirla, pdfBaslik, pdfTablo, pdfAc, PDF_RENK, PDF_KENAR } from '@/lib/pdf'
 import type { RowInput, UserOptions } from '@/lib/pdf'
 import { useAuth } from '@/lib/AuthContext'
@@ -788,7 +789,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
         const vw = typeof window !== 'undefined' ? window.innerWidth : 1000
         const vh = typeof window !== 'undefined' ? window.innerHeight : 800
         return (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 1200 }} onClick={() => setEslesmePop(null)}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1200 }} {...perdeKapat(() => setEslesmePop(null))}>
             <div
               style={{ position: 'absolute', top: Math.min(rect.bottom + 6, vh - 280), left: Math.min(Math.max(rect.left - 100, 10), vw - 270), background: 'var(--surface)', borderRadius: 12, boxShadow: '0 16px 44px rgba(0,0,0,0.22)', padding: 16, width: 254, border: '1px solid var(--border)' }}
               onClick={e => e.stopPropagation()}

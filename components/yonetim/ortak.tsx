@@ -3,6 +3,7 @@
 import { useCallback } from 'react'
 import type { ReactNode } from 'react'
 import { useAuth } from '@/lib/AuthContext'
+import { perdeKapat } from '@/lib/perdeKapat'
 
 // ── Tipler ─────────────────────────────────────────────────────
 export type OdemeDurumu = 'aktif' | 'deneme' | 'borclu'
@@ -180,7 +181,7 @@ export function Sayfalama({ sayfa, toplam, boyut, onSayfa }: { sayfa: number; to
 
 export function Pencere({ baslik, aciklama, kapat, children, genislik = 480 }: { baslik: string; aciklama?: string; kapat: () => void; children: ReactNode; genislik?: number }) {
   return (
-    <div className="modal-overlay" onClick={kapat} role="presentation">
+    <div className="modal-overlay" {...perdeKapat(kapat)} role="presentation">
       <div className="modal-box" role="dialog" aria-modal="true" aria-label={baslik} onClick={e => e.stopPropagation()} style={{ maxWidth: genislik, padding: 22 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
           <div>

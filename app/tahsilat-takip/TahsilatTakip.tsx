@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
+import { perdeKapat } from '@/lib/perdeKapat'
 import { pdfHazirla, pdfBaslik, pdfTablo, pdfAc, PDF_RENK } from '@/lib/pdf'
 import type { CellHookData } from '@/lib/pdf'
 import { useAuth } from '@/lib/AuthContext'
@@ -929,7 +930,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
 
       {/* Hücre popover */}
       {popover && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }} onClick={() => setPopover(null)}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }} {...perdeKapat(() => setPopover(null))}>
           <div
             style={{ ...popKonum(popover.rect, 234, 340), background:'var(--surface)', borderRadius: 12, boxShadow: '0 16px 44px rgba(0,0,0,0.22)', padding: 16, width: 234, border: '1px solid var(--border)' }}
             onClick={e => e.stopPropagation()}
@@ -956,7 +957,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
         const pd = planDurum(plan)
         const W = 330
         return (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }} onClick={() => setTaksitPop(null)}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }} {...perdeKapat(() => setTaksitPop(null))}>
             <div
               style={{ ...popKonum(taksitPop.rect, W, 150 + pd.adet * 46), background:'var(--surface)', borderRadius: 12, boxShadow: '0 16px 44px rgba(0,0,0,0.22)', padding: 16, width: W, border: '1px solid var(--border)' }}
               onClick={e => e.stopPropagation()}

@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
+import { perdeKapat } from '@/lib/perdeKapat'
 import { supabase } from '@/lib/supabase'
 import { DersProgrami, Personel, Tatil, Sinif, Ayarlar } from '@/lib/types'
 import { AYLAR, gunSayisi, tatilMi, ayLabel } from '@/lib/hesaplama'
@@ -880,7 +881,7 @@ export default function DersProgramiPage() {
         const kullanilabilir = Math.max(200, altta ? altBosluk : ustBosluk)
         const listeMax = Math.max(110, Math.min(300, kullanilabilir - (mevcutId !== null ? 150 : 104)))
         return (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(14,17,22,0.12)' }} onClick={closePicker}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(14,17,22,0.12)' }} {...perdeKapat(closePicker)}>
             <div
               role="dialog"
               aria-label="Öğretmen seç"

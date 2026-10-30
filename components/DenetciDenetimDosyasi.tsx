@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { perdeKapat } from '@/lib/perdeKapat'
 import { AYLAR } from '@/lib/hesaplama'
 import {
   DenetimMadde, DenetimBelge, DenetimTeslim, TESLIM_DURUM_ETIKET, DENETIM_BUCKET,
@@ -275,7 +276,7 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
 
       {/* ── Önizleme ── */}
       {onizleme && (
-        <div role="presentation" onClick={onizlemeKapat}
+        <div role="presentation" {...perdeKapat(onizlemeKapat)}
           style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15, 23, 20, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(8px, 3vh, 32px) clamp(8px, 3vw, 40px)' }}>
         <aside role="dialog" aria-modal="true" aria-label="Belge önizleme" onClick={e => e.stopPropagation()}
           style={{ width: 'min(1200px, 100%)', height: '100%', background: 'var(--surface)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,.3)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
