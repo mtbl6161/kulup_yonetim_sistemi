@@ -37,7 +37,7 @@ interface Props {
 }
 
 /** Dosya türüne göre ikon ve renk (liste satırında hangi belge olduğu bir bakışta anlaşılsın) */
-function dosyaIkonu(ad: string, mime?: string | null) {
+export function dosyaIkonu(ad: string, mime?: string | null) {
   if (/\.pdf$/i.test(ad) || mime === 'application/pdf') return { I: FileText, renk: '#c0392b' }
   if (/\.(xlsx?|xlsm|csv)$/i.test(ad)) return { I: FileSpreadsheet, renk: '#1d7a45' }
   if (/\.(png|jpe?g|gif|webp)$/i.test(ad) || (mime || '').startsWith('image/')) return { I: FileImage, renk: '#7a4fb5' }
@@ -220,6 +220,11 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
           </button>
         </div>
 
+        {durum === 'iade' && (
+          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface2)', fontSize: 13, color: 'var(--text2)' }}>
+            Dosyayı iade ettiniz. Okulun iadeden sonra eklediği belgeler, okul dosyayı yeniden gönderdiğinde burada görünür.
+          </div>
+        )}
         {msg && <div role="status" style={{ padding: 12, borderRadius: 10, fontSize: 13, background: msg.tip === 'ok' ? 'var(--success-light)' : 'var(--danger-light)', color: msg.tip === 'ok' ? 'var(--success)' : 'var(--danger)' }}>{msg.text}</div>}
         {islem && <div role="status" style={{ padding: 12, borderRadius: 10, fontSize: 13, background: 'var(--info-light)' }}>⏳ {islem}</div>}
 

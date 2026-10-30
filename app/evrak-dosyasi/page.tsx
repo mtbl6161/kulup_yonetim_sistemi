@@ -12,6 +12,7 @@ import {
 } from '@/lib/denetimDosyasi'
 import { FolderCheck, Upload, Eye, Download, Trash2, Send, FileArchive, ListChecks, AlertTriangle } from 'lucide-react'
 import MaddeEtiketleri from '@/components/MaddeEtiketleri'
+import { dosyaIkonu } from '@/components/DenetciDenetimDosyasi'
 import { useYukleme } from '@/lib/useYukleme'
 
 const DURUM_RENK: Record<string, string> = {
@@ -30,6 +31,7 @@ export default function DenetimDosyasiPage() {
   const [islem, setIslem] = useState<string | null>(null) // devam eden işlem mesajı
   const [msg, setMsg] = useState<{ tip: 'ok' | 'hata'; text: string } | null>(null)
   const [silinecek, setSilinecek] = useState<DenetimBelge | null>(null)
+  const [acikMaddeler, setAcikMaddeler] = useState<Set<number>>(new Set()) // uzun belge listesi açılmış maddeler
   const [gonderOnay, setGonderOnay] = useState<string | null>(null)
   const dosyaInput = useRef<HTMLInputElement>(null)
   const hedefMadde = useRef<DenetimMadde | null>(null)
@@ -171,9 +173,16 @@ export default function DenetimDosyasiPage() {
   }
 
   const tamam = maddeler.filter(m => maddeBelgeleri(m).length > 0 || (m.tip === 'otomatik' && acik)).length
+  // Denetçi bir belgeyi ancak dosya gönderildikten sonra görür; iade sonrası eklenenler yeniden gönderilene kadar görünmez
+  // (migration_denetim_gonderilmeden_gizle.sql ile aynı kural)
+  const denetciGorur = (b: DenetimBelge) => !!teslim && (teslim.durum === 'gonderildi' || teslim.durum === 'onaylandi'
+    || (teslim.durum === 'iade' && !!teslim.karar_tarihi && new Date(b.created_at) <= new Date(teslim.karar_tarihi)))
+  const gonderilmemis = maddeler.flatMap(m => maddeBelgeleri(m)).filter(b => b.kaynak === 'yukleme' && !denetciGorur(b))
+  const KISA_LISTE = 4
 
   return (
     <div>
+      <style>{ED_CSS}</style>
       <Topbar
         title="Denetim Dosyası"
         sub={`${AYLAR[ay]} ${yil} – il denetimine gönderilecek evraklar`}
@@ -210,6 +219,7 @@ export default function DenetimDosyasiPage() {
             </div>
           </div>
           {!acik && <div style={{ fontSize: 12, color: 'var(--text2)' }}>Dosya kilitli. Denetçi iade ederse yeniden düzenleyebilirsiniz.</div>}
+          {acik && (!teslim || teslim.durum === 'taslak') && <div style={{ fontSize: 12, color: 'var(--text2)', maxWidth: 320 }}>Denetçi belgeleri, dosyayı “Denetime Gönder” ile gönderdiğinizde görür.</div>}
         </div>
 
         {!yukleniyor && !bordroVar && (!teslim || teslim.durum === 'taslak') && (
@@ -227,6 +237,14 @@ export default function DenetimDosyasiPage() {
           <div className="alert alert-danger" style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
             <AlertTriangle size={18} style={{ flexShrink: 0 }} />
             <div><b>Denetçi dosyayı iade etti.</b> {teslim.denetci_notu || ''} Düzeltmeleri yapıp yeniden gönderin.</div>
+          </div>
+        )}
+        {teslim?.durum === 'iade' && gonderilmemis.length > 0 && (
+          <div className="alert alert-info" style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ flex: 1, minWidth: 240 }}>
+              İadeden sonra <b>{gonderilmemis.length} yeni belge</b> eklediniz. Denetçi bu belgeleri dosyayı yeniden gönderdiğinizde görür.
+            </span>
+            <button type="button" className="btn btn-primary btn-sm" onClick={gonderKontrol} disabled={!!islem}><Send size={14} /> Yeniden gönder</button>
           </div>
         )}
         {msg && <div className={`alert ${msg.tip === 'ok' ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: 16 }}>{msg.text}</div>}
@@ -251,24 +269,50 @@ export default function DenetimDosyasiPage() {
                     <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 8px', fontWeight: 600, fontSize: 13.5 }}>
                       <span>{m.baslik}</span>
                       <MaddeEtiketleri madde={m} />
+                      {mb.length > 1 && <span className="badge badge-gray" style={{ fontWeight: 600 }}>{mb.length} belge</span>}
                     </div>
                     {m.aciklama && <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{m.aciklama}</div>}
                     {m.tip === 'otomatik' && otomatikKopya.length === 0 && (
                       <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>Gönderimde sistem verisinden PDF olarak eklenecek.</div>
                     )}
-                    {mb.map(b => (
-                      <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 12.5, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 500, wordBreak: 'break-all' }}>{b.dosya_adi}</span>
-                        <span style={{ color: 'var(--text3)' }}>{boyutFmt(b.boyut)}{b.kaynak === 'otomatik' ? ' · gönderim kopyası' : ''}{m.yillik && (b.yil !== yil || b.ay !== ay) ? ` · ${AYLAR[b.ay]} ${b.yil}'de yüklendi` : ''}</span>
-                        {b.durum !== 'bekliyor' && <span className={`badge ${DURUM_RENK[b.durum]}`}>{b.durum === 'onaylandi' ? 'Onaylandı' : 'İade'}</span>}
-                        {b.denetci_notu && <span style={{ color: 'var(--danger)' }}>“{b.denetci_notu}”</span>}
-                        <button className="btn btn-secondary btn-sm" title="Aç" onClick={() => belgeAc(b).catch(hata)}><Eye size={13} /></button>
-                        <button className="btn btn-secondary btn-sm" title="İndir" onClick={() => belgeIndir(b).catch(hata)}><Download size={13} /></button>
-                        {acik && b.kaynak === 'yukleme' && b.durum !== 'onaylandi' && (
-                          <button className="btn btn-outline-danger btn-icon" title="Sil" onClick={() => setSilinecek(b)}><Trash2 size={13} /></button>
+                    {mb.length > 0 && (
+                      <ul className="ed-liste">
+                        {(mb.length > KISA_LISTE + 1 && !acikMaddeler.has(m.id) ? mb.slice(0, KISA_LISTE) : mb).map(b => {
+                          const { I, renk } = dosyaIkonu(b.dosya_adi, b.mime)
+                          const gitmedi = b.kaynak === 'yukleme' && teslim?.durum === 'iade' && !denetciGorur(b)
+                          return (
+                            <li key={b.id} className="ed-satir">
+                              <I size={16} aria-hidden="true" style={{ color: renk, flexShrink: 0 }} />
+                              <div style={{ minWidth: 0 }}>
+                                <div className="ed-ad" title={b.dosya_adi}>{b.dosya_adi}</div>
+                                <div className="ed-meta">
+                                  {boyutFmt(b.boyut)}{b.kaynak === 'otomatik' ? ' · gönderim kopyası' : ''}{m.yillik && (b.yil !== yil || b.ay !== ay) ? ` · ${AYLAR[b.ay]} ${b.yil}'de yüklendi` : ''}
+                                  {b.denetci_notu && <span style={{ color: 'var(--danger)' }}> · Denetçi notu: “{b.denetci_notu}”</span>}
+                                </div>
+                              </div>
+                              <div className="ed-rozetler">
+                                {gitmedi && <span className="badge badge-orange" title="Dosyayı yeniden gönderdiğinizde denetçi görür">Yeni · gönderilmedi</span>}
+                                {b.durum !== 'bekliyor' && <span className={`badge ${DURUM_RENK[b.durum]}`}>{b.durum === 'onaylandi' ? 'Onaylandı' : 'İade'}</span>}
+                              </div>
+                              <div className="ed-aksiyon">
+                                <button type="button" className="ed-ikon" aria-label={`${b.dosya_adi} dosyasını aç`} title="Aç" onClick={() => belgeAc(b).catch(hata)}><Eye size={15} /></button>
+                                <button type="button" className="ed-ikon" aria-label={`${b.dosya_adi} dosyasını indir`} title="İndir" onClick={() => belgeIndir(b).catch(hata)}><Download size={15} /></button>
+                                {acik && b.kaynak === 'yukleme' && b.durum !== 'onaylandi'
+                                  ? <button type="button" className="ed-ikon sil" aria-label={`${b.dosya_adi} dosyasını sil`} title="Sil" onClick={() => setSilinecek(b)}><Trash2 size={15} /></button>
+                                  : <span className="ed-ikon-bos" aria-hidden="true" />}
+                              </div>
+                            </li>
+                          )
+                        })}
+                        {mb.length > KISA_LISTE + 1 && (
+                          <li>
+                            <button type="button" className="ed-daha" onClick={() => setAcikMaddeler(s => { const n = new Set(s); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n })}>
+                              {acikMaddeler.has(m.id) ? 'Daha az göster' : `+${mb.length - KISA_LISTE} belge daha göster`}
+                            </button>
+                          </li>
                         )}
-                      </div>
-                    ))}
+                      </ul>
+                    )}
                   </div>
                   <div style={{ flexShrink: 0, display: 'flex', gap: 6 }}>
                     {m.tip === 'otomatik' ? (
@@ -301,3 +345,27 @@ export default function DenetimDosyasiPage() {
     </div>
   )
 }
+
+// Belge satırları: dosya adı ne uzunlukta olursa olsun düğmeler sağda aynı hizada; silme düğmesi sakin, üzerine gelince kırmızı
+const ED_CSS = `
+.ed-liste { list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid var(--border-light); border-radius: 10px; overflow: hidden; }
+.ed-satir { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 7px 10px; border-top: 1px solid var(--border-light); }
+.ed-satir:first-child { border-top: none; }
+.ed-satir:hover { background: var(--surface2); }
+.ed-ad { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ed-meta { font-size: 11.5px; color: var(--text3); margin-top: 1px; }
+.ed-rozetler { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.ed-aksiyon { display: flex; gap: 2px; }
+.ed-ikon, .ed-ikon-bos { width: 32px; height: 32px; border-radius: 8px; border: none; background: transparent; color: var(--text2);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background .12s, color .12s; }
+.ed-ikon:hover { background: var(--accent-lighter); color: var(--accent); }
+.ed-ikon.sil:hover { background: var(--danger-light); color: var(--danger); }
+.ed-ikon-bos { cursor: default; }
+.ed-daha { width: 100%; padding: 8px 10px; border: none; border-top: 1px solid var(--border-light); background: var(--surface2);
+  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent); cursor: pointer; text-align: left; }
+.ed-daha:hover { background: var(--accent-lighter); }
+@media (max-width: 640px) {
+  .ed-satir { grid-template-columns: 16px minmax(0, 1fr) auto; }
+  .ed-rozetler { grid-column: 2 / -1; justify-content: flex-start; }
+}
+`
