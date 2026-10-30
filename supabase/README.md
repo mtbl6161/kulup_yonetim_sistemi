@@ -31,6 +31,8 @@ bir kısmı tek seferlik veri düzeltmesidir.
    `migration_okul_aile_birligi.sql`
 6. **Kasım 2026:** `migration_denetim_raporu.sql` (EK-6 denetim raporu, kulüp bilgileri, personel belgeleri,
    okul bildirimleri; önce `migration_denetim_dosyasi.sql` çalışmış olmalı)
+   → `migration_bordro_istisna_karti.sql` (bordroyla birlikte o ayın istisna ayarını saklar)
+   → `migration_denetim_gonderilmeden_gizle.sql` (okul göndermeden denetçi o ayın belgelerini göremez)
 
 `debug_sinif_defteri.sql` yalnızca inceleme sorgusudur; çalıştırılması gerekmez.
 

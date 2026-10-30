@@ -167,6 +167,19 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
   if (yukleniyor) return <div style={{ padding: 40, color: 'var(--text3)' }}>⏳ Yükleniyor...</div>
 
   const durum = teslim?.durum || 'taslak'
+  // Okul göndermeden dosya denetçiye kapalıdır (veritabanı da gönderilmemiş ayın belgelerini döndürmez)
+  if (durum === 'taslak') {
+    return (
+      <div className="dn-sayfa">
+        <div style={{ padding: '28px 24px', borderRadius: 12, background: 'var(--surface2)', border: '1px solid var(--border)', textAlign: 'center' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Okul {AYLAR[ay]} {yil} denetim dosyasını henüz göndermedi</div>
+          <div style={{ fontSize: 13, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
+            Her ayın dosyası ayrıdır ve okul “Denetime gönder” dediğinde burada görünür. Gönderilmemiş dosyanın belgeleri ve sistem belgeleri gösterilmez.
+          </div>
+        </div>
+      </div>
+    )
+  }
   const kararVerilebilir = durum === 'gonderildi' || durum === 'onaylandi'
   const doluMadde = maddeler.filter(m => maddeBelgeleri(m).length > 0).length
   const bekleyenBelge = belgeler.filter(b => b.durum === 'bekliyor' && maddeler.some(m => m.id === b.madde_id && belgeDonemde(b, m, yil, ay))).length
@@ -207,11 +220,6 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
           </button>
         </div>
 
-        {durum === 'taslak' && (
-          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface2)', fontSize: 13 }}>
-            Okul bu dosyayı henüz denetime göndermedi. Yüklenen belgeleri ve sistem belgelerinin güncel hâlini görebilirsiniz; karar gönderimden sonra verilir.
-          </div>
-        )}
         {msg && <div role="status" style={{ padding: 12, borderRadius: 10, fontSize: 13, background: msg.tip === 'ok' ? 'var(--success-light)' : 'var(--danger-light)', color: msg.tip === 'ok' ? 'var(--success)' : 'var(--danger)' }}>{msg.text}</div>}
         {islem && <div role="status" style={{ padding: 12, borderRadius: 10, fontSize: 13, background: 'var(--info-light)' }}>⏳ {islem}</div>}
 
