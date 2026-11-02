@@ -1,14 +1,18 @@
 'use client'
+import { useState } from 'react'
 import type React from 'react'
 import type { Ogrenci } from '@/lib/types'
 import { perdeKapat } from '@/lib/perdeKapat'
-import type { ColMap, ParsedRow } from './yardimcilar'
-import { fmtTL, tarihFmt } from '@/lib/hesaplama'
+import type { ColMap, ImportSonuc, ParsedRow } from './yardimcilar'
+import { AYLAR, fmtTL, tarihFmt } from '@/lib/hesaplama'
 import { Save, X, FileSpreadsheet, CheckCircle2, AlertTriangle, UserCheck, ChevronDown, ChevronUp, Circle } from 'lucide-react'
 import { StatPil } from './yardimcilar'
 
-// Banka ekstresi içe aktarma penceresi: dosya seçimi, sütun eşleme ve önizleme
-export default function EkstreModal({ setImportOpen, importFileName, importReading, dosyaSec, importRows, colCount, gelismisAcik, setGelismisAcik, colMap, setColMap, sutunSecenekleri, basSatirAtla, setBasSatirAtla, onizleme, setOnizleme, setEslesmePop, ogrencilerSirali, ogrenciAdMap, importSaving, importKaydet }: {
+/** Öğrenci ödemesi olup Tahsilat Takip'e otomatik işlenmeyecek gelir satırı */
+const elleGerekir = (r: ParsedRow) => r.gecerli && r.tur === 'gelir' && !r.odemeDegil && !r.isaretle
+
+// Banka ekstresi içe aktarma penceresi: dosya seçimi, sütun eşleme, önizleme ve aktarım sonucu
+export default function EkstreModal({ setImportOpen, importFileName, importReading, dosyaSec, importRows, colCount, gelismisAcik, setGelismisAcik, colMap, setColMap, sutunSecenekleri, basSatirAtla, setBasSatirAtla, onizleme, setOnizleme, setEslesmePop, ogrencilerSirali, ogrenciAdMap, importSaving, importKaydet, importSonuc, importKapat, hedefAdi }: {
   setImportOpen: (acik: boolean) => void
   importFileName: string
   importReading: boolean
@@ -29,18 +33,26 @@ export default function EkstreModal({ setImportOpen, importFileName, importReadi
   ogrenciAdMap: Map<number, string>
   importSaving: boolean
   importKaydet: () => void
+  importSonuc: ImportSonuc | null
+  importKapat: () => void
+  hedefAdi: (anahtar: string | null) => string | null
 }) {
+  const [yalnizElle, setYalnizElle] = useState(false)
+  const kapat = () => (importSonuc ? importKapat() : setImportOpen(false))
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(26,26,20,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} {...perdeKapat(() => !importSaving && setImportOpen(false))}>
-      <div className="card" style={{ width: '100%', maxWidth: 960, maxHeight: '92vh', overflowY: 'auto', padding: '22px 24px', marginBottom: 0 }} onClick={e => e.stopPropagation()}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(26,26,20,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }} {...perdeKapat(() => !importSaving && kapat())}>
+      <div className="card" style={{ width: '100%', maxWidth: 1020, maxHeight: '92vh', overflowY: 'auto', padding: '22px 24px', marginBottom: 0 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
             <FileSpreadsheet size={20} style={{ color: 'var(--accent)' }} /> Banka Ekstresi Aktar
           </h2>
-          <button onClick={() => setImportOpen(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)' }}><X size={20} /></button>
+          <button onClick={kapat} aria-label="Kapat" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)' }}><X size={20} /></button>
         </div>
+
+        {importSonuc ? <SonucGorunumu sonuc={importSonuc} kapat={importKapat} /> : <>
         <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--text3)', lineHeight: 1.5 }}>
-          Bankadan indirdiğiniz ekstre dosyasını (.xlsx / .xls / .csv) yükleyin — sütunlar otomatik tanınır.
+          Bankadan indirdiğiniz ekstre dosyasını (.xlsx / .xls / .csv) yükleyin — sütunlar otomatik tanınır. Öğrenci ödemeleri Tahsilat Takip&rsquo;e ekstredeki tarihle &ldquo;ödendi&rdquo; olarak işlenir.
         </p>
 
         {/* Dosya seçimi */}
@@ -103,7 +115,9 @@ export default function EkstreModal({ setImportOpen, importFileName, importReadi
           const gImp = gecerli.filter(r => r.tur === 'gelir').reduce((s, r) => s + r.tutar, 0)
           const gdImp = gecerli.filter(r => r.tur === 'gider').reduce((s, r) => s + r.tutar, 0)
           const atlanacak = onizleme.length - gecerli.length
-          const isaretliSayisi = onizleme.filter(r => r.isaretle).length
+          const isaretliSayisi = onizleme.filter(r => r.gecerli && r.tur === 'gelir' && r.isaretle).length
+          const elleSayisi = onizleme.filter(elleGerekir).length
+          const satirlar = onizleme.map((r, idx) => ({ r, idx })).filter(x => !yalnizElle || elleGerekir(x.r))
           return (
             <div style={{ marginTop: 16 }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -111,14 +125,27 @@ export default function EkstreModal({ setImportOpen, importFileName, importReadi
                 <StatPil label="Gelir" value={fmtTL(gImp)} color="var(--success)" />
                 <StatPil label="Gider" value={fmtTL(gdImp)} color="var(--danger)" />
                 {atlanacak > 0 && <StatPil label="Atlanacak" value={String(atlanacak)} color="var(--warn)" />}
-                {isaretliSayisi > 0 && <StatPil label="Ödeme Takip" value={String(isaretliSayisi)} color="var(--accent)" />}
+                {isaretliSayisi > 0 && <StatPil label="Ödendi işaretlenecek" value={String(isaretliSayisi)} color="var(--accent)" />}
+                {elleSayisi > 0 && <StatPil label="Elle işaretlenecek" value={String(elleSayisi)} color="var(--warn)" />}
               </div>
-              {ogrencilerSirali.length > 0 && (
-                <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.5 }}>
-                  Açıklamadan tahmin edilen öğrenci ödemeleri sağdaki rozette görünür — tıklayıp düzeltebilir veya kaldırabilirsiniz. Sadece işaretli satırlar Ödeme Takip&rsquo;e yazılır.
+              {ogrencilerSirali.length > 0 && elleSayisi > 0 && (
+                <div className="alert alert-warn" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10, fontSize: 12.5 }}>
+                  <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                  <div style={{ flex: 1 }}>
+                    <strong>{elleSayisi} gelir satırı ekstreden okunamadı.</strong> Öğrenci ya da ödeme türü kesin anlaşılamadı (kardeş ödemesi, birleşik ödeme, açıklamasız havale…).
+                    Sarı satırlardaki rozete tıklayıp öğrenciyi ve ödeme türünü seçin; seçmezseniz aktarımdan sonra bu satırları Tahsilat Takip&rsquo;ten <strong>elle işaretlemeniz</strong> gerekir.
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={yalnizElle} onChange={e => setYalnizElle(e.target.checked)} /> Yalnız bunları göster
+                  </label>
                 </div>
               )}
-              <div style={{ maxHeight: 340, overflowY: 'auto', overflowX: 'hidden', border: '1px solid var(--border)', borderRadius: 8 }}>
+              {ogrencilerSirali.length > 0 && (
+                <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.5 }}>
+                  Açıklamadan tahmin edilen öğrenci ve ödeme türü sağdaki rozette görünür — tıklayıp düzeltebilir veya kaldırabilirsiniz. Yalnız ✓ işaretli satırlar Tahsilat Takip&rsquo;e işlenir; ödeme tarihi ekstredeki tarihtir.
+                </div>
+              )}
+              <div style={{ maxHeight: 360, overflowY: 'auto', overflowX: 'hidden', border: '1px solid var(--border)', borderRadius: 8 }}>
                 <table className="data-table" style={{ width: '100%', tableLayout: 'fixed' }}>
                   <colgroup>
                     <col style={{ width: 30 }} />
@@ -126,7 +153,7 @@ export default function EkstreModal({ setImportOpen, importFileName, importReadi
                     <col style={{ width: 60 }} />
                     <col />
                     <col style={{ width: 88 }} />
-                    <col style={{ width: 150 }} />
+                    <col style={{ width: 200 }} />
                     <col style={{ width: 30 }} />
                   </colgroup>
                   <thead><tr>
@@ -135,54 +162,63 @@ export default function EkstreModal({ setImportOpen, importFileName, importReadi
                     <th style={{ textAlign: 'center', padding: '9px 4px' }}>Tür</th>
                     <th>Açıklama</th>
                     <th className="td-num" style={{ padding: '9px 6px' }}>Tutar (₺)</th>
-                    <th style={{ padding: '9px 6px' }}>Ödeme Takip</th>
+                    <th style={{ padding: '9px 6px' }}>Tahsilat Takip</th>
                     <th style={{ padding: '9px 4px' }}></th>
                   </tr></thead>
                   <tbody>
-                    {onizleme.map((r, idx) => (
-                      <tr key={idx} style={r.gecerli ? undefined : { background: 'var(--warn-light)' }}>
-                        <td style={{ textAlign: 'center', padding: '9px 4px' }}>{r.gecerli ? <CheckCircle2 size={15} color="var(--success)" /> : <AlertTriangle size={15} color="var(--warn)" />}</td>
-                        <td style={{ fontSize: 12, padding: '9px 6px' }}>{r.tarih ? tarihFmt(r.tarih) : <span style={{ color: 'var(--danger)', fontSize: 11 }}>geçersiz</span>}</td>
-                        <td style={{ textAlign: 'center', padding: '9px 4px' }}>
-                          <button
-                            onClick={() => setOnizleme(o => o ? o.map((x, i) => i === idx ? { ...x, tur: x.tur === 'gelir' ? 'gider' : 'gelir' } : x) : o)}
-                            className={`badge ${r.tur === 'gelir' ? 'badge-green' : 'badge-red'}`}
-                            style={{ border: 'none', cursor: 'pointer', padding: '2px 6px', fontSize: 10.5 }}
-                            title="Gelir/Gider değiştir"
-                          >{r.tur === 'gelir' ? 'Gelir' : 'Gider'}</button>
-                        </td>
-                        <td style={{ fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word', padding: '8px 6px' }}>
-                          <div>{r.aciklama || '—'}</div>
-                          {r.belge && <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>Belge: {r.belge}</div>}
-                        </td>
-                        <td className="td-num" style={{ fontSize: 12, padding: '9px 6px' }}>{isNaN(r.tutar) ? '—' : fmtTL(r.tutar)}</td>
-                        <td style={{ padding: '6px', textAlign: 'center' }}>
-                          {r.tur !== 'gelir' ? (
-                            <span style={{ color: 'var(--text3)', fontSize: 11 }}>—</span>
-                          ) : (
+                    {satirlar.map(({ r, idx }) => {
+                      const elle = elleGerekir(r) && ogrencilerSirali.length > 0
+                      const hedef = hedefAdi(r.hedef)
+                      return (
+                        <tr key={idx} style={!r.gecerli || elle ? { background: 'var(--warn-light)' } : undefined}>
+                          <td style={{ textAlign: 'center', padding: '9px 4px' }}>{r.gecerli ? <CheckCircle2 size={15} color="var(--success)" /> : <AlertTriangle size={15} color="var(--warn)" />}</td>
+                          <td style={{ fontSize: 12, padding: '9px 6px' }}>{r.tarih ? tarihFmt(r.tarih) : <span style={{ color: 'var(--danger)', fontSize: 11 }}>geçersiz</span>}</td>
+                          <td style={{ textAlign: 'center', padding: '9px 4px' }}>
                             <button
-                              onClick={e => setEslesmePop({ idx, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() })}
-                              style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 5, maxWidth: '100%',
-                                padding: '4px 9px', borderRadius: 20, fontSize: 10.5, fontWeight: 600, cursor: 'pointer',
-                                border: `1px solid ${r.ogrenciId ? (r.isaretle ? 'var(--success-border)' : 'var(--border)') : 'var(--border)'}`,
-                                background: r.ogrenciId ? (r.isaretle ? 'var(--success-light)' : 'var(--surface2)') : 'var(--surface)',
-                                color: r.ogrenciId ? (r.isaretle ? '#1a7a3a' : 'var(--text2)') : 'var(--text3)',
-                              }}
-                              title="Öğrenci eşleştirmesini düzenle"
-                            >
-                              {r.ogrenciId ? (r.isaretle ? <CheckCircle2 size={12} /> : <Circle size={12} />) : <UserCheck size={12} />}
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 118 }}>
-                                {r.ogrenciId ? (ogrenciAdMap.get(r.ogrenciId) || '—') : 'Eşleştir'}
-                              </span>
-                            </button>
-                          )}
-                        </td>
-                        <td style={{ textAlign: 'center', padding: '9px 4px' }}>
-                          <button onClick={() => { setOnizleme(o => o ? o.filter((_, i) => i !== idx) : o); setEslesmePop(null) }} title="Satırı çıkar" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)' }}><X size={14} /></button>
-                        </td>
-                      </tr>
-                    ))}
+                              onClick={() => setOnizleme(o => o ? o.map((x, i) => i === idx ? { ...x, tur: x.tur === 'gelir' ? 'gider' : 'gelir' } : x) : o)}
+                              className={`badge ${r.tur === 'gelir' ? 'badge-green' : 'badge-red'}`}
+                              style={{ border: 'none', cursor: 'pointer', padding: '2px 6px', fontSize: 10.5 }}
+                              title="Gelir/Gider değiştir"
+                            >{r.tur === 'gelir' ? 'Gelir' : 'Gider'}</button>
+                          </td>
+                          <td style={{ fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word', padding: '8px 6px' }}>
+                            <div>{r.aciklama || '—'}</div>
+                            {r.belge && <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>Belge: {r.belge}</div>}
+                            {elle && <div style={{ fontSize: 10.5, color: '#8a5200', marginTop: 3, fontWeight: 600 }}>⚠ {r.uyari || 'Eşleştirilmedi'} — elle işaretleyin</div>}
+                          </td>
+                          <td className="td-num" style={{ fontSize: 12, padding: '9px 6px' }}>{isNaN(r.tutar) ? '—' : fmtTL(r.tutar)}</td>
+                          <td style={{ padding: '6px', textAlign: 'center' }}>
+                            {r.tur !== 'gelir' ? (
+                              <span style={{ color: 'var(--text3)', fontSize: 11 }}>—</span>
+                            ) : r.odemeDegil && !r.ogrenciId ? (
+                              <button onClick={e => setEslesmePop({ idx, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() })}
+                                style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 10.5 }} title="Öğrenci ödemesi değil (iade/devir) — yine de eşleştirmek için tıklayın">öğrenci ödemesi değil</button>
+                            ) : (
+                              <button
+                                onClick={e => setEslesmePop({ idx, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() })}
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 5, maxWidth: '100%', textAlign: 'left',
+                                  padding: '4px 9px', borderRadius: 12, fontSize: 10.5, fontWeight: 600, cursor: 'pointer',
+                                  border: `1px solid ${r.isaretle ? 'var(--success-border)' : elle ? '#e0b45c' : 'var(--border)'}`,
+                                  background: r.isaretle ? 'var(--success-light)' : 'var(--surface)',
+                                  color: r.isaretle ? '#1a7a3a' : elle ? '#8a5200' : 'var(--text3)',
+                                }}
+                                title={r.uyari ? `${r.uyari} — düzenlemek için tıklayın` : 'Öğrenci eşleştirmesini düzenle'}
+                              >
+                                {r.isaretle ? <CheckCircle2 size={12} style={{ flexShrink: 0 }} /> : r.ogrenciId ? <Circle size={12} style={{ flexShrink: 0 }} /> : <UserCheck size={12} style={{ flexShrink: 0 }} />}
+                                <span style={{ overflow: 'hidden', minWidth: 0 }}>
+                                  <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.ogrenciId ? (ogrenciAdMap.get(r.ogrenciId) || '—') : 'Elle eşleştir'}</span>
+                                  {hedef && <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, opacity: 0.85 }}>{hedef}{r.ay ? ` · ${AYLAR[r.ay]}` : ''}{r.tutaraGore ? ' (tutara göre)' : ''}</span>}
+                                </span>
+                              </button>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center', padding: '9px 4px' }}>
+                            <button onClick={() => { setOnizleme(o => o ? o.filter((_, i) => i !== idx) : o); setEslesmePop(null) }} title="Satırı çıkar" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)' }}><X size={14} /></button>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -196,6 +232,50 @@ export default function EkstreModal({ setImportOpen, importFileName, importReadi
             <Save size={15} /> {importSaving ? 'Kaydediliyor...' : 'İçe Aktar'}
           </button>
         </div>
+        </>}
+      </div>
+    </div>
+  )
+}
+
+function SonucGorunumu({ sonuc, kapat }: { sonuc: ImportSonuc; kapat: () => void }) {
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        <StatPil label="Deftere eklenen" value={String(sonuc.hareket)} color="var(--success)" />
+        {sonuc.mukerrer > 0 && <StatPil label="Defterde zaten vardı" value={String(sonuc.mukerrer)} />}
+        <StatPil label="Ödendi işaretlenen" value={String(sonuc.isaretlenen)} color="var(--accent)" />
+        {sonuc.tarihiGuncellenen > 0 && <StatPil label="Tarihi ekstreden düzeltilen" value={String(sonuc.tarihiGuncellenen)} color="var(--accent)" />}
+        {sonuc.zatenVardi > 0 && <StatPil label="Zaten işaretliydi" value={String(sonuc.zatenVardi)} />}
+        {sonuc.hata > 0 && <StatPil label="Hata" value={String(sonuc.hata)} color="var(--danger)" />}
+      </div>
+      {sonuc.elle.length > 0 ? (
+        <>
+          <div className="alert alert-warn" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, marginBottom: 10 }}>
+            <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div><strong>{sonuc.elle.length} ödeme Tahsilat Takip&rsquo;e işlenemedi — elle işaretleyin.</strong> Bu satırlar işletme defterine yazıldı; öğrencinin ödemesini Tahsilat Takip ekranından aşağıdaki tarih ve tutarla işaretleyin.</div>
+          </div>
+          <div style={{ maxHeight: 340, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+            <table className="data-table" style={{ width: '100%' }}>
+              <thead><tr><th style={{ width: 84 }}>Tarih</th><th>Açıklama</th><th className="td-num" style={{ width: 96 }}>Tutar (₺)</th><th style={{ width: 220 }}>Neden</th></tr></thead>
+              <tbody>
+                {sonuc.elle.map((e, i) => (
+                  <tr key={i}>
+                    <td style={{ fontSize: 12 }}>{tarihFmt(e.tarih)}</td>
+                    <td style={{ fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{e.aciklama || '—'}</td>
+                    <td className="td-num" style={{ fontSize: 12 }}>{fmtTL(e.tutar)}</td>
+                    <td style={{ fontSize: 11.5, color: '#8a5200' }}>{e.neden}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <div className="alert alert-success" style={{ fontSize: 12.5 }}>Tüm öğrenci ödemeleri Tahsilat Takip&rsquo;e işlendi.</div>
+      )}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 18 }}>
+        <button className="btn btn-primary" onClick={kapat}>Tamam</button>
       </div>
     </div>
   )

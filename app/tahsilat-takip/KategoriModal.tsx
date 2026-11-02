@@ -43,7 +43,7 @@ export default function KategoriModal({ birim, editId, form, setForm, otomatikKi
               {birim === 'okul' && <button type="button" onClick={() => kaynakDegistir('otomatik_kulup')} style={secBtn(form.veri_kaynagi === 'otomatik_kulup')}><RefreshCw size={14} /> Otomatik (Kulüp)</button>}
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
-              {otomatikKilit ? 'Kulüp aidatı mevcut Ödeme Takibi verisinden salt-okunur gelir. Aylık ve tüm öğrenciler olarak sabitlenir.' : 'Memur her öğrenciyi ödedi / ödenmedi olarak elle işaretler.'}
+              {otomatikKilit ? 'Kulüp aidatı mevcut Aidat Takibi verisinden salt-okunur gelir. Aylık ve tüm öğrenciler olarak sabitlenir.' : 'Memur her öğrenciyi ödedi / ödenmedi olarak elle işaretler.'}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 12, opacity: otomatikKilit ? 0.5 : 1, pointerEvents: otomatikKilit ? 'none' : 'auto' }}>

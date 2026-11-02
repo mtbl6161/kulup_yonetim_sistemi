@@ -8,7 +8,9 @@ import { perdeKapat } from '@/lib/perdeKapat'
 import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
 import { Ogrenci, kulupOgrencisi } from '@/lib/types'
-import { Plus, Search, Pencil, Trash2, RotateCcw, X, Save, Info, FileSpreadsheet } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, RotateCcw, X, Save, FileSpreadsheet, FileText, Files } from 'lucide-react'
+import OgrenciDokumuModal from '@/app/tahsilat-takip/OgrenciDokumuModal'
+import TopluDokumModal from '@/app/tahsilat-takip/TopluDokumModal'
 import { excelIndir, bugunEtiketi } from '@/lib/excel'
 import { EmptyStudents } from '@/components/brand/Illustrations'
 import { useYukleme } from '@/lib/useYukleme'
@@ -16,8 +18,8 @@ import { useYukleme } from '@/lib/useYukleme'
 // Okul öğrencisi = kulübe kayıtlı olmayan, sadece okul tahsilatlarında (Kırtasiye, Etkinlik vb.) yer alan öğrenci.
 // Aynı `ogrenciler` tablosunda ogrenci_turu = 'okul' olarak tutulur; kulüp ekranlarında görünmez.
 
-interface FormState { ad: string; soyad: string; tc: string; sinif: string; ogretmen: string; veli_ad: string; anne_tel: string }
-const BOS: FormState = { ad: '', soyad: '', tc: '', sinif: '', ogretmen: '', veli_ad: '', anne_tel: '' }
+interface FormState { ad: string; soyad: string; tc: string; sinif: string; ogretmen: string; veli_ad: string; anne_tel: string; veli_eposta: string }
+const BOS: FormState = { ad: '', soyad: '', tc: '', sinif: '', ogretmen: '', veli_ad: '', anne_tel: '', veli_eposta: '' }
 
 export default function OkulOgrencileriPage() {
   const { okul, profil } = useAuth()
@@ -30,6 +32,8 @@ export default function OkulOgrencileriPage() {
   const [sinifFiltre, setSinifFiltre] = useState('')
   const [listeTuru, setListeTuru] = useState<'aktif' | 'arsiv'>('aktif')
   const [importAcik, setImportAcik] = useState(false)
+  const [dokumOgrenci, setDokumOgrenci] = useState<Ogrenci | null>(null)
+  const [topluDokum, setTopluDokum] = useState(false)
   const [silOnay, setSilOnay] = useState<Ogrenci | null>(null)
 
   const [modalAcik, setModalAcik] = useState(false)
@@ -50,7 +54,6 @@ export default function OkulOgrencileriPage() {
   function bilgi(text: string, sure = 3000) { setMsg(text); if (sure) setTimeout(() => setMsg(''), sure) }
 
   const okulOgrencileri = useMemo(() => tum.filter(o => !kulupOgrencisi(o)), [tum])
-  const kulupSayisi = useMemo(() => tum.filter(o => kulupOgrencisi(o) && o.aktif !== false).length, [tum])
   const siniflar = useMemo(() => Array.from(new Set(okulOgrencileri.map(o => o.sinif).filter(Boolean))).sort((a, b) => a!.localeCompare(b!, 'tr')) as string[], [okulOgrencileri])
   const ogretmenler = useMemo(() => Array.from(new Set(okulOgrencileri.map(o => o.ogretmen).filter(Boolean))).sort() as string[], [okulOgrencileri])
 
@@ -66,7 +69,7 @@ export default function OkulOgrencileriPage() {
   function yeniAc() { setEditId(null); setForm(BOS); setFormMsg(''); setModalAcik(true) }
   function duzenleAc(o: Ogrenci) {
     setEditId(o.id)
-    setForm({ ad: o.ad, soyad: o.soyad, tc: o.tc || '', sinif: o.sinif || '', ogretmen: o.ogretmen || '', veli_ad: o.veli_ad || '', anne_tel: o.anne_tel || '' })
+    setForm({ ad: o.ad, soyad: o.soyad, tc: o.tc || '', sinif: o.sinif || '', ogretmen: o.ogretmen || '', veli_ad: o.veli_ad || '', anne_tel: o.anne_tel || '', veli_eposta: o.veli_eposta || '' })
     setFormMsg(''); setModalAcik(true)
   }
 
@@ -92,6 +95,8 @@ export default function OkulOgrencileriPage() {
       return
     }
 
+    const veliEposta = form.veli_eposta.trim().toLocaleLowerCase('en')
+    if (veliEposta && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(veliEposta)) { setFormMsg('❌ Veli e-posta adresi geçersiz.'); return }
     setSaving(true)
     const payload = {
       ad, soyad, tc: tc || null,
@@ -99,6 +104,7 @@ export default function OkulOgrencileriPage() {
       ogretmen: form.ogretmen.trim() || null,
       veli_ad: form.veli_ad.trim() || null,
       anne_tel: form.anne_tel.trim() || null,
+      veli_eposta: veliEposta || null,
     }
     const { error } = editId
       ? await supabase.from('ogrenciler').update(payload).eq('id', editId)
@@ -134,17 +140,9 @@ export default function OkulOgrencileriPage() {
 
   return (
     <div>
-      <Topbar title="Okul Öğrencileri" sub="Kulübe kayıtlı olmayan okul öğrencileri" actions={<button className="btn btn-secondary btn-sm" onClick={excelAktar} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileSpreadsheet size={15} /> Excel</button>} />
+      <Topbar title="Okul Öğrencileri" sub="Kulübe kayıtlı olmayan okul öğrencileri" actions={<div style={{ display: 'flex', gap: 8 }}><button className="btn btn-secondary btn-sm" onClick={() => setTopluDokum(true)} title="Öğrencilerin ne ödediği, ne zaman ve nereye ödediği; ödenmemiş kalemleri — tüm öğrenciler ya da sınıf sınıf" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Files size={15} /> Ödeme Dökümleri</button><button className="btn btn-secondary btn-sm" onClick={excelAktar} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileSpreadsheet size={15} /> Excel</button></div>} />
       <div style={{ padding: 28 }}>
         {msg && <div className={`alert ${msg.startsWith('✅') ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: 16 }}>{msg}</div>}
-
-        <div className="alert alert-info" style={{ marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-          <Info size={16} style={{ flexShrink: 0, marginTop: 2 }} />
-          <span>
-            Buraya yalnızca <strong>kulübe kayıtlı olmayan</strong> öğrencileri ekleyin. Kulüp öğrencileri ({kulupSayisi} kişi) Kulüp › Öğrenci Listesi&apos;nden gelir ve okul tahsilatlarında zaten yer alır.
-            Tahsilat Takip&apos;te her öğrenciye türüne göre <strong>kulüp</strong> veya <strong>okul</strong> ücreti uygulanır.
-          </span>
-        </div>
 
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
@@ -182,7 +180,7 @@ export default function OkulOgrencileriPage() {
                 ) : liste.map((o, i) => (
                   <tr key={o.id}>
                     <td style={{ color: 'var(--text3)', fontSize: 12 }}>{i + 1}</td>
-                    <td><strong>{o.ad} {o.soyad}</strong></td>
+                    <td><button type="button" onClick={() => setDokumOgrenci(o)} title="Ödeme dökümünü aç" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontWeight: 700, fontSize: 'inherit', color: 'var(--accent)', textAlign: 'left' }}>{o.ad} {o.soyad}</button></td>
                     <td style={{ fontSize: 12, color: 'var(--text3)' }}>{o.tc || '-'}</td>
                     <td>{o.sinif || '-'}</td>
                     <td>{o.ogretmen || '-'}</td>
@@ -191,7 +189,8 @@ export default function OkulOgrencileriPage() {
                     <td>
                       {listeTuru === 'aktif' ? (
                         <div style={{ display: 'flex', gap: 4 }}>
-                          <button className="btn btn-secondary btn-icon" onClick={() => duzenleAc(o)} title="Düzenle"><Pencil size={14} /></button>
+                          <button className="btn btn-secondary btn-sm" onClick={() => setDokumOgrenci(o)} title="Ödeme dökümü" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 8px' }}><FileText size={13} /> Döküm</button>
+                            <button className="btn btn-secondary btn-icon" onClick={() => duzenleAc(o)} title="Düzenle"><Pencil size={14} /></button>
                           <button className="btn btn-outline-danger btn-icon" onClick={() => setSilOnay(o)} title="Sil ve Arşivle"><Trash2 size={14} /></button>
                         </div>
                       ) : (
@@ -208,6 +207,8 @@ export default function OkulOgrencileriPage() {
         </div>
       </div>
 
+      {topluDokum && <TopluDokumModal ogrenciler={okulOgrencileri.filter(o => listeTuru === 'aktif' ? o.aktif !== false : o.aktif === false)} baslik={listeTuru === 'arsiv' ? 'Arşivdeki öğrenciler' : 'Tüm öğrenciler'} kapat={() => setTopluDokum(false)} />}
+      {dokumOgrenci && <OgrenciDokumuModal ogrenci={dokumOgrenci} kapat={() => setDokumOgrenci(null)} />}
       {importAcik && (
         <ImportModal
           tip="ogrenci"
@@ -260,6 +261,7 @@ export default function OkulOgrencileriPage() {
             </div>
             <div style={grid2}>
               <div><label className="form-label">Telefon</label><input className="form-input" value={form.anne_tel} onChange={e => setForm(f => ({ ...f, anne_tel: e.target.value }))} /></div>
+              <div><label className="form-label" htmlFor="okul-veli-eposta">Veli E-posta</label><input id="okul-veli-eposta" type="email" className="form-input" placeholder="ornek@gmail.com" autoComplete="off" value={form.veli_eposta} onChange={e => setForm(f => ({ ...f, veli_eposta: e.target.value }))} /></div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
               <button className="btn btn-secondary" onClick={() => setModalAcik(false)} disabled={saving}>İptal</button>

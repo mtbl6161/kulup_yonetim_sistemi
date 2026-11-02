@@ -570,7 +570,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       <Topbar
-        title={birim === 'oab' ? 'OAB Tahsilat Takip' : birim === 'kulup' ? 'Kulüp Tahsilat Takip' : 'Tahsilat Takip'}
+        title={birim === 'oab' ? 'OAB Tahsilat Takip' : birim === 'kulup' ? 'Diğer Tahsilatlar' : 'Tahsilat Takip'}
         sub={`${ayLabel(ay, yil)} — ${view === 'takip' ? 'Ödeme Takibi' : view === 'rapor' ? 'Ödeme Durumu' : 'Kategori Yönetimi'}`}
         actions={
           <div className="tk-seg">
@@ -592,7 +592,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
           <div style={emptyBox}>
             <ClipboardList size={48} color="var(--accent)" style={{ marginBottom: 18 }} />
             <h2 style={{ fontSize: 19, fontWeight: 800, margin: '0 0 8px' }}>Henüz kategori yok</h2>
-            <p style={{ color: 'var(--text2)', maxWidth: 440, marginBottom: 22, lineHeight: 1.6 }}>{birim === 'oab' ? 'Okul aile birliği bağışı, aidatı veya bir etkinlik için ilk tahsilat kategorinizi oluşturun.' : birim === 'kulup' ? 'Kırtasiye, gezi, etkinlik veya forma gibi aidat dışı kulüp tahsilatları için ilk kategorinizi oluşturun. Aylık aidat Ödeme Takibi’nde kalır.' : 'Okul, kulüp, kırtasiye veya bir etkinlik için ilk tahsilat kategorinizi oluşturun.'}</p>
+            <p style={{ color: 'var(--text2)', maxWidth: 440, marginBottom: 22, lineHeight: 1.6 }}>{birim === 'oab' ? 'Okul aile birliği bağışı, aidatı veya bir etkinlik için ilk tahsilat kategorinizi oluşturun.' : birim === 'kulup' ? 'Kırtasiye, gezi, etkinlik veya forma gibi aidat dışı kulüp tahsilatları için ilk kategorinizi oluşturun. Aylık aidat Aidat Takibi’nde kalır.' : 'Okul, kulüp, kırtasiye veya bir etkinlik için ilk tahsilat kategorinizi oluşturun.'}</p>
             <button className="btn btn-primary" onClick={yeniAc}><Plus size={16} /> İlk Kategoriyi Oluştur</button>
           </div>
         ) : view === 'yonetim' ? (
@@ -811,7 +811,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
                 {saltOkunur && (
                   <div className="alert alert-info" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
                     <RefreshCw size={16} style={{ flexShrink: 0 }} />
-                    <span><strong>Salt-okunur:</strong> Kulüp aidatı ödemeleri mevcut <strong>Ödeme Takibi</strong> ekranından gelir; buradan değiştirilemez. Yeşil hücre = o ay aidat tahsil edilmiş.</span>
+                    <span><strong>Salt-okunur:</strong> Kulüp aidatı ödemeleri mevcut <strong>Aidat Takibi</strong> ekranından gelir; buradan değiştirilemez. Yeşil hücre = o ay aidat tahsil edilmiş.</span>
                   </div>
                 )}
                 {/* Özet */}

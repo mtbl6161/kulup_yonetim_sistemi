@@ -13,7 +13,7 @@ export async function kulupOtomatikHareketler(yil: number): Promise<IsletmeHarek
   const ayi = (t: string) => Number(t.slice(5, 7))
   const hesap: IsletmeHareket[] = (hh || []).map(h => ({
     id: -h.id, tarih: h.tarih, tutar: Number(h.tutar), tur: h.tur, belge_no: h.dekont_no, aciklama: h.aciklama,
-    kaynak: 'otomatik', otomatikKaynak: h.kaynak === 'tahsilat' ? 'Ödeme Takibi' : 'Hesap Hareketleri', ay: ayi(h.tarih), yil,
+    kaynak: 'otomatik', otomatikKaynak: h.kaynak === 'tahsilat' ? 'Aidat Takibi' : 'Hesap Hareketleri', ay: ayi(h.tarih), yil,
   }))
   type Bir<T> = T | T[] | null
   type TkSatir = { id: number; tarih: string; tutar: number | null; aciklama: string | null; tahsilat_kategorileri: Bir<{ ad: string }>; ogrenciler: Bir<{ ad: string; soyad: string }> }

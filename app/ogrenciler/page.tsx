@@ -9,7 +9,9 @@ import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
 import { Ogrenci, Ayarlar, Personel, kulupOgrencisi, Sinif } from '@/lib/types'
 import OgrenciModal from '@/components/OgrenciModal'
-import { Plus, Search, Pencil, Trash2, RotateCcw, FileSpreadsheet } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, RotateCcw, FileSpreadsheet, FileText, Files } from 'lucide-react'
+import OgrenciDokumuModal from '@/app/tahsilat-takip/OgrenciDokumuModal'
+import TopluDokumModal from '@/app/tahsilat-takip/TopluDokumModal'
 import { excelIndir, bugunEtiketi } from '@/lib/excel'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
@@ -26,6 +28,8 @@ function OgrencilerIc() {
   const [personel, setPersonel] = useState<Personel[]>([])
   const [siniflar, setSiniflar] = useState<Sinif[]>([])
   const [editItem, setEditItem] = useState<Ogrenci | null>(null)
+  const [dokumOgrenci, setDokumOgrenci] = useState<Ogrenci | null>(null)
+  const [topluDokum, setTopluDokum] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [silOnayId, setSilOnayId] = useState<number | null>(null)
   const [filtre, setFiltre] = useState('')
@@ -156,7 +160,7 @@ function OgrencilerIc() {
 
   return (
     <div>
-      <Topbar title="Öğrenci Listesi" sub="Kayıt ve yönetim" actions={<button className="btn btn-secondary btn-sm" onClick={excelAktar} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileSpreadsheet size={15} /> Excel</button>} />
+      <Topbar title="Öğrenciler" sub="Kayıt ve yönetim" actions={<div style={{ display: 'flex', gap: 8 }}><button className="btn btn-secondary btn-sm" onClick={() => setTopluDokum(true)} title="Öğrencilerin ne ödediği, ne zaman ve nereye ödediği; ödenmemiş kalemleri — tüm öğrenciler ya da sınıf sınıf" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Files size={15} /> Ödeme Dökümleri</button><button className="btn btn-secondary btn-sm" onClick={excelAktar} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileSpreadsheet size={15} /> Excel</button></div>} />
       <div style={{ padding: 28 }}>
         {msg && <div className={`alert ${msg.startsWith('✅') ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: 20 }}>{msg}</div>}
 
@@ -164,7 +168,7 @@ function OgrencilerIc() {
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 10 }}>
             <div className="card-title" style={{ marginBottom: 0 }}>
-              Öğrenci Listesi ({loading ? '...' : liste.length})
+              Öğrenciler ({loading ? '...' : liste.length})
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <select
@@ -225,7 +229,7 @@ function OgrencilerIc() {
                   liste.map((o, i) => (
                     <tr key={o.id}>
                       <td style={{ color: 'var(--text3)', fontSize: 12 }}>{i + 1}</td>
-                      <td><strong>{o.ad} {o.soyad}</strong></td>
+                      <td><button type="button" onClick={() => setDokumOgrenci(o)} title="Ödeme dökümünü aç" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontWeight: 700, fontSize: 'inherit', color: 'var(--accent)', textAlign: 'left' }}>{o.ad} {o.soyad}</button></td>
                       <td style={{ fontSize: 12, color: 'var(--text3)' }}>{o.tc || '-'}</td>
                       <td>{o.sinif || '-'}</td>
                       <td>{o.ogretmen || '-'}</td>
@@ -242,6 +246,7 @@ function OgrencilerIc() {
                       <td>
                         {listeTuru === 'aktif' ? (
                           <div style={{ display: 'flex', gap: 4 }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setDokumOgrenci(o)} title="Ödeme dökümü" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 8px' }}><FileText size={13} /> Döküm</button>
                             <button className="btn btn-secondary btn-icon" onClick={() => duzenle(o)} title="Düzenle"><Pencil size={14} /></button>
                             <button className="btn btn-outline-danger btn-icon" onClick={() => setSilOnayId(o.id)} title="Sil ve Arşivle"><Trash2 size={14} /></button>
                           </div>
@@ -260,6 +265,8 @@ function OgrencilerIc() {
         </div>
       </div>
 
+      {topluDokum && <TopluDokumModal ogrenciler={ogrenciler.filter(o => listeTuru === 'aktif' ? o.aktif !== false : o.aktif === false)} baslik={listeTuru === 'arsiv' ? 'Arşivdeki öğrenciler' : 'Tüm öğrenciler'} kapat={() => setTopluDokum(false)} />}
+      {dokumOgrenci && <OgrenciDokumuModal ogrenci={dokumOgrenci} kapat={() => setDokumOgrenci(null)} />}
       {importAcik && (
         <ImportModal
           tip="ogrenci"

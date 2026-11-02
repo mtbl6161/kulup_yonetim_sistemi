@@ -10,7 +10,7 @@ import {
   DenetimMadde, DenetimBelge, DenetimTeslim, DENETIM_BUCKET, MAKS_DOSYA_BOYUTU, KABUL_EDILEN, TESLIM_DURUM_ETIKET,
   belgeDonemde, donemBelgeleriniGetir, depoYolu, boyutFmt, otomatikBelgeUret, kontrolListesiUret, belgeAc, belgeIndir, blobKaydet, dosyayiZiple,
 } from '@/lib/denetimDosyasi'
-import { FolderCheck, Upload, Eye, Download, Trash2, Send, FileArchive, ListChecks, AlertTriangle } from 'lucide-react'
+import { FolderCheck, Upload, Eye, Download, Trash2, Send, FileArchive, ListChecks, AlertTriangle, RefreshCw, Plus } from 'lucide-react'
 import MaddeEtiketleri from '@/components/MaddeEtiketleri'
 import { dosyaIkonu } from '@/components/DenetciDenetimDosyasi'
 import { useYukleme } from '@/lib/useYukleme'
@@ -29,12 +29,14 @@ export default function DenetimDosyasiPage() {
   const [bordroVar, setBordroVar] = useState(true)
   const [yukleniyor, setYukleniyor] = useState(true)
   const [islem, setIslem] = useState<string | null>(null) // devam eden işlem mesajı
-  const [msg, setMsg] = useState<{ tip: 'ok' | 'hata'; text: string } | null>(null)
+  const [msg, setMsg] = useState<{ tip: 'ok' | 'hata' | 'bilgi'; text: string } | null>(null)
   const [silinecek, setSilinecek] = useState<DenetimBelge | null>(null)
   const [acikMaddeler, setAcikMaddeler] = useState<Set<number>>(new Set()) // uzun belge listesi açılmış maddeler
   const [gonderOnay, setGonderOnay] = useState<string | null>(null)
   const dosyaInput = useRef<HTMLInputElement>(null)
   const hedefMadde = useRef<DenetimMadde | null>(null)
+  // Değiştirilen belge: yeni dosya yüklenince bu belge silinir (yerine konur); null ise yeni belge eklenir
+  const degistirilen = useRef<DenetimBelge | null>(null)
 
   const okulId = okul?.id
   const acik = !teslim || teslim.durum === 'taslak' || teslim.durum === 'iade'
@@ -71,10 +73,19 @@ export default function DenetimDosyasiPage() {
   }
 
   // ── Yükleme ───────────────────────────────────────────────────
-  function yukleSec(m: DenetimMadde) {
+  function yukleSec(m: DenetimMadde, eski: DenetimBelge | null = null) {
     hedefMadde.current = m
+    degistirilen.current = eski
+    if (dosyaInput.current) dosyaInput.current.multiple = !eski
     dosyaInput.current?.click()
   }
+
+  // Değiştirilince yerine konabilecek belge: bu aya ait, okulun yüklediği ve onaylanmamış.
+  // Onaylı ya da önceki ayın dosyasıyla gönderilmiş (yıllık) belge silinmez; o ayın gönderim kaydı bozulmasın.
+  const degistirilebilir = (b: DenetimBelge) => b.kaynak === 'yukleme' && b.durum !== 'onaylandi' && b.yil === yil && b.ay === ay
+  const degistirmeEngeli = (b: DenetimBelge) => degistirilebilir(b) ? null
+    : b.durum === 'onaylandi' ? `"${b.dosya_adi}" denetçi tarafından onaylandığı için değiştirilemez. Yeni bir belge gerekiyorsa maddenin Ekle düğmesini kullanın.`
+    : `"${b.dosya_adi}" ${AYLAR[b.ay]} ${b.yil} dosyasıyla gönderildiği için değiştirilemez. Bu ay için yeni belge eklemek üzere maddenin Ekle düğmesini kullanın.`
 
   async function dosyalariYukle(files: FileList | null) {
     const m = hedefMadde.current
@@ -83,6 +94,7 @@ export default function DenetimDosyasiPage() {
     const buyuk = liste.filter(f => f.size > MAKS_DOSYA_BOYUTU)
     if (buyuk.length) { setMsg({ tip: 'hata', text: `❌ Dosya 10 MB'tan büyük olamaz: ${buyuk.map(f => f.name).join(', ')}` }); return }
     setMsg(null)
+    const eski = degistirilen.current
     try {
       for (const f of liste) {
         setIslem(`Yükleniyor: ${f.name}`)
@@ -94,9 +106,16 @@ export default function DenetimDosyasiPage() {
         })
         if (ins.error) { await supabase.storage.from(DENETIM_BUCKET).remove([yol]); throw ins.error }
       }
-      setMsg({ tip: 'ok', text: `✅ ${liste.length} dosya ${m.sira_no}. maddeye eklendi.` })
+      if (eski && degistirilebilir(eski)) {
+        const { error } = await supabase.from('denetim_belgeleri').delete().eq('id', eski.id)
+        if (error) throw error
+        await supabase.storage.from(DENETIM_BUCKET).remove([eski.dosya_yolu])
+        setMsg({ tip: 'ok', text: `✅ "${eski.dosya_adi}" yerine "${liste[0].name}" konuldu.` })
+      } else {
+        setMsg({ tip: 'ok', text: `✅ ${liste.length} dosya ${m.sira_no}. maddeye eklendi.` })
+      }
       await load()
-    } catch (e) { hata(e) } finally { setIslem(null); if (dosyaInput.current) dosyaInput.current.value = '' }
+    } catch (e) { hata(e) } finally { setIslem(null); degistirilen.current = null; if (dosyaInput.current) dosyaInput.current.value = '' }
   }
 
   async function sil(b: DenetimBelge) {
@@ -126,7 +145,7 @@ export default function DenetimDosyasiPage() {
     if (!okulId) return
     setMsg(null)
     const { count } = await supabase.from('bordro').select('id', { count: 'exact', head: true }).eq('okul_id', okulId).eq('yil', yil).eq('ay', ay)
-    if (!count) { setMsg({ tip: 'hata', text: `❌ ${AYLAR[ay]} ${yil} bordrosu hesaplanmamış. Önce Bordro Özeti sayfasından bordroyu hesaplayın.` }); return }
+    if (!count) { setMsg({ tip: 'hata', text: `❌ ${AYLAR[ay]} ${yil} bordrosu hesaplanmamış. Önce Bordro sayfasından bordroyu hesaplayın.` }); return }
     const eksik = maddeler.filter(m => m.tip === 'yukleme' && m.zorunlu && maddeBelgeleri(m).length === 0)
     const iadeli = belgeler.filter(b => b.durum === 'iade' && b.yil === yil && b.ay === ay)
     const uyarilar: string[] = []
@@ -247,7 +266,7 @@ export default function DenetimDosyasiPage() {
             <button type="button" className="btn btn-primary btn-sm" onClick={gonderKontrol} disabled={!!islem}><Send size={14} /> Yeniden gönder</button>
           </div>
         )}
-        {msg && <div className={`alert ${msg.tip === 'ok' ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: 16 }}>{msg.text}</div>}
+        {msg && <div className={`alert ${msg.tip === 'ok' ? 'alert-success' : msg.tip === 'bilgi' ? 'alert-info' : 'alert-danger'}`} style={{ marginBottom: 16 }}>{msg.text}</div>}
         {islem && <div className="alert alert-info" style={{ marginBottom: 16 }}>⏳ {islem}</div>}
 
         {yukleniyor ? (
@@ -259,6 +278,8 @@ export default function DenetimDosyasiPage() {
             {maddeler.map(m => {
               const mb = maddeBelgeleri(m)
               const otomatikKopya = mb.filter(b => b.kaynak === 'otomatik')
+              const silinebilir = (b: typeof mb[number]) => acik && b.kaynak === 'yukleme' && b.durum !== 'onaylandi'
+              const silYeri = mb.some(silinebilir)
               return (
                 <div key={m.id} style={{ display: 'flex', gap: 14, padding: '14px 18px', borderBottom: '1px solid var(--border-light)', alignItems: 'flex-start' }}>
                   <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13,
@@ -266,10 +287,25 @@ export default function DenetimDosyasiPage() {
                     {m.sira_no}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 8px', fontWeight: 600, fontSize: 13.5 }}>
-                      <span>{m.baslik}</span>
-                      <MaddeEtiketleri madde={m} />
-                      {mb.length > 1 && <span className="badge badge-gray" style={{ fontWeight: 600 }}>{mb.length} belge</span>}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 8px', fontWeight: 600, fontSize: 13.5, minHeight: 30 }}>
+                        <span>{m.baslik}</span>
+                        <MaddeEtiketleri madde={m} />
+                        {mb.length > 1 && <span className="badge badge-gray" style={{ fontWeight: 600 }}>{mb.length} belge</span>}
+                      </div>
+                      {m.tip === 'otomatik' ? (
+                        <button className="btn btn-secondary btn-sm" onClick={() => onizle(m)} disabled={!!islem} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                          <Eye size={13} /> Önizle
+                        </button>
+                      ) : acik && (mb.some(b => b.kaynak === 'yukleme') ? (
+                        <button className="btn btn-success btn-sm" onClick={() => yukleSec(m)} disabled={!!islem} title="Bu maddeye bir belge daha ekler" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                          <Plus size={13} /> Ekle
+                        </button>
+                      ) : (
+                        <button className="btn btn-primary btn-sm" onClick={() => yukleSec(m)} disabled={!!islem} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                          <Upload size={13} /> Yükle
+                        </button>
+                      ))}
                     </div>
                     {m.aciklama && <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{m.aciklama}</div>}
                     {m.tip === 'otomatik' && otomatikKopya.length === 0 && (
@@ -295,11 +331,18 @@ export default function DenetimDosyasiPage() {
                                 {b.durum !== 'bekliyor' && <span className={`badge ${DURUM_RENK[b.durum]}`}>{b.durum === 'onaylandi' ? 'Onaylandı' : 'İade'}</span>}
                               </div>
                               <div className="ed-aksiyon">
+                                {acik && b.kaynak === 'yukleme' && (
+                                  <button type="button" className={`ed-degistir${degistirilebilir(b) ? '' : ' kilitli'}`} disabled={!!islem}
+                                    aria-label={`${b.dosya_adi} dosyasını değiştir`} title={degistirmeEngeli(b) || 'Bu belgenin yerine yeni dosya yükle'}
+                                    onClick={() => { const engel = degistirmeEngeli(b); if (engel) setMsg({ tip: 'bilgi', text: `ℹ️ ${engel}` }); else yukleSec(m, b) }}>
+                                    <RefreshCw size={13} /> Değiştir
+                                  </button>
+                                )}
                                 <button type="button" className="ed-ikon" aria-label={`${b.dosya_adi} dosyasını aç`} title="Aç" onClick={() => belgeAc(b).catch(hata)}><Eye size={15} /></button>
                                 <button type="button" className="ed-ikon" aria-label={`${b.dosya_adi} dosyasını indir`} title="İndir" onClick={() => belgeIndir(b).catch(hata)}><Download size={15} /></button>
-                                {acik && b.kaynak === 'yukleme' && b.durum !== 'onaylandi'
+                                {silinebilir(b)
                                   ? <button type="button" className="ed-ikon sil" aria-label={`${b.dosya_adi} dosyasını sil`} title="Sil" onClick={() => setSilinecek(b)}><Trash2 size={15} /></button>
-                                  : <span className="ed-ikon-bos" aria-hidden="true" />}
+                                  : silYeri && <span className="ed-ikon-bos" aria-hidden="true" />}
                               </div>
                             </li>
                           )
@@ -312,17 +355,6 @@ export default function DenetimDosyasiPage() {
                           </li>
                         )}
                       </ul>
-                    )}
-                  </div>
-                  <div style={{ flexShrink: 0, display: 'flex', gap: 6 }}>
-                    {m.tip === 'otomatik' ? (
-                      <button className="btn btn-secondary btn-sm" onClick={() => onizle(m)} disabled={!!islem} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                        <Eye size={13} /> Önizle
-                      </button>
-                    ) : acik && (
-                      <button className="btn btn-primary btn-sm" onClick={() => yukleSec(m)} disabled={!!islem} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                        <Upload size={13} /> Yükle
-                      </button>
                     )}
                   </div>
                 </div>
@@ -348,20 +380,26 @@ export default function DenetimDosyasiPage() {
 
 // Belge satırları: dosya adı ne uzunlukta olursa olsun düğmeler sağda aynı hizada; silme düğmesi sakin, üzerine gelince kırmızı
 const ED_CSS = `
-.ed-liste { list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid var(--border-light); border-radius: 10px; overflow: hidden; }
-.ed-satir { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 7px 10px; border-top: 1px solid var(--border-light); }
+.ed-liste { list-style: none; margin: 10px 0 0; padding: 0; border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.ed-satir { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 8px 6px 8px 12px; border-top: 1px solid var(--border); }
 .ed-satir:first-child { border-top: none; }
 .ed-satir:hover { background: var(--surface2); }
 .ed-ad { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ed-meta { font-size: 11.5px; color: var(--text3); margin-top: 1px; }
 .ed-rozetler { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-.ed-aksiyon { display: flex; gap: 2px; }
+.ed-aksiyon { display: flex; gap: 2px; align-items: center; }
+.ed-degistir { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 9px; margin-right: 4px; border-radius: 7px;
+  border: 1px solid #8a5600; background: var(--accent2); color: #fff; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.ed-degistir:hover:not(:disabled) { background: var(--accent2-hover); }
+.ed-degistir.kilitli { background: var(--surface2); border-color: var(--border); color: var(--text3); }
+.ed-degistir.kilitli:hover { background: var(--surface2); }
+.ed-degistir:disabled { opacity: .6; cursor: wait; }
 .ed-ikon, .ed-ikon-bos { width: 32px; height: 32px; border-radius: 8px; border: none; background: transparent; color: var(--text2);
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background .12s, color .12s; }
 .ed-ikon:hover { background: var(--accent-lighter); color: var(--accent); }
 .ed-ikon.sil:hover { background: var(--danger-light); color: var(--danger); }
 .ed-ikon-bos { cursor: default; }
-.ed-daha { width: 100%; padding: 8px 10px; border: none; border-top: 1px solid var(--border-light); background: var(--surface2);
+.ed-daha { width: 100%; padding: 8px 12px; border: none; border-top: 1px solid var(--border); background: var(--surface2);
   font: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent); cursor: pointer; text-align: left; }
 .ed-daha:hover { background: var(--accent-lighter); }
 @media (max-width: 640px) {

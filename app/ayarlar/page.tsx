@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { MUHSGK_ALANLARI, MUHSGK_VARSAYILAN } from '@/lib/muhsgk'
 import Topbar from '@/components/Topbar'
 import SayiInput from '@/components/SayiInput'
 import { supabase } from '@/lib/supabase'
@@ -528,10 +529,12 @@ export default function AyarlarPage() {
                     <input id="ay-ssk-sube" className="form-input" value={form.ssk_sube || ''} onChange={e => setF('ssk_sube', e.target.value)} />
                   </div>
 
-                  <details style={{ gridColumn: 'span 2', padding: '12px 16px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, marginTop: 6 }}>
+                  {/* Beyanname ve SGK sayfasındaki "Düzenle" bağlantısı (#beyanname) bu bölümü açık getirir */}
+                  <details id="beyanname" ref={el => { if (el && window.location.hash === '#beyanname' && !el.dataset.acildi) { el.dataset.acildi = '1'; el.open = true; setTimeout(() => el.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80) } }}
+                    style={{ gridColumn: 'span 2', padding: '12px 16px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, marginTop: 6 }}>
                     <summary style={{ fontSize: 13.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <FileCode2 size={15} color="var(--accent)" /> Gelişmiş: SGK e-Bildirge (XML) parametreleri
-                      <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text3)', marginLeft: 'auto' }}>Yalnızca SGK bildirge dosyası alacaksanız</span>
+                      <FileCode2 size={15} color="var(--accent)" /> Gelişmiş: e-Beyanname (MUHSGK) ve SGK parametreleri
+                      <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text3)', marginLeft: 'auto' }}>MUHSGK XML dosyası için</span>
                     </summary>
                     <div style={{ height: 12 }} />
                     <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 12 }}>
@@ -556,7 +559,24 @@ export default function AyarlarPage() {
                         <input id="ay-sgk-belge-turu" className="form-input" maxLength={2} value={form.sgk_belge_turu || ''} onChange={e => setF('sgk_belge_turu', e.target.value)} placeholder="01" />
                       </div>
                     </div>
-                    <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10 }}>* Bu bilgiler SGK e-Bildirge XML dosyası oluşturulurken kullanılır.</p>
+                    <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10, marginBottom: 0 }}>* SGK işyeri bilgileri; MUHSGK dosyasının SGK bildirimi bölümünde kullanılır.</p>
+
+                    {MUHSGK_ALANLARI.map(g => (
+                      <div key={g.grup} style={{ marginTop: 16 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 8, paddingTop: 12, borderTop: '1px solid var(--border)' }}>{g.grup}</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 12 }}>
+                          {g.alanlar.map(([k, etiket, ipucu]) => (
+                            <div key={k}>
+                              <label htmlFor={`ay-mb-${k}`} className="form-label">{etiket}</label>
+                              <input id={`ay-mb-${k}`} className="form-input" placeholder={ipucu}
+                                value={form.muhsgk_bilgileri?.[k] ?? MUHSGK_VARSAYILAN[k] ?? ''}
+                                onChange={e => setForm(f => ({ ...f, muhsgk_bilgileri: { ...MUHSGK_VARSAYILAN, ...(f.muhsgk_bilgileri || {}), [k]: e.target.value.trim() } }))} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10, marginBottom: 0 }}>* Beyanname bilgileri Personel ve maaş › Beyanname ve SGK sayfasındaki MUHSGK XML dosyasına yazılır. Değişiklikler sayfanın Kaydet düğmesiyle kaydedilir.</p>
                   </details>
 
                   <div style={{ gridColumn: 'span 2' }}>

@@ -1,19 +1,30 @@
 'use client'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Calculator, FileText, TrendingUp, Landmark, FileDown, AlertTriangle, CheckCircle2, Download } from 'lucide-react'
+import Link from 'next/link'
+import { Calculator, FileText, TrendingUp, Landmark, FileDown, AlertTriangle, CheckCircle2, Download, Settings } from 'lucide-react'
 import StatCard from '@/components/StatCard'
-import { AYLAR } from '@/lib/hesaplama'
+import { AYLAR, fmtTL } from '@/lib/hesaplama'
 import { useAy } from '@/lib/AyContext'
 import { uyari } from '@/lib/diyalog'
-import type { Ayarlar, Bordro, Personel } from '@/lib/types'
+import type { Ayarlar } from '@/lib/types'
 import { useYukleme } from '@/lib/useYukleme'
 import { useAuth } from '@/lib/AuthContext'
-import { EKSIK_GUN_NEDENLERI, eksikGunAdi, eksikGunSayisi, primGunu } from '@/lib/sgkEksikGun'
+import { EKSIK_GUN_NEDENLERI, eksikGunAdi } from '@/lib/sgkEksikGun'
 import type { EksikGunKaydi } from '@/lib/sgkEksikGun'
+import { adSoyadAyir, latin5Kodla, muhsgkEksikleri, muhsgkOzet, muhsgkXml, muhtasaraGirer, sgkGunleri, MUHSGK_VARSAYILAN, type MuhsgkBilgileri, type MuhsgkSatir } from '@/lib/muhsgk'
+import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAc } from '@/lib/pdf'
 
 // Sorgu personel(*) ile birleştirir; her bordro satırının personeli vardır
-type MuhasebeSatir = Bordro & { personel: Personel }
+type MuhasebeSatir = MuhsgkSatir
+
+const girisAnahtari = (okulId: number | undefined, yil: number, ay: number) => `muhsgk_isegiris_${okulId ?? 0}_${yil}_${ay}`
+function yerelOku<T>(anahtar: string): T | null {
+  try { const v = localStorage.getItem(anahtar); return v ? JSON.parse(v) as T : null } catch { return null }
+}
+function yerelYaz(anahtar: string, deger: unknown) {
+  try { localStorage.setItem(anahtar, JSON.stringify(deger)) } catch { /* özel pencere */ }
+}
 
 export default function MuhasebePage() {
   const [, setLoading] = useState(false)
@@ -24,14 +35,45 @@ export default function MuhasebePage() {
   const { okul } = useAuth()
   // personel_id → seçilen eksik gün nedeni; tablo yoksa (migration çalıştırılmadı) null
   const [eksikler, setEksikler] = useState<Record<number, EksikGunKaydi> | null>({})
+  // personel_id → bu ay işe giriş günü (önceki ay bordrosu olmayan SGK'lılar için ilk puantaj gününden önerilir)
+  const [iseGiris, setIseGiris] = useState<Record<number, number | null>>({})
+  // Beyanname bilgileri Ayarlar › Kurum bilgileri › Gelişmiş bölümünde düzenlenir
+  const [bilgiler, setBilgiler] = useState<MuhsgkBilgileri>(MUHSGK_VARSAYILAN)
 
   const fetchData = async () => {
     setLoading(true)
-    const { data: ayar } = await supabase.from('ayarlar').select('*').single()
-    const { data: bordro } = await supabase.from('bordro').select('*, personel(*)').eq('yil', activeYear).eq('ay', activeMonth)
-    const { data: eg, error: egHata } = await supabase.from('sgk_eksik_gun').select('*').eq('yil', activeYear).eq('ay', activeMonth)
+    const oncekiAy = activeMonth === 1 ? 12 : activeMonth - 1
+    const oncekiYil = activeMonth === 1 ? activeYear - 1 : activeYear
+    const ayStr = String(activeMonth).padStart(2, '0')
+    const ayGun = new Date(activeYear, activeMonth, 0).getDate()
+    const [{ data: ayar }, { data: bordro }, { data: eg, error: egHata }, { data: onceki }, { data: puantaj }] = await Promise.all([
+      supabase.from('ayarlar').select('*').single(),
+      supabase.from('bordro').select('*, personel(*)').eq('yil', activeYear).eq('ay', activeMonth),
+      supabase.from('sgk_eksik_gun').select('*').eq('yil', activeYear).eq('ay', activeMonth),
+      supabase.from('bordro').select('personel_id').eq('yil', oncekiYil).eq('ay', oncekiAy),
+      supabase.from('puantaj').select('personel_id, tarih, saat').gte('tarih', `${activeYear}-${ayStr}-01`).lte('tarih', `${activeYear}-${ayStr}-${ayGun}`),
+    ])
     setEksikler(egHata ? null : Object.fromEntries((eg || []).map((k: EksikGunKaydi) => [k.personel_id, k])))
 
+    // İşe giriş önerisi: önceki ay bordrosu olmayan SGK'lı bu ay işe girmiş sayılır. Giriş günü kişinin ilk puantaj günü;
+    // puantajı olmayanlar (pay usulü ödenenler) için kulübün o ayki ilk çalışma günü. Tabloda değiştirilebilir.
+    const oncekiler = new Set((onceki || []).map((r: { personel_id: number }) => r.personel_id))
+    const ilkGun: Record<number, number> = {}
+    for (const p of (puantaj || []) as { personel_id: number; tarih: string; saat: number }[]) {
+      if (!(p.saat > 0)) continue
+      const g = Number(p.tarih.slice(8, 10))
+      if (!ilkGun[p.personel_id] || g < ilkGun[p.personel_id]) ilkGun[p.personel_id] = g
+    }
+    const kulupIlkGun = Object.values(ilkGun).length ? Math.min(...Object.values(ilkGun)) : null
+    const oneri: Record<number, number | null> = {}
+    for (const b of (bordro || []) as MuhasebeSatir[]) {
+      if (!b.personel?.sgk_li || oncekiler.has(b.personel_id)) continue
+      const g = ilkGun[b.personel_id] ?? kulupIlkGun
+      oneri[b.personel_id] = g && g > 1 ? g : null
+    }
+    setIseGiris({ ...oneri, ...(yerelOku<Record<number, number | null>>(girisAnahtari(okul?.id, activeYear, activeMonth)) || {}) })
+
+    setBilgiler({ ...MUHSGK_VARSAYILAN, ...(ayar?.muhsgk_bilgileri || {}) })
     setSettings(ayar)
     setPayrollData(bordro || [])
     setLoading(false)
@@ -51,6 +93,14 @@ export default function MuhasebePage() {
     if (error) setEksikler(e => ({ ...(e || {}), ...(onceki ? { [personelId]: onceki } : {}) }))
   }
 
+  function girisDegistir(personelId: number, deger: string) {
+    const ayGun = new Date(activeYear, activeMonth, 0).getDate()
+    const g = Math.trunc(Number(deger))
+    const yeni = { ...iseGiris, [personelId]: g >= 1 && g <= ayGun ? g : null }
+    setIseGiris(yeni)
+    yerelYaz(girisAnahtari(okul?.id, activeYear, activeMonth), yeni)
+  }
+
   // Hata Denetimi
   const hatalar = payrollData.filter(b => {
     const p = b.personel
@@ -58,200 +108,96 @@ export default function MuhasebePage() {
     return !p.tc || p.tc.length !== 11 || (p.sgk_li && !p.meslek_kodu) || !p.iban || p.iban.length < 10
   })
 
-  const generateBankList = () => {
-    if (payrollData.length === 0) return uyari('Ödeme verisi bulunamadı!')
-    
-    // Excel'in Türkçe karakterleri tanıması için BOM ekliyoruz
-    let csv = '\uFEFFAd Soyad;IBAN;Net Odenecek;TC Kimlik No\n'
-    
-    payrollData.forEach(b => {
-      const net = b.net || 0
-      const ad = (b.personel?.ad || 'BILSIZ').toUpperCase()
-      const iban = b.personel?.iban || ''
-      const tc = b.personel?.tc || ''
-      
-      csv += `${ad};${iban};${net.toFixed(2).replace('.', ',')};${tc}\n`
-    })
+  const generateBankList = async () => {
+    const liste = payrollData.filter(b => (b.net || 0) > 0).sort((a, b) => (a.personel?.ad || '').localeCompare(b.personel?.ad || '', 'tr'))
+    if (liste.length === 0) return uyari('Ödeme verisi bulunamadı!')
+    const ibanBicim = (iban?: string) => (iban || '').replace(/\s+/g, '').toUpperCase().replace(/(.{4})/g, '$1 ').trim()
+    const toplam = liste.reduce((s, b) => s + (b.net || 0), 0)
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `Banka_Odeme_Listesi_${activeYear}_${activeMonth}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    const { pdf, autoTable } = await pdfHazirla('portrait')
+    const y = pdfBaslik(pdf, {
+      kurum: settings?.kurum_adi, baslik: 'Banka Ödeme Listesi',
+      alt: `${AYLAR[activeMonth]} ${activeYear} dönemi ücret ödemeleri · ${liste.length} kişi`,
+    })
+    autoTable(pdf, pdfTablo({
+      startY: y,
+      head: [['Sıra', 'Adı Soyadı', 'T.C. Kimlik No', 'IBAN', 'Net Ödenecek (₺)']],
+      body: liste.map((b, i) => [String(i + 1), (b.personel?.ad || '').toLocaleUpperCase('tr-TR'), b.personel?.tc || '', ibanBicim(b.personel?.iban) || '— IBAN eksik —', fmtTL(b.net)]),
+      foot: [[{ content: 'TOPLAM', colSpan: 4, styles: { halign: 'right' } }, { content: fmtTL(toplam), styles: { halign: 'right' } }]],
+      styles: { fontSize: 8.5, cellPadding: 1.8 },
+      columnStyles: { 0: { halign: 'center', cellWidth: 12 }, 2: { halign: 'center', cellWidth: 28 }, 3: { cellWidth: 64 }, 4: { halign: 'right', cellWidth: 32 } },
+    }))
+    pdfImza(pdf, settings, pdfSonY(pdf))
+    pdfAc(pdf, 'Banka ödeme listesi')
   }
 
-  const matrahlar = (() => {
-    const summary = [
-      { kod: '011', label: '011 (Asgari Ücretli - Hizmet)', gayrisafi: 0, kesinti: 0 },
-      { kod: '012', label: '012 (Diğer Ücretli - Öğretmen)', gayrisafi: 0, kesinti: 0 },
-      { kod: '018', label: '018 (Ek Ders / Huzur Hakkı)', gayrisafi: 0, kesinti: 0 },
-      { kod: '302', label: '302 (Damga Vergisi - Toplam)', gayrisafi: 0, kesinti: 0 }
-    ]
+  const ozet = muhsgkOzet(payrollData)
+  const matrahlar = [
+    { kod: '012', label: '012 (Ücret — SGK\'lı personel)', gayrisafi: ozet.ucretSgk.gayrisafi, kesinti: ozet.ucretSgk.kesinti },
+    { kod: '018', label: '018 (Ücret — SGK\'sız / kadrolu)', gayrisafi: ozet.ucretDiger.gayrisafi, kesinti: ozet.ucretDiger.kesinti },
+    { kod: '302', label: '302 (Damga Vergisi — Toplam)', gayrisafi: ozet.damga.gayrisafi, kesinti: ozet.damga.kesinti },
+  ]
 
-    payrollData.forEach(b => {
-      const g = (b.personel?.gorev || '').toLowerCase()
-      const isAdmin = g.includes('başkan') || g.includes('muhasebe') || g.includes('denetim') || g.includes('müdür')
-      const isTeacher = g.includes('öğretmen') || g.includes('usta') || g.includes('koordinatör')
-      
-      if (b.personel?.personel_turu === 'kadrolu' || isAdmin) {
-        summary[2].gayrisafi += (b.brut || 0)
-        summary[2].kesinti += (b.gv_tutar || 0)
-      } else if (isTeacher) {
-        summary[1].gayrisafi += (b.brut || 0)
-        summary[1].kesinti += (b.gv_tutar || 0)
-      } else {
-        summary[0].gayrisafi += (b.brut || 0)
-        summary[0].kesinti += (b.gv_tutar || 0)
-      }
+  const totalBrut = ozet.damga.gayrisafi
+  const totalNet = payrollData.filter(muhtasaraGirer).reduce((sum: number, b) => sum + (b.net || 0), 0)
+  const totalGV = ozet.ucretSgk.kesinti + ozet.ucretDiger.kesinti
+  const totalDV = ozet.damga.kesinti
 
-      summary[3].gayrisafi += (b.brut || 0)
-      summary[3].kesinti += (b.damga_tutar || 0)
-    })
-
-    return summary
-  })()
-
-  const totalBrut = payrollData.reduce((sum: number, b) => sum + (b.brut || 0), 0)
-  const totalNet = payrollData.reduce((sum: number, b) => sum + (b.net || 0), 0)
-  const totalGV = matrahlar.filter(m => m.kod !== '302').reduce((sum: number, m) => sum + m.kesinti, 0)
-  const totalDV = matrahlar.find(m => m.kod === '302')?.kesinti || 0
+  const xmlGirdi = settings ? {
+    ayarlar: settings, bilgiler, satirlar: payrollData, yil: activeYear, ay: activeMonth, iseGiris,
+    eksikNedenleri: Object.fromEntries(Object.entries(eksikler || {}).map(([k, v]) => [k, v.kod])),
+  } : null
 
   const generateXML = () => {
-    if (!settings) return uyari('Ayarlar yüklenemedi!')
-    
-    const xml = `<?xml version="1.0" encoding="ISO-8859-9"?>
-<beyanname kod="MUHSGK" versiyon="21">
-  <genelBilgiler>
-    <vergiDairesiKodu>${settings.vergi_dairesi_kodu || '045260'}</vergiDairesiKodu>
-    <donemTip>Aylık</donemTip>
-    <yil>${activeYear}</yil>
-    <ay>${String(activeMonth).padStart(2, '0')}</ay>
-    <mukellef>
-      <vkn>${settings.vergi_no || ''}</vkn>
-      <unvan>${settings.kurum_adi || ''}</unvan>
-    </mukellef>
-  </genelBilgiler>
-  <muhSGK>
-    <matrahVeVergiBildirimi>
-      ${matrahlar.filter((m) => m.gayrisafi > 0).map((m) => `
-      <tevkifatSatiri>
-        <turKod>${m.kod}</turKod>
-        <gayrisafiTutar>${m.gayrisafi.toFixed(2)}</gayrisafiTutar>
-        <vergiKesintiTutari>${m.kesinti.toFixed(2)}</vergiKesintiTutari>
-      </tevkifatSatiri>`).join('')}
-    </matrahVeVergiBildirimi>
-    <vergiBildirimi>
-      <tahakkukEdenVergiler>
-        <vergiKodu>0003</vergiKodu>
-        <vergiTutari>${totalGV.toFixed(2)}</vergiTutari>
-      </tahakkukEdenVergiler>
-      <tahakkukEdenVergiler>
-        <vergiKodu>1046</vergiKodu>
-        <vergiTutari>${totalDV.toFixed(2)}</vergiTutari>
-      </tahakkukEdenVergiler>
-      <tahakkukEdenVergiler>
-        <vergiKodu>1048</vergiKodu>
-        <vergiTutari>${(settings?.beyanname_damga_vergisi || 939.70).toFixed(2)}</vergiTutari>
-      </tahakkukEdenVergiler>
-    </vergiBildirimi>
-    <sgkBilgileri>
-      ${payrollData.filter((b) => b.personel?.sgk_li).map((b) => `
-      <sigortaliCalisanBilgileri>
-        <tcKimlikNo>${b.personel.tc || ''}</tcKimlikNo>
-        <ad>${b.personel.ad.split(' ')[0]?.toUpperCase() || ''}</ad>
-        <soyad>${b.personel.ad.split(' ').slice(1).join(' ')?.toUpperCase() || ''}</soyad>
-        <primOdemeGunu>${Math.min(30, Math.round(b.toplam_saat / 7.5)) || 1}</primOdemeGunu>
-        <hakEdilenUcret>${b.brut.toFixed(2)}</hakEdilenUcret>
-        <meslekKodu>${b.personel.meslek_kodu || ''}</meslekKodu>
-      </sigortaliCalisanBilgileri>`).join('')}
-    </sgkBilgileri>
-  </muhSGK>
-  <duzenleyenBilgileri>
-    <tcKimlikNo>${settings.vergi_no || ''}</tcKimlikNo>
-    <ad>${settings.mudur_adi?.split(' ')[0]?.toUpperCase() || ''}</ad>
-    <soyad>${settings.mudur_adi?.split(' ').slice(1).join(' ')?.toUpperCase() || ''}</soyad>
-  </duzenleyenBilgileri>
-</beyanname>`
-
-    const blob = new Blob([xml], { type: 'text/xml' })
+    if (!xmlGirdi || !settings) return uyari('Ayarlar yüklenemedi!')
+    if (!payrollData.some(muhtasaraGirer)) return uyari(`${AYLAR[activeMonth]} ${activeYear} için bordro bulunamadı. Önce bordroyu oluşturun.`)
+    const eksik = muhsgkEksikleri(xmlGirdi)
+    if (eksik.length) {
+      const ayarda = eksik.some(e => e.startsWith('Vergi dairesi') || e.includes('ayarlarda'))
+      return uyari(`MUHSGK XML oluşturulamadı:\n• ${eksik.join('\n• ')}${ayarda ? '\n\nKurum ve beyanname bilgileri: Ayarlar › Kurum bilgileri › Gelişmiş: e-Beyanname (MUHSGK) ve SGK parametreleri.' : ''}`)
+    }
+    const bytes = latin5Kodla(muhsgkXml(xmlGirdi))
+    const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'text/xml;charset=ISO-8859-9' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
+    const son = new Date(activeYear, activeMonth, 0).getDate()
+    const donem = `${String(activeMonth).padStart(2, '0')}${activeYear}`
     a.href = url
-    a.download = `MUHSGK_${settings.vergi_no}_${activeYear}_${activeMonth}.xml`
+    a.download = `${bilgiler.vd_kodu}_${settings.vergi_no}_MUHSGK_21_01${donem}_${son}${donem}.xml`
     a.click()
     URL.revokeObjectURL(url)
   }
 
-  const generateSGKXML = () => {
-    if (!settings) return uyari('Ayarlar yüklenemedi!')
-    if (!settings.sgk_sicil_no) return uyari('SGK Sicil No ayarlar sayfasında tanımlanmamış!')
-
-    const filteredEmployees = payrollData.filter((b) => b.personel?.sgk_li)
-    const nedensiz = filteredEmployees.filter(b => eksikGunSayisi(primGunu(b.toplam_saat)) > 0 && !eksikler?.[b.personel_id]?.kod)
-    if (nedensiz.length) return uyari(`Eksik günü olan personel için SGK eksik gün nedeni seçilmemiş: ${nedensiz.map(b => b.personel.ad).join(', ')}. Aşağıdaki bildirge taslağından nedeni seçin.`)
-
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<AYLIKBILDIRGELER>
-  <ISYERI ISYERISICIL="${settings.sgk_sicil_no}" KONTROLNO="${settings.sgk_kontrol_no || '00'}" ISYERIARACINO="${settings.sgk_araci_no || '000'}" ISYERIUNVAN="${(settings.kurum_adi || '').toUpperCase()}" ISYERIADRES="${(settings.adres || '').toUpperCase()}" ISYERIVERGINO="${settings.vergi_no}" />
-  <BORDRO DONEMAY="${activeMonth}" DONEMYIL="${activeYear}" BELGEMAHIYET="A" />
-  <BILDIRGELER BELGETURU="${settings.sgk_belge_turu || '01'}" KANUN="${settings.sgk_kanun_no || '05510'}">
-    <SIGORTALILAR>
-      ${filteredEmployees.map((b, index: number) => {
-        const ad = (b.personel.ad.split(' ')[0] || '').toUpperCase()
-        const soyad = (b.personel.ad.split(' ').slice(1).join(' ') || '').toUpperCase()
-        const gun = primGunu(b.toplam_saat)
-        const g = (b.personel.gorev || '').toLowerCase()
-        const is011 = g.includes('temizlik') || g.includes('hizmet') || g.includes('büro') || g.includes('bakım') || g.includes('memur')
-        
-        let ucret = b.brut
-        let ikramiye = 0
-        if (is011 && settings?.asgari_ucret) {
-          const gunlukAsgari = settings.asgari_ucret / 30
-          ucret = Math.min(b.brut, gunlukAsgari * gun)
-          ikramiye = Math.max(0, b.brut - ucret)
-        }
-        
-        const eksikGun = eksikGunSayisi(gun)
-        return `<SIGORTALI SIRA="${index + 1}" TCKNO="${b.personel.tc}" AD="${ad}" SOYAD="${soyad}" PEK="${b.brut.toFixed(2)}" PRIM_IKRAMIYE="${ikramiye.toFixed(2)}" GUN="${gun}" EKSIKGUNSAYISI="${eksikGun > 0 ? eksikGun : ''}" EKSIKGUNNEDENI="${eksikGun > 0 ? eksikler?.[b.personel_id]?.kod ?? '' : ''}" MESLEKKOD="${b.personel.meslek_kodu || ''}" />`
-      }).join('\n      ')}
-    </SIGORTALILAR>
-  </BILDIRGELER>
-</AYLIKBILDIRGELER>`
-
-    const blob = new Blob([xml], { type: 'text/xml' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `SGK_APHB_${activeYear}_${activeMonth}.xml`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+  const sgkSatirlari = payrollData.filter(b => muhtasaraGirer(b) && b.personel.sgk_li)
 
   return (
     <div style={{ paddingBottom: 40 }}>
       <div style={{ padding: '24px' }}>
         <div className="card" style={{ marginBottom: 24, padding: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div>
               <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>e-Beyanname ve Bildirge Yönetimi</h3>
-              <p style={{ fontSize: 13, color: 'var(--text2)', margin: 0 }}>GİB ve SGK standartlarında resmi XML paketleri oluşturun.</p>
+              <p style={{ fontSize: 13, color: 'var(--text2)', margin: 0 }}>Muhtasar ve prim hizmet beyannamesi (MUHSGK) tek XML dosyasında: GİB e-Beyanname&apos;ye yüklenir.</p>
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', marginBottom: 8 }}>Aktif Dönem: {AYLAR[activeMonth]} {activeYear}</div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 <button className="btn btn-secondary" onClick={generateBankList} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Download size={18} /> Banka Listesi
+                  <Download size={18} /> Banka Listesi (PDF)
                 </button>
                 <button className="btn btn-primary" onClick={generateXML} style={{ background: '#16a34a', borderColor: '#16a34a', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <FileDown size={18} /> MUHSGK XML
-                </button>
-                <button className="btn btn-primary" onClick={generateSGKXML} style={{ background: '#d97706', borderColor: '#d97706', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <FileDown size={18} /> SGK XML
+                  <FileDown size={18} /> MUHSGK XML (Muhtasar + SGK)
                 </button>
               </div>
             </div>
+          </div>
+
+          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12.5, color: bilgiler.vd_kodu ? 'var(--text2)' : 'var(--danger)', fontWeight: bilgiler.vd_kodu ? 400 : 600 }}>
+            <Settings size={14} />
+            {bilgiler.vd_kodu
+              ? <span>Beyanname bilgileri Ayarlar&apos;da: vergi dairesi {bilgiler.vd_kodu}{bilgiler.duzenleyen_vkn ? ` · düzenleyen ${[bilgiler.duzenleyen_ad, bilgiler.duzenleyen_soyad].filter(Boolean).join(' ') || bilgiler.duzenleyen_vkn}` : ' · kurum kendisi verir'}</span>
+              : <span>Vergi dairesi kodu girilmemiş; MUHSGK XML oluşturulamaz.</span>}
+            <Link href="/ayarlar#beyanname" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>{bilgiler.vd_kodu ? 'Düzenle →' : 'Ayarlar’dan girin →'}</Link>
           </div>
         </div>
 
@@ -285,16 +231,17 @@ export default function MuhasebePage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20, marginBottom: 32 }}>
           <StatCard title="Toplam Brüt (Matrah)" value={`₺${totalBrut.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`} icon={<TrendingUp size={20} />} color="var(--accent)" />
           <StatCard title="Ödenecek Net Maaş" value={`₺${totalNet.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`} icon={<Landmark size={20} />} color="#0284c7" />
-          <StatCard title="Gelir Vergisi (0003)" value={`₺${totalGV.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`} icon={<Calculator size={20} />} color="#ef4444" />
-          <StatCard title="Damga Vergisi (1046)" value={`₺${totalDV.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`} icon={<FileText size={20} />} color="#10b981" />
+          <StatCard title="Gelir Vergisi" value={`₺${totalGV.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`} icon={<Calculator size={20} />} color="#ef4444" />
+          <StatCard title="Damga Vergisi" value={`₺${totalDV.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`} icon={<FileText size={20} />} color="#10b981" />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
           <div className="card" style={{ padding: 0, border: '1px solid var(--accent)' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--th-border)', background: 'var(--th-bg)', color: 'var(--th-fg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Beyanname Matrah Bildirimi</h3>
+              <span style={{ fontSize: 12 }}>{ozet.toplamCalisan} çalışan · {ozet.sgkMuaf} SGK muaf</span>
             </div>
-            <div style={{ padding: '24px' }}>
+            <div style={{ padding: '24px', overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border)', background: 'var(--bg2)' }}>
@@ -313,52 +260,53 @@ export default function MuhasebePage() {
                   ))}
                 </tbody>
               </table>
+              <p style={{ margin: '10px 0 0', fontSize: 11.5, color: 'var(--text3)' }}>Denetim payı kuruma ödendiği için beyannameye girmez. Asgari ücret istisnası: GV ₺{ozet.gvIstisna.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} · DV ₺{ozet.dvIstisna.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
             </div>
           </div>
 
           <div className="card" style={{ padding: 0, border: '1px solid #d97706' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #d97706', background: '#d97706', color: '#fff' }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>SGK e-Bildirge Taslağı (APHB)</h3>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>SGK Bildirimi (MUHSGK içinde)</h3>
             </div>
             {eksikler === null ? (
               <div className="alert alert-warn" style={{ margin: 16 }}>Eksik gün nedenleri kaydedilemiyor: veritabanında <strong>sgk_eksik_gun</strong> tablosu yok. supabase/migration_sgk_eksik_gun.sql dosyasını Supabase SQL Editor&apos;da çalıştırın.</div>
             ) : (
-              <p style={{ margin: 0, padding: '10px 16px', fontSize: 12, color: 'var(--text2)', borderBottom: '1px solid var(--border)' }}>SGK ayı 30 gün sayar. 30 günden az bildirilen her personel için eksik gün nedenini seçin ve kısaca açıklayın; seçim olmadan SGK XML oluşturulmaz.</p>
+              <p style={{ margin: 0, padding: '10px 16px', fontSize: 12, color: 'var(--text2)', borderBottom: '1px solid var(--border)' }}>SGK ayı 30 gün sayar; personel ay içinde işe girdiyse ay giriş gününden başlar. Önceki ay bordrosu olmayanlar için giriş günü ilk puantaj gününden önerilir, gerekirse düzeltin ya da silin. Eksik günü olan herkes için neden seçilmeden XML oluşturulmaz.</p>
             )}
-            <div style={{ padding: 0 }}>
+            <div style={{ padding: 0, overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)', background: 'var(--bg2)' }}>
                     <th style={{ padding: '12px 16px' }}>Sno</th>
                     <th style={{ padding: '12px 16px' }}>TC Kimlik</th>
-                    <th style={{ padding: '12px 16px' }}>Ad Soyad</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>PEK (TL)</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>İkramiye</th>
+                    <th style={{ padding: '12px 16px' }}>Ad / Soyad</th>
+                    <th style={{ padding: '12px 16px' }}>Belge</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Hak edilen ücret</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>İşe giriş günü</th>
                     <th style={{ padding: '12px 16px', textAlign: 'center' }}>Gün</th>
                     <th style={{ padding: '12px 16px', textAlign: 'center' }}>Eksik</th>
-                    <th style={{ padding: '12px 16px', minWidth: 300 }}>Eksik gün nedeni</th>
+                    <th style={{ padding: '12px 16px', minWidth: 280 }}>Eksik gün nedeni</th>
                     <th style={{ padding: '12px 16px' }}>Meslek</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {payrollData.filter(b => b.personel?.sgk_li).map((b, idx) => {
-                    const gun = primGunu(b.toplam_saat)
-                    const eksik = eksikGunSayisi(gun)
+                  {sgkSatirlari.map((b, idx) => {
+                    const giris = iseGiris[b.personel_id] ?? null
+                    const { gun, eksik } = sgkGunleri(b.toplam_saat, giris, activeYear, activeMonth)
                     const secim = eksikler?.[b.personel_id]
-                    const g = (b.personel.gorev || '').toLowerCase()
-                    const is011 = g.includes('temizlik') || g.includes('hizmet') || g.includes('büro') || g.includes('bakım') || g.includes('memur')
-                    let u = b.brut, i = 0
-                    if (is011 && settings?.asgari_ucret) {
-                      u = Math.min(b.brut, ((settings?.asgari_ucret ?? 0) / 30) * gun)
-                      i = Math.max(0, b.brut - u)
-                    }
+                    const { ad, soyad } = adSoyadAyir(b.personel.ad)
                     return (
-                      <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <tr key={b.id} style={{ borderBottom: '1px solid var(--border)' }}>
                         <td style={{ padding: '10px 16px' }}>{idx + 1}</td>
                         <td style={{ padding: '10px 16px' }}>{b.personel.tc}</td>
-                        <td style={{ padding: '10px 16px', fontWeight: 600 }}>{b.personel.ad.toUpperCase()}</td>
-                        <td style={{ padding: '10px 16px', textAlign: 'right' }}>₺{u.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
-                        <td style={{ padding: '10px 16px', textAlign: 'right' }}>₺{i.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+                        <td style={{ padding: '10px 16px' }}><strong>{ad}</strong> <span style={{ color: 'var(--text2)' }}>{soyad}</span></td>
+                        <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>{b.personel.is_retired ? '02 (emekli)' : settings?.sgk_belge_turu || '01'}</td>
+                        <td style={{ padding: '10px 16px', textAlign: 'right' }}>₺{b.brut.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+                        <td style={{ padding: '6px 16px', textAlign: 'center' }}>
+                          <input type="number" min={1} max={31} className="form-input" aria-label={`${b.personel.ad} işe giriş günü`} placeholder="—"
+                            style={{ width: 64, minHeight: 30, fontSize: 12, textAlign: 'center' }}
+                            value={giris ?? ''} onChange={e => girisDegistir(b.personel_id, e.target.value)} />
+                        </td>
                         <td style={{ padding: '10px 16px', textAlign: 'center' }}>{gun}</td>
                         <td style={{ padding: '10px 16px', textAlign: 'center' }}>{eksik > 0 ? eksik : ''}</td>
                         <td style={{ padding: '6px 16px' }}>

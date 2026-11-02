@@ -123,7 +123,7 @@ export default function GelirGiderPage() {
   return (
     <div>
       <Topbar
-        title="Gelir / Gider Özet"
+        title="Gelir / Gider"
         sub="Mali özet ve tahakkuk dağılımı"
         actions={
           <button 

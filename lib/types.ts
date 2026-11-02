@@ -60,6 +60,7 @@ export interface Ayarlar {
   email: string
   vergi_dairesi: string
   vergi_dairesi_kodu?: string      // Muhtasar beyanname XML'i
+  muhsgk_bilgileri?: import('./muhsgk').MuhsgkBilgileri | null // migration_muhsgk_bilgileri.sql
   beyanname_damga_vergisi?: number // Beyanname damga vergisi tutarı
   vergi_no: string
   sgk_no: string
@@ -132,6 +133,7 @@ export interface Ogrenci {
   anne_adi?: string
   anne_tel?: string
   veli_ad?: string          // Yeni alan
+  veli_eposta?: string | null // migration_ogrenci_veli_eposta.sql — döküm e-postası
   ucretsiz_mi: boolean
   ucretsiz_nedeni?: string
   gunluk_saat?: number      // Bireysel saat kısıtı

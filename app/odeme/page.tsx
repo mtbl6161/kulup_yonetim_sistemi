@@ -434,7 +434,7 @@ export default function OdemePage() {
   return (
     <div>
       <Topbar
-        title="Ödeme Takibi"
+        title="Aidat Takibi"
         sub={`${ayLabel(ay, yil)} — Aylık tahsilat`}
         actions={
           <>

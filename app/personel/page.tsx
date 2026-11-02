@@ -132,14 +132,14 @@ function PersonelIc() {
 
   return (
     <div>
-      <Topbar title="Personel Listesi" sub="Çalışan yönetimi" actions={<button className="btn btn-secondary btn-sm" onClick={excelAktar} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileSpreadsheet size={15} /> Excel</button>} />
+      <Topbar title="Personeller" sub="Çalışan yönetimi" actions={<button className="btn btn-secondary btn-sm" onClick={excelAktar} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileSpreadsheet size={15} /> Excel</button>} />
       <div style={{ padding: 20 }}>
         {msg && <div className={`alert ${msg.startsWith('✅') ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: 20 }}>{msg}</div>}
 
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div className="card-title" style={{ marginBottom: 0 }}>
-              Personel Listesi ({loading ? '...' : sorted.length})
+              Personeller ({loading ? '...' : sorted.length})
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <select

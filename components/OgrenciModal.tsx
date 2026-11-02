@@ -19,7 +19,7 @@ interface Props {
 
 const EMPTY: Partial<Ogrenci> = {
   ad: '', soyad: '', tc: '', sinif: '', ogretmen: '',
-  kardes_indirimi: undefined, anne_adi: '', anne_tel: '',
+  kardes_indirimi: undefined, anne_adi: '', anne_tel: '', veli_eposta: '',
   ucretsiz_mi: false, ucretsiz_nedeni: '', aktif: true,
   gunluk_saat: undefined
 }
@@ -40,6 +40,8 @@ export default function OgrenciModal({ editItem, ayarlar, profilOkulId, siniflar
     if (!form.ad?.trim() || !form.soyad?.trim()) { setMsg('❌ Ad ve soyad zorunlu!'); return }
     if (!form.sinif) { setMsg('❌ Sınıf seçimi zorunlu!'); return }
     if (form.kardes_indirimi === undefined || form.kardes_indirimi === null) { setMsg('❌ Kardeş İndirimi seçimi zorunlu!'); return }
+    const veliEposta = (form.veli_eposta || '').trim().toLocaleLowerCase('en')
+    if (veliEposta && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(veliEposta)) { setMsg('❌ Veli e-posta adresi geçersiz.'); return }
 
     const okulId = profilOkulId ?? ayarlar?.okul_id
     if (!okulId) { setMsg('❌ Okul bilgisi bulunamadı.'); return }
@@ -52,6 +54,7 @@ export default function OgrenciModal({ editItem, ayarlar, profilOkulId, siniflar
       ad: form.ad!.trim().toUpperCase(),
       soyad: form.soyad!.trim().toUpperCase(),
       ogretmen: form.ogretmen || '',
+      veli_eposta: veliEposta || null,
       okul_id: okulId
     }
 
@@ -184,6 +187,13 @@ export default function OgrenciModal({ editItem, ayarlar, profilOkulId, siniflar
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Anne Telefon</label>
               <input className="form-input" style={{ width: '100%' }} value={form.anne_tel || ''} onChange={e => setF('anne_tel', e.target.value)} />
             </div>
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <label htmlFor="ogr-veli-eposta" className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Veli E-posta</label>
+            <input id="ogr-veli-eposta" type="email" className="form-input" style={{ width: '100%' }} placeholder="ornek@gmail.com" autoComplete="off"
+              value={form.veli_eposta || ''} onChange={e => setF('veli_eposta', e.target.value)} />
+            <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 4 }}>Ödeme dökümü bu adrese gönderilir.</div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>

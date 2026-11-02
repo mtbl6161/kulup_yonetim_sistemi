@@ -5,13 +5,30 @@ import { IsletmeHareket, IsletmeTur } from '@/lib/types'
 
 export const bugunISO = () => new Date().toISOString().split('T')[0]
 
-export type OdemeTipi = 'kulup' | 'kirtasiye'
 export interface ParsedRow {
   tarih: string; tutar: number; tur: IsletmeTur; aciklama: string; belge: string; gecerli: boolean
-  odemeTipi: OdemeTipi | null
+  /** Ödemenin işleneceği yer: 'kulup' (Ödeme Takibi) ya da `k<kategori id>` (Tahsilat Takip) */
+  hedef: string | null
   ogrenciId: number | null
-  ayIpucu: number | null
+  /** Aylık hedefte ödenen ay */
+  ay: number | null
   isaretle: boolean
+  /** Otomatik işaretlenemediyse nedeni */
+  uyari: string | null
+  tutaraGore: boolean
+  /** İade / devir gibi öğrenci ödemesi olmayan giriş */
+  odemeDegil: boolean
+}
+
+/** İçe aktarma sonrası Tahsilat Takip'e işlenemeyen, elle işaretlenmesi gereken satırlar */
+export interface ImportSonuc {
+  hareket: number
+  mukerrer: number
+  isaretlenen: number
+  tarihiGuncellenen: number
+  zatenVardi: number
+  hata: number
+  elle: { tarih: string; aciklama: string; tutar: number; neden: string }[]
 }
 
 // Türk formatındaki tutarı sayıya çevir ("1.234,56" -> 1234.56). İşaret ayrı ele alınır.

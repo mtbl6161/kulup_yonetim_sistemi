@@ -641,7 +641,7 @@ export default function DashboardPage() {
                 <h3 style={panelTitle}>Ödemesi geciken öğrenciler</h3>
                 {borcluSayisi > 0 && <span className="tabular" style={chipStyle(false)}>{borcluSayisi} öğrenci · {tlTam(toplamBorc)}</span>}
               </div>
-              <Link href="/odeme" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>Ödeme Takibi →</Link>
+              <Link href="/odeme" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>Aidat Takibi →</Link>
             </div>
             {borcluSayisi === 0 ? (
               <div style={{ padding: '28px 20px', textAlign: 'center', color: 'var(--text3)' }}>
