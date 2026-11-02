@@ -55,20 +55,60 @@ describe('ogrenciEslestir', () => {
   })
 })
 
+const k = (x: TahsilatKategori) => `k${x.id}`
+const tek = (t: ReturnType<typeof tahmin>) => t.parcalar.length === 1 ? t.parcalar[0] : null
+
 describe('odemeTahminEt', () => {
   it('ödeme türünü açıklamadan bulur ve otomatik işaretler', () => {
-    expect(tahmin("HALİL 'DAN Hafsa can kırtasiye , Akbank", 6500)).toMatchObject({ ogrenciId: hafsa.id, hedef: `k${kirtasiye.id}`, isaretle: true, tutaraGore: false })
-    expect(tahmin("NUR 'DAN Miray BİR Eylül ayı ücreti , Akbank", 3250)).toMatchObject({ hedef: `k${ogleci.id}`, ay: 9, isaretle: true })
-    expect(tahmin("X 'DAN Muhammed Ilgaz KIROĞLU 1B ÖĞLECİ GRUP KIRTASİYE ÜCRETİ", 4000).hedef).toBe(`k${kirtasiye.id}`)
+    const t = tahmin("HALİL 'DAN Hafsa can kırtasiye , Akbank", 6500)
+    expect(t).toMatchObject({ isaretle: true, tutaraGore: false })
+    expect(tek(t)).toMatchObject({ ogrenciId: hafsa.id, hedef: k(kirtasiye), tutar: 6500 })
+    expect(tek(tahmin("NUR 'DAN Miray BİR Eylül ayı ücreti , Akbank", 3250))).toMatchObject({ hedef: k(ogleci), ay: 9 })
+    // "öğleci" öğrencinin grubunu anlatır; ödeme kırtasiyedir
+    expect(tek(tahmin("X 'DAN Muhammed Ilgaz KIROĞLU 1B ÖĞLECİ GRUP KIRTASİYE ÜCRETİ", 4000))?.hedef).toBe(k(kirtasiye))
   })
   it('açıklamada tür yoksa tek uyan tutara göre seçer', () => {
-    expect(tahmin("MUAMMER GÜREL 'DAN Remzi GÜREL , Yapı ve Kredi", 2600)).toMatchObject({ hedef: `k${sabahci.id}`, tutaraGore: true, isaretle: true })
-    expect(tahmin("BİLAL CAN 'DAN 52300406426 Hafsa can , Yapı ve Kredi", 6000)).toMatchObject({ hedef: `k${personel.id}`, isaretle: true })
+    expect(tahmin("MUAMMER GÜREL 'DAN Remzi GÜREL , Yapı ve Kredi", 2600)).toMatchObject({ parcalar: [{ hedef: k(sabahci) }], tutaraGore: true, isaretle: true })
+    expect(tahmin("BİLAL CAN 'DAN 52300406426 Hafsa can , Yapı ve Kredi", 6000)).toMatchObject({ parcalar: [{ hedef: k(personel) }], isaretle: true })
+  })
+  it('birleşik ödemeyi kalemlerine böler', () => {
+    // Açıklamada iki kalem: ücretler toplamı tutara eşit
+    expect(tahmin("ALİ 'DAN Hafsa Can personel ve kırtasiye ücreti", 12500)).toMatchObject({
+      isaretle: true, parcalar: [{ ogrenciId: hafsa.id, hedef: k(kirtasiye), tutar: 6500 }, { ogrenciId: hafsa.id, hedef: k(personel), tutar: 6000 }],
+    })
+    // Açıklamada tür yok, tutar iki kalemin toplamı
+    const t = tahmin("ALİ OSMAN 'DAN hafsa can , İş Bankası", 12500)
+    expect(t).toMatchObject({ isaretle: true, tutaraGore: true })
+    expect(t.parcalar.map(p => p.hedef).sort()).toEqual([k(kirtasiye), k(personel)].sort())
+  })
+  it('kardeş ödemesini her kardeşe böler', () => {
+    const t = tahmin("ERKAN 'DAN İpek Aydemir ve Deniz Aydemir , Yapı", 8000)
+    expect(t).toMatchObject({ isaretle: true, tutaraGore: true })
+    expect(t.parcalar).toHaveLength(2)
+    expect(t.parcalar.every(p => p.hedef === k(kirtasiye) && p.tutar === 4000)).toBe(true)
+    // Ücretler toplamı tutarı aşıyorsa kimseye 0 yazılmaz, eşit bölünüp kontrol istenir
+    const kismi = tahmin("ŞENER 'DAN İpek Aydemir Deniz Aydemir kırtasiye", 4000)
+    expect(kismi.isaretle).toBe(false)
+    expect(kismi.parcalar.map(p => p.tutar)).toEqual([2000, 2000])
+  })
+  it('kısmi ödemeyi ve taksiti tanır', () => {
+    // Anılan kalemin ücretinden az: o kalemin kısmi ödemesi (birleşik sayılmaz)
+    expect(tahmin("PEMBE 'DAN Aybüke Karan 3 yaş kırtasiye 1/2 ödemesi , Vakıf", 3250)).toMatchObject({ isaretle: true, parcalar: [{ ogrenciId: karan.id, hedef: k(kirtasiye), tutar: 3250 }] })
+    // Açıklamasız yarım ödeme: öneri, işaretleme yok
+    expect(tahmin("KASIM 'DAN Devrim Durmaz , Yapı", 2000)).toMatchObject({ isaretle: false, parcalar: [{ hedef: k(kirtasiye), tutar: 2000 }] })
+    // Öğrencinin taksit planı varsa taksit tutarıyla eşleşir
+    const planli = hedefleriHazirla([kirtasiye, personel], [], { dahil: false }, [{ kategori_id: kirtasiye.id, ogrenci_id: durmaz.id, tutarlar: [1000, 1000, 2000] }])
+    expect(odemeTahminEt("KASIM 'DAN Devrim Durmaz , Yapı", 1000, '2026-10-01', ogrenciler, planli)).toMatchObject({ isaretle: true, tutaraGore: true, parcalar: [{ hedef: k(kirtasiye), tutar: 1000 }] })
+  })
+  it('yalnız veli adından bulunan ve aynı soyadlı birden fazla öğrenci varsa seçmez', () => {
+    const t = tahmin("HALİME KIROĞLU 'DAN GELEN FAST ODEMESİ , Akbank", 2000)
+    expect(t.isaretle).toBe(false)
+    expect(t.uyari).toContain('Velinin öğrencisi belirsiz')
+    expect(t.uyari).toContain('ILGAZ')
+    expect(t.parcalar[0]?.ogrenciId ?? null).toBeNull()
   })
   it('belirsiz satırları işaretlemez, nedenini söyler', () => {
-    expect(tahmin("ERKAN 'DAN İpek Aydemir ve Deniz Aydemir , Yapı", 8000)).toMatchObject({ isaretle: false })
-    expect(tahmin("POYRAZ 'DAN Remzi Gürel eylul ayi okul parasi,kirtasiye,temizlik", 21085)).toMatchObject({ isaretle: false, uyari: 'Birden fazla ödeme içeriyor olabilir' })
-    expect(tahmin("HALİME KIROĞLU 'DAN GELEN FAST ODEMESİ , Akbank", 2000)).toMatchObject({ isaretle: false })
+    expect(tahmin("POYRAZ 'DAN Remzi Gürel eylul ayi okul parasi,kirtasiye,temizlik", 21085)).toMatchObject({ isaretle: false, uyari: 'Birden fazla ödeme: tutar dağılımını kontrol edin' })
     expect(tahmin('PARS NOYAN ÇOBAN SEHVEN YATIRILAN PERSONEL ÜCRETİN İADESİ', 6000)).toMatchObject({ odemeDegil: true, uyari: null })
   })
 })

@@ -9,16 +9,17 @@ import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { ayLabel, fmtTL, tarihFmt, AYLAR } from '@/lib/hesaplama'
 import { IsletmeHareket, IsletmeTur, Ayarlar, Ogrenci, TahsilatKategori, Birim, birimKurumAdi } from '@/lib/types'
-import { taksitAcilabilir, taksitKey, taksitCoz } from '@/lib/taksit'
-import { aylikDonem, donemlikDonem, hedefleriHazirla, odemeTahminEt, KULUP_HEDEF } from '@/lib/ekstreEslesme'
+import { taksitAcilabilir, taksitKey, taksitCoz, aylikVadeler } from '@/lib/taksit'
+import { aylikDonem, donemlikDonem, hedefleriHazirla, odemeTahminEt, KULUP_HEDEF, type OdemeParcasi } from '@/lib/ekstreEslesme'
 import ConfirmModal from '@/components/ConfirmModal'
 import {
+  Plus,
   BookText, BookOpen, Pencil, Trash2, TrendingUp, TrendingDown, Scale, Save, X, ArrowDownCircle, ArrowUpCircle, ListChecks, LayoutList, Download, FileSpreadsheet,
 } from 'lucide-react'
 import { hataMesaji } from '@/lib/hata'
 import { useYukleme } from '@/lib/useYukleme'
 import { useDegisince } from '@/lib/useDegisince'
-import { bugunISO, ParsedRow, type ImportSonuc, parseTutar, parseTarih, cellStr, ekstreBasligiBul, ColMap, autoDetect, FormState, bosForm, DefterTablo, turBtn } from './yardimcilar'
+import { bugunISO, ParsedRow, parcaEksigi, type ImportSonuc, parseTutar, parseTarih, cellStr, ekstreBasligiBul, ColMap, autoDetect, FormState, bosForm, DefterTablo, turBtn } from './yardimcilar'
 import EkstreModal from '@/app/isletme-defteri/EkstreModal'
 import { defterKapagi, makamSatirlari, BIRIM_HESAP_ADI, type KapakVerisi } from './kapakPdf'
 import { kulupOtomatikHareketler } from '@/lib/isletmeDefteri'
@@ -65,6 +66,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
   const [odemeOgrenciler, setOdemeOgrenciler] = useState<Ogrenci[]>([])
   const [odemeKategoriler, setOdemeKategoriler] = useState<TahsilatKategori[]>([])
   const [odemeUyelikler, setOdemeUyelikler] = useState<{ kategori_id: number; ogrenci_id: number }[]>([])
+  const [odemePlanlari, setOdemePlanlari] = useState<{ kategori_id: number; ogrenci_id: number; tutarlar: number[] }[]>([])
   const [importSonuc, setImportSonuc] = useState<ImportSonuc | null>(null)
   const [odemeVerisiYuklendi, setOdemeVerisiYuklendi] = useState(false)
   const [gelismisAcik, setGelismisAcik] = useState(false)
@@ -347,25 +349,28 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
 
   // Ekstredeki öğrenci ödemelerini eşleştirebilmek için öğrenci/kategori listesini yükle.
   // Aynı banka hesabına okulun, OAB'nin ve kulübün tahsilatları gelebildiği için tüm birimlerin kategorileri aranır.
+  // Taksit planları da yüklenir: açıklamasız ödeme, öğrencinin taksit tutarıyla eşleşebilir.
   useEffect(() => {
     if (!importOpen || odemeVerisiYuklendi) return
     ;(async () => {
-      const [{ data: ogr }, { data: kat }, { data: uye }] = await Promise.all([
+      const [{ data: ogr }, { data: kat }, { data: uye }, { data: pl }] = await Promise.all([
         supabase.from('ogrenciler').select('*').order('soyad'),
         supabase.from('tahsilat_kategorileri').select('*'),
         supabase.from('tahsilat_kategori_ogrenci').select('kategori_id, ogrenci_id'),
+        supabase.from('tahsilat_taksit_planlari').select('kategori_id, ogrenci_id, tutarlar'),
       ])
       setOdemeOgrenciler((ogr || []).filter((o: Ogrenci) => o.aktif !== false))
       setOdemeKategoriler(kat || [])
       setOdemeUyelikler(uye || [])
+      setOdemePlanlari(pl || [])
       setOdemeVerisiYuklendi(true)
     })()
   }, [importOpen, odemeVerisiYuklendi, birim])
 
   // OAB hesabına kulüp aidatı gelmez; kulüp Ödeme Takibi yalnız okul/kulüp defterinden işlenir
   const odemeHedefleri = useMemo(
-    () => hedefleriHazirla(odemeKategoriler, odemeUyelikler, { dahil: birim !== 'oab' }),
-    [odemeKategoriler, odemeUyelikler, birim]
+    () => hedefleriHazirla(odemeKategoriler, odemeUyelikler, { dahil: birim !== 'oab' }, odemePlanlari),
+    [odemeKategoriler, odemeUyelikler, odemePlanlari, birim]
   )
   const ogrencilerSirali = useMemo(
     () => [...odemeOgrenciler].sort((a, b) => `${a.ad} ${a.soyad}`.localeCompare(`${b.ad} ${b.soyad}`, 'tr')),
@@ -425,23 +430,23 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
       const aciklama = (colMap.aciklama >= 0 ? (c[colMap.aciklama] || '') : '').trim()
       const belge = (colMap.belge >= 0 ? (c[colMap.belge] || '') : '').trim()
       const gecerli = !!tarih && !isNaN(tutar) && tutar > 0
-      const satir: ParsedRow = { tarih, tutar, tur, aciklama, belge, gecerli, hedef: null, ogrenciId: null, ay: null, isaretle: false, uyari: null, tutaraGore: false, odemeDegil: false }
+      const satir: ParsedRow = { tarih, tutar, tur, aciklama, belge, gecerli, parcalar: [], isaretle: false, uyari: null, tutaraGore: false, odemeDegil: false }
 
       // Gelir satırlarında açıklamadan öğrenci ödemesi tahmini — sadece önizleme, kullanıcı düzeltebilir
       if (gecerli && tur === 'gelir' && aciklama && ogrencilerSirali.length && odemeHedefleri.length) {
         const t = odemeTahminEt(aciklama, tutar, tarih, ogrencilerSirali, odemeHedefleri)
-        Object.assign(satir, { hedef: t.hedef, ogrenciId: t.ogrenciId, ay: t.ay, isaretle: t.isaretle, uyari: t.uyari, tutaraGore: t.tutaraGore, odemeDegil: t.odemeDegil })
+        Object.assign(satir, { parcalar: t.parcalar, isaretle: t.isaretle, uyari: t.uyari, tutaraGore: t.tutaraGore, odemeDegil: t.odemeDegil })
       }
       return satir
     })
     setOnizleme(rows)
   })
 
-  /** Satırın Tahsilat Takip'te düştüğü dönem anahtarı (taksit planı varsa kaydetme sırasında taksite çevrilir) */
-  function satirDonemi(r: ParsedRow, k: TahsilatKategori): string {
+  /** Parçanın Tahsilat Takip'te düştüğü dönem anahtarı (taksit planı varsa kaydetme sırasında taksite çevrilir) */
+  function parcaDonemi(tarih: string, p: OdemeParcasi, k: TahsilatKategori): string {
     if (k.tip === 'tek_seferlik') return '-'
-    if (k.tip === 'donemlik') return donemlikDonem(r.tarih)
-    return aylikDonem(r.tarih, r.ay || Number(r.tarih.slice(5, 7)))
+    if (k.tip === 'donemlik') return donemlikDonem(tarih)
+    return aylikDonem(tarih, p.ay || Number(tarih.slice(5, 7)))
   }
 
   async function importKaydet() {
@@ -468,75 +473,100 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
       if (error) { setImportSaving(false); bilgi('❌ Aktarım hatası: ' + error.message, 6000); return }
     }
 
-    // Tahsilat Takip / Ödeme Takibi: işaretli gelir satırları ekstredeki tarihle ödendi işaretlenir.
+    // Tahsilat Takip / Ödeme Takibi: işaretli gelir satırlarının her parçası ekstredeki tarihle ödendi işaretlenir.
     // Defterde zaten olan satırlar da işlenir; böylece aynı ekstre yeniden yüklenince eksik işaretler tamamlanır.
-    const sonuc: ImportSonuc = { hareket: yeni.length, mukerrer: atlanan, isaretlenen: 0, tarihiGuncellenen: 0, zatenVardi: 0, hata: 0, elle: [] }
-    const elle = (r: ParsedRow, neden: string) => sonuc.elle.push({ tarih: r.tarih, aciklama: r.aciklama, tutar: r.tutar, neden })
+    const sonuc: ImportSonuc = { hareket: yeni.length, mukerrer: atlanan, isaretlenen: 0, tarihiGuncellenen: 0, zatenVardi: 0, hata: 0, taksitAcilan: 0, elle: [] }
+    const elle = (r: ParsedRow, neden: string, p?: OdemeParcasi) => sonuc.elle.push({
+      tarih: r.tarih, aciklama: r.aciklama, tutar: p && r.parcalar.length > 1 ? p.tutar : r.tutar,
+      neden: p && r.parcalar.length > 1 ? `${ogrenciAdMap.get(p.ogrenciId ?? -1) || 'öğrenci seçilmedi'} · ${odemeHedefleri.find(h => h.anahtar === p.hedef)?.ad || 'tür seçilmedi'}: ${neden}` : neden,
+    })
+
+    /** Bir parçayı (öğrenci × ödeme kalemi) işler */
+    async function parcaIsle(r: ParsedRow, p: OdemeParcasi) {
+      const ogrenciId = p.ogrenciId!
+      if (p.hedef === KULUP_HEDEF) {
+        const [yStr, mStr] = aylikDonem(r.tarih, p.ay || Number(r.tarih.slice(5, 7))).split('-')
+        const ay = Number(mStr), rYil = Number(yStr)
+        const { data: mevcutT } = await supabase.from('tahsilat').select('id, tarih').eq('ogrenci_id', ogrenciId).eq('ay', ay).eq('yil', rYil).maybeSingle()
+        if (mevcutT) {
+          if (mevcutT.tarih !== r.tarih) {
+            const { error } = await supabase.from('tahsilat').update({ tarih: r.tarih }).eq('id', mevcutT.id)
+            if (error) sonuc.hata++; else sonuc.tarihiGuncellenen++
+          } else sonuc.zatenVardi++
+          return
+        }
+        const { data: tahNew, error: e1 } = await supabase.from('tahsilat').insert({
+          ogrenci_id: ogrenciId, tutar: p.tutar, tarih: r.tarih, aciklama: r.aciklama || null,
+          dekont_no: r.belge || null, ay, yil: rYil, okul_id: okulId,
+        }).select('id').single()
+        if (e1 || !tahNew) { sonuc.hata++; return }
+        const ogr = odemeOgrenciler.find(o => o.id === ogrenciId)
+        const { error: e2 } = await supabase.from('hesap_hareketleri').insert({
+          tarih: r.tarih, tutar: p.tutar, tur: 'gelir',
+          aciklama: `Öğrenci ödemesi: ${ogr ? ogr.ad + ' ' + ogr.soyad : ''} ${r.aciklama || ''}`.trim(),
+          dekont_no: r.belge || null, kaynak: 'tahsilat', kaynak_id: tahNew.id,
+          ay, yil: rYil, okul_id: okulId,
+        })
+        if (e2) sonuc.hata++; else sonuc.isaretlenen++
+        return
+      }
+
+      const hedef = odemeHedefleri.find(h => h.anahtar === p.hedef)
+      const k = hedef?.kategori
+      if (!k) { elle(r, 'Kategori bulunamadı', p); return }
+      let donem = parcaDonemi(r.tarih, p, k)
+      const { data: kayitlarHam } = await supabase.from('tahsilat_kayitlari').select('id, donem, tarih, tutar, aciklama').eq('kategori_id', k.id).eq('ogrenci_id', ogrenciId).like('donem', `${donem}%`)
+      const kayitlar = ((kayitlarHam || []) as { id: number; donem: string; tarih: string | null; tutar: number | null; aciklama: string | null }[])
+        .sort((a, b) => a.donem.localeCompare(b.donem, 'tr', { numeric: true }))
+      // Bu ödeme zaten işlenmiş (aynı tarih) ya da elle işaretlenmişse yeni kayıt açma, tarihi ekstredekiyle düzelt.
+      // Elle işaret: açıklamasız (ekstreden gelenlerde banka açıklaması olur) ve tutarı aynı/boş kayıt — taksitler dahil, ilk taksitten başlanır
+      if (kayitlar.some(x => x.tarih === r.tarih)) { sonuc.zatenVardi++; return }
+      const ayniDonem = (x: { donem: string }) => x.donem === donem || taksitCoz(x.donem)?.donem === donem
+      const elleIsaretli = kayitlar.find(x => ayniDonem(x) && !x.aciklama && (x.tutar == null || Math.abs(Number(x.tutar) - p.tutar) < 0.01))
+      if (elleIsaretli) {
+        const { error } = await supabase.from('tahsilat_kayitlari').update({ tarih: r.tarih, tutar: elleIsaretli.tutar ?? p.tutar, aciklama: r.aciklama || null }).eq('id', elleIsaretli.id)
+        if (error) sonuc.hata++; else sonuc.tarihiGuncellenen++
+        return
+      }
+      // Öğrencinin bu dönem için taksit planı varsa ödemeyi ödenmemiş ilk taksite işle
+      const { data: plan } = taksitAcilabilir(k)
+        ? await supabase.from('tahsilat_taksit_planlari').select('vadeler').eq('kategori_id', k.id).eq('ogrenci_id', ogrenciId).eq('donem', donem).maybeSingle()
+        : { data: null }
+      const ogr = odemeOgrenciler.find(o => o.id === ogrenciId)
+      const ucret = ogr && hedef ? hedef.ucret(ogr) : null
+      if (plan) {
+        const odenenNo = new Set(kayitlar.map(x => taksitCoz(x.donem)?.no))
+        const siradaki = Array.from({ length: (plan.vadeler as string[]).length }, (_, i) => i + 1).find(no => !odenenNo.has(no))
+        if (!siradaki) { elle(r, 'Tüm taksitler zaten ödenmiş görünüyor', p); return }
+        donem = taksitKey(donem, siradaki)
+      } else if (kayitlar.some(x => x.donem === donem)) {
+        elle(r, `${k.ad} bu dönem için başka tutarla zaten işaretli (kısmi ödeme olabilir)`, p)
+        return
+      } else if (taksitAcilabilir(k) && ucret != null && p.tutar < ucret - 0.01 && !kayitlar.length) {
+        // Planı olmayan kısmi ödeme: ödenen kısım 1. taksit, kalan 2. taksit olarak plan açılır
+        // (Tahsilat Takip'te ve dökümde kalan taksit "bekliyor" görünür; sonraki ödeme 2. taksite işlenir)
+        const vadeler = aylikVadeler(r.tarih, 2)
+        const { error: pe } = await supabase.from('tahsilat_taksit_planlari').insert({
+          kategori_id: k.id, ogrenci_id: ogrenciId, donem, vadeler, tutarlar: [p.tutar, Math.round((ucret - p.tutar) * 100) / 100],
+          aciklama: 'Ekstre aktarımında kısmi ödemeden açıldı', okul_id: okulId,
+        })
+        if (pe) { sonuc.hata++; return }
+        sonuc.taksitAcilan++
+        donem = taksitKey(donem, 1)
+      }
+      const { error: e3 } = await supabase.from('tahsilat_kayitlari').insert({
+        kategori_id: k.id, ogrenci_id: ogrenciId, donem, tutar: p.tutar, tarih: r.tarih, aciklama: r.aciklama || null, okul_id: okulId,
+      })
+      if (e3) sonuc.hata++; else sonuc.isaretlenen++
+    }
+
     for (const r of gecerliler) {
       if (r.tur !== 'gelir' || r.odemeDegil) continue
-      if (!r.isaretle || !r.ogrenciId || !r.hedef) { elle(r, r.uyari || (!r.ogrenciId ? 'Öğrenci seçilmedi' : !r.hedef ? 'Ödeme türü seçilmedi' : 'İşaretlenmedi')); continue }
-      try {
-        if (r.hedef === KULUP_HEDEF) {
-          const [yStr, mStr] = aylikDonem(r.tarih, r.ay || Number(r.tarih.slice(5, 7))).split('-')
-          const ay = Number(mStr), rYil = Number(yStr)
-          const { data: mevcutT } = await supabase.from('tahsilat').select('id, tarih').eq('ogrenci_id', r.ogrenciId).eq('ay', ay).eq('yil', rYil).maybeSingle()
-          if (mevcutT) {
-            if (mevcutT.tarih !== r.tarih) {
-              const { error } = await supabase.from('tahsilat').update({ tarih: r.tarih }).eq('id', mevcutT.id)
-              if (error) sonuc.hata++; else sonuc.tarihiGuncellenen++
-            } else sonuc.zatenVardi++
-            continue
-          }
-          const { data: tahNew, error: e1 } = await supabase.from('tahsilat').insert({
-            ogrenci_id: r.ogrenciId, tutar: r.tutar, tarih: r.tarih, aciklama: r.aciklama || null,
-            dekont_no: r.belge || null, ay, yil: rYil, okul_id: okulId,
-          }).select('id').single()
-          if (e1 || !tahNew) { sonuc.hata++; continue }
-          const ogr = odemeOgrenciler.find(o => o.id === r.ogrenciId)
-          const { error: e2 } = await supabase.from('hesap_hareketleri').insert({
-            tarih: r.tarih, tutar: r.tutar, tur: 'gelir',
-            aciklama: `Öğrenci ödemesi: ${ogr ? ogr.ad + ' ' + ogr.soyad : ''} ${r.aciklama || ''}`.trim(),
-            dekont_no: r.belge || null, kaynak: 'tahsilat', kaynak_id: tahNew.id,
-            ay, yil: rYil, okul_id: okulId,
-          })
-          if (e2) sonuc.hata++; else sonuc.isaretlenen++
-          continue
-        }
-
-        const k = odemeHedefleri.find(h => h.anahtar === r.hedef)?.kategori
-        if (!k) { elle(r, 'Kategori bulunamadı'); continue }
-        let donem = satirDonemi(r, k)
-        const { data: kayitlarHam } = await supabase.from('tahsilat_kayitlari').select('id, donem, tarih, tutar, aciklama').eq('kategori_id', k.id).eq('ogrenci_id', r.ogrenciId).like('donem', `${donem}%`)
-        const kayitlar = ((kayitlarHam || []) as { id: number; donem: string; tarih: string | null; tutar: number | null; aciklama: string | null }[])
-          .sort((a, b) => a.donem.localeCompare(b.donem, 'tr', { numeric: true }))
-        // Bu ödeme zaten işlenmiş (aynı tarih) ya da elle işaretlenmişse yeni kayıt açma, tarihi ekstredekiyle düzelt.
-        // Elle işaret: açıklamasız (ekstreden gelenlerde banka açıklaması olur) ve tutarı aynı/boş kayıt — taksitler dahil, ilk taksitten başlanır
-        if (kayitlar.some(x => x.tarih === r.tarih)) { sonuc.zatenVardi++; continue }
-        const ayniDonem = (x: { donem: string }) => x.donem === donem || taksitCoz(x.donem)?.donem === donem
-        const elleIsaretli = kayitlar.find(x => ayniDonem(x) && !x.aciklama && (x.tutar == null || Math.abs(Number(x.tutar) - r.tutar) < 0.01))
-        if (elleIsaretli) {
-          const { error } = await supabase.from('tahsilat_kayitlari').update({ tarih: r.tarih, tutar: elleIsaretli.tutar ?? r.tutar, aciklama: r.aciklama || null }).eq('id', elleIsaretli.id)
-          if (error) sonuc.hata++; else sonuc.tarihiGuncellenen++
-          continue
-        }
-        // Öğrencinin bu dönem için taksit planı varsa ödemeyi ödenmemiş ilk taksite işle
-        const { data: plan } = taksitAcilabilir(k)
-          ? await supabase.from('tahsilat_taksit_planlari').select('vadeler').eq('kategori_id', k.id).eq('ogrenci_id', r.ogrenciId).eq('donem', donem).maybeSingle()
-          : { data: null }
-        if (plan) {
-          const odenenNo = new Set(kayitlar.map(x => taksitCoz(x.donem)?.no))
-          const siradaki = Array.from({ length: (plan.vadeler as string[]).length }, (_, i) => i + 1).find(no => !odenenNo.has(no))
-          if (!siradaki) { elle(r, 'Tüm taksitler zaten ödenmiş görünüyor'); continue }
-          donem = taksitKey(donem, siradaki)
-        } else if (kayitlar.some(x => x.donem === donem)) {
-          elle(r, `${k.ad} bu dönem için başka tutarla zaten işaretli (kısmi ödeme olabilir)`)
-          continue
-        }
-        const { error: e3 } = await supabase.from('tahsilat_kayitlari').insert({
-          kategori_id: k.id, ogrenci_id: r.ogrenciId, donem, tutar: r.tutar, tarih: r.tarih, aciklama: r.aciklama || null, okul_id: okulId,
-        })
-        if (e3) sonuc.hata++; else sonuc.isaretlenen++
-      } catch { sonuc.hata++ }
+      const eksik = parcaEksigi(r)
+      if (!r.isaretle || eksik) { elle(r, r.uyari || eksik || 'İşaretlenmedi'); continue }
+      for (const p of r.parcalar) {
+        try { await parcaIsle(r, p) } catch { sonuc.hata++ }
+      }
     }
 
     setImportSaving(false)
@@ -814,72 +844,119 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
 
       {importOpen && <EkstreModal setImportOpen={setImportOpen} importFileName={importFileName} importReading={importReading} dosyaSec={dosyaSec} importRows={importRows} colCount={colCount} gelismisAcik={gelismisAcik} setGelismisAcik={setGelismisAcik} colMap={colMap} setColMap={setColMap} sutunSecenekleri={sutunSecenekleri} basSatirAtla={basSatirAtla} setBasSatirAtla={setBasSatirAtla} onizleme={onizleme} setOnizleme={setOnizleme} setEslesmePop={setEslesmePop} ogrencilerSirali={ogrencilerSirali} ogrenciAdMap={ogrenciAdMap} importSaving={importSaving} importKaydet={importKaydet} importSonuc={importSonuc} importKapat={importKapat} hedefAdi={(a: string | null) => odemeHedefleri.find(h => h.anahtar === a)?.ad ?? null} />}
 
-      {/* Tahsilat Takip eşleştirme popover */}
+      {/* Tahsilat Takip eşleştirme penceresi: satır bir ya da birden fazla parçaya (öğrenci × ödeme kalemi) bölünebilir */}
       {eslesmePop && onizleme && onizleme[eslesmePop.idx] && (() => {
         const idx = eslesmePop.idx
         const r = onizleme[idx]
         const rect = eslesmePop.rect
         const vw = typeof window !== 'undefined' ? window.innerWidth : 1000
         const vh = typeof window !== 'undefined' ? window.innerHeight : 800
-        const ogr = odemeOgrenciler.find(o => o.id === r.ogrenciId)
-        // Öğrencinin dahil olduğu kategoriler önce; diğerleri de seçilebilir (kapsam eksik girilmiş olabilir)
-        const uygun = ogr ? odemeHedefleri.filter(h => h.kapsar(ogr)) : odemeHedefleri
-        const diger = ogr ? odemeHedefleri.filter(h => !h.kapsar(ogr)) : []
-        const hedef = odemeHedefleri.find(h => h.anahtar === r.hedef)
-        const tamam = !!r.ogrenciId && !!r.hedef
+        const parcalar = r.parcalar.length ? r.parcalar : [{ ogrenciId: null, hedef: null, ay: null, tutar: r.tutar }]
+        const toplam = Math.round(parcalar.reduce((t, p) => t + (Number(p.tutar) || 0), 0) * 100) / 100
+        const fark = Math.round((r.tutar - toplam) * 100) / 100
+        const eksik = parcaEksigi({ ...r, parcalar })
+        const guncelle = (yeni: OdemeParcasi[], isaretle?: boolean) => {
+          const sonraki = { ...r, parcalar: yeni }
+          onizlemeGuncelle(idx, { parcalar: yeni, isaretle: isaretle ?? !parcaEksigi(sonraki) })
+        }
+        const parcaDegistir = (i: number, patch: Partial<OdemeParcasi>) => guncelle(parcalar.map((p, j) => j === i ? { ...p, ...patch } : p))
+        const parcaEkle = () => {
+          const son = parcalar[parcalar.length - 1]
+          guncelle([...parcalar, { ogrenciId: son?.ogrenciId ?? null, hedef: null, ay: null, tutar: Math.max(0, fark) }], false)
+        }
+        const genislik = 380
         return (
           <div style={{ position: 'fixed', inset: 0, zIndex: 1200 }} {...perdeKapat(() => setEslesmePop(null))}>
             <div
-              style={{ position: 'absolute', top: Math.max(10, Math.min(rect.bottom + 6, vh - 380)), left: Math.min(Math.max(rect.left - 120, 10), vw - 300), background: 'var(--surface)', borderRadius: 12, boxShadow: '0 16px 44px rgba(0,0,0,0.22)', padding: 16, width: 284, border: '1px solid var(--border)' }}
+              style={{ position: 'absolute', top: Math.max(10, Math.min(rect.bottom + 6, vh - 520)), left: Math.min(Math.max(rect.left - 200, 10), vw - genislik - 16), background: 'var(--surface)', borderRadius: 12, boxShadow: '0 16px 44px rgba(0,0,0,0.22)', padding: 16, width: genislik, maxHeight: vh - 20, overflowY: 'auto', border: '1px solid var(--border)' }}
               onClick={e => e.stopPropagation()}
             >
-              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>Tahsilat Takip Eşleştirme</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Tahsilat Takip Eşleştirme</div>
+                <div style={{ fontSize: 12.5, fontWeight: 700 }}>{fmtTL(r.tutar)} · {tarihFmt(r.tarih)}</div>
+              </div>
               {r.uyari && <div className="alert alert-warn" style={{ fontSize: 11.5, padding: '6px 9px', marginBottom: 10 }}>{r.uyari}</div>}
-              <label className="form-label">Öğrenci</label>
-              <select
-                className="form-select"
-                value={r.ogrenciId ?? ''}
-                onChange={e => { const v = e.target.value ? Number(e.target.value) : null; onizlemeGuncelle(idx, { ogrenciId: v, isaretle: !!(v && r.hedef) }) }}
-                style={{ marginBottom: 10 }}
-              >
-                <option value="">— Seçilmedi —</option>
-                {ogrencilerSirali.map(o => <option key={o.id} value={o.id}>{o.ad} {o.soyad}{o.sinif ? ` (${o.sinif})` : ''}</option>)}
-              </select>
-              <label className="form-label">Ödeme türü</label>
-              <select
-                className="form-select"
-                value={r.hedef ?? ''}
-                onChange={e => {
-                  const v = e.target.value || null
-                  const h = odemeHedefleri.find(x => x.anahtar === v)
-                  onizlemeGuncelle(idx, { hedef: v, ay: h?.tip === 'aylik' ? (r.ay ?? Number(r.tarih.slice(5, 7))) : null, isaretle: !!(v && r.ogrenciId) })
-                }}
-                style={{ marginBottom: 10 }}
-              >
-                <option value="">— Seçilmedi —</option>
-                {uygun.map(h => <option key={h.anahtar} value={h.anahtar}>{h.ad}</option>)}
-                {diger.length > 0 && <optgroup label="Öğrencinin dahil olmadığı kategoriler">{diger.map(h => <option key={h.anahtar} value={h.anahtar}>{h.ad}</option>)}</optgroup>}
-              </select>
-              {hedef?.tip === 'aylik' && (
-                <>
-                  <label className="form-label">Ödenen ay</label>
-                  <select className="form-select" value={r.ay ?? ''} onChange={e => onizlemeGuncelle(idx, { ay: Number(e.target.value) })} style={{ marginBottom: 10 }}>
-                    {[9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8].map(m => <option key={m} value={m}>{AYLAR[m]}</option>)}
-                  </select>
-                </>
+
+              {parcalar.map((p, i) => {
+                const ogr = odemeOgrenciler.find(o => o.id === p.ogrenciId)
+                // Öğrencinin dahil olduğu kategoriler önce; diğerleri de seçilebilir (kapsam eksik girilmiş olabilir)
+                const uygun = ogr ? odemeHedefleri.filter(h => h.kapsar(ogr)) : odemeHedefleri
+                const diger = ogr ? odemeHedefleri.filter(h => !h.kapsar(ogr)) : []
+                const hedef = odemeHedefleri.find(h => h.anahtar === p.hedef)
+                const ucret = ogr && hedef ? hedef.ucret(ogr) : null
+                return (
+                  <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, marginBottom: 8, background: parcalar.length > 1 ? 'var(--surface2)' : undefined }}>
+                    {parcalar.length > 1 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text2)' }}>{i + 1}. ödeme</span>
+                        <button type="button" onClick={() => guncelle(parcalar.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 11.5 }} title="Bu parçayı çıkar"><X size={13} /></button>
+                      </div>
+                    )}
+                    <label className="form-label">Öğrenci</label>
+                    <select className="form-select" value={p.ogrenciId ?? ''} style={{ marginBottom: 8 }}
+                      onChange={e => parcaDegistir(i, { ogrenciId: e.target.value ? Number(e.target.value) : null })}>
+                      <option value="">— Seçilmedi —</option>
+                      {ogrencilerSirali.map(o => <option key={o.id} value={o.id}>{o.ad} {o.soyad}{o.sinif ? ` (${o.sinif})` : ''}</option>)}
+                    </select>
+                    <div style={{ display: 'grid', gridTemplateColumns: hedef?.tip === 'aylik' ? '1fr 96px' : '1fr', gap: 8 }}>
+                      <div>
+                        <label className="form-label">Ödeme türü</label>
+                        <select className="form-select" value={p.hedef ?? ''}
+                          onChange={e => {
+                            const v = e.target.value || null
+                            const h = odemeHedefleri.find(x => x.anahtar === v)
+                            parcaDegistir(i, { hedef: v, ay: h?.tip === 'aylik' ? (p.ay ?? Number(r.tarih.slice(5, 7))) : null })
+                          }}>
+                          <option value="">— Seçilmedi —</option>
+                          {uygun.map(h => <option key={h.anahtar} value={h.anahtar}>{h.ad}</option>)}
+                          {diger.length > 0 && <optgroup label="Öğrencinin dahil olmadığı kategoriler">{diger.map(h => <option key={h.anahtar} value={h.anahtar}>{h.ad}</option>)}</optgroup>}
+                        </select>
+                      </div>
+                      {hedef?.tip === 'aylik' && (
+                        <div>
+                          <label className="form-label">Ay</label>
+                          <select className="form-select" value={p.ay ?? ''} onChange={e => parcaDegistir(i, { ay: Number(e.target.value) })}>
+                            {[9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8].map(m => <option key={m} value={m}>{AYLAR[m]}</option>)}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginTop: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <label className="form-label">Tutar (₺)</label>
+                        <input className="form-input" inputMode="decimal" value={String(p.tutar).replace('.', ',')}
+                          onChange={e => { const n = Number(e.target.value.replace(/\./g, '').replace(',', '.')); parcaDegistir(i, { tutar: isNaN(n) ? 0 : n }) }} />
+                      </div>
+                      {ucret != null && Math.abs(ucret - p.tutar) > 0.01 && (
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => parcaDegistir(i, { tutar: ucret })} title="Kalemin ücretini yaz">Ücret: {fmtTL(ucret)}</button>
+                      )}
+                      {ucret != null && p.tutar > 0 && p.tutar < ucret - 0.01 && <span style={{ fontSize: 11, color: '#8a5200', paddingBottom: 8 }}>kısmi → taksit</span>}
+                    </div>
+                  </div>
+                )
+              })}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                <button type="button" className="btn btn-success btn-sm" onClick={parcaEkle} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Plus size={13} /> Ödeme ekle</button>
+                <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>Birden fazla kalem (personel + kırtasiye) ya da kardeşler için</span>
+              </div>
+              {parcalar.length > 1 && (
+                <div style={{ fontSize: 12, marginBottom: 10, color: Math.abs(fark) > 0.01 ? 'var(--danger)' : 'var(--success)', fontWeight: 600 }}>
+                  Parçalar toplamı {fmtTL(toplam)}{Math.abs(fark) > 0.01 ? ` · ${fark > 0 ? 'eksik' : 'fazla'} ${fmtTL(Math.abs(fark))}` : ' · satır tutarına eşit'}
+                </div>
               )}
-              <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 10 }}>Ödeme tarihi: <strong style={{ color: 'var(--text2)' }}>{tarihFmt(r.tarih)}</strong> (ekstreden)</div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text2)', marginBottom: 14, opacity: tamam ? 1 : 0.5 }}>
-                <input type="checkbox" checked={r.isaretle} disabled={!tamam} onChange={e => onizlemeGuncelle(idx, { isaretle: e.target.checked })} />
-                Ödendi olarak işaretle
+              <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 10 }}>Ödeme tarihi ekstredeki tarihtir. Ücretin altındaki ödeme taksit sayılır; kalan için taksit açılır.</div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text2)', marginBottom: 14, opacity: eksik ? 0.5 : 1 }} title={eksik || undefined}>
+                <input type="checkbox" checked={r.isaretle && !eksik} disabled={!!eksik} onChange={e => onizlemeGuncelle(idx, { isaretle: e.target.checked })} />
+                Ödendi olarak işaretle{eksik ? ` — ${eksik}` : ''}
               </label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-secondary btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setEslesmePop(null)}>Kapat</button>
-                {(r.ogrenciId || r.hedef) && (
+                {r.parcalar.some(p => p.ogrenciId || p.hedef) && (
                   <button
                     className="btn btn-sm"
                     style={{ background: 'var(--danger-light)', color: 'var(--danger)', border: '1px solid var(--danger-border)' }}
-                    onClick={() => { onizlemeGuncelle(idx, { ogrenciId: null, hedef: null, ay: null, isaretle: false }); setEslesmePop(null) }}
+                    onClick={() => { onizlemeGuncelle(idx, { parcalar: [], isaretle: false }); setEslesmePop(null) }}
                   >Kaldır</button>
                 )}
               </div>

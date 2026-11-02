@@ -168,7 +168,8 @@ export default function EkstreModal({ setImportOpen, importFileName, importReadi
                   <tbody>
                     {satirlar.map(({ r, idx }) => {
                       const elle = elleGerekir(r) && ogrencilerSirali.length > 0
-                      const hedef = hedefAdi(r.hedef)
+                      const ilk = r.parcalar[0]
+                      const cok = r.parcalar.length > 1
                       return (
                         <tr key={idx} style={!r.gecerli || elle ? { background: 'var(--warn-light)' } : undefined}>
                           <td style={{ textAlign: 'center', padding: '9px 4px' }}>{r.gecerli ? <CheckCircle2 size={15} color="var(--success)" /> : <AlertTriangle size={15} color="var(--warn)" />}</td>
@@ -190,7 +191,7 @@ export default function EkstreModal({ setImportOpen, importFileName, importReadi
                           <td style={{ padding: '6px', textAlign: 'center' }}>
                             {r.tur !== 'gelir' ? (
                               <span style={{ color: 'var(--text3)', fontSize: 11 }}>—</span>
-                            ) : r.odemeDegil && !r.ogrenciId ? (
+                            ) : r.odemeDegil && !ilk?.ogrenciId ? (
                               <button onClick={e => setEslesmePop({ idx, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() })}
                                 style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 10.5 }} title="Öğrenci ödemesi değil (iade/devir) — yine de eşleştirmek için tıklayın">öğrenci ödemesi değil</button>
                             ) : (
@@ -205,10 +206,17 @@ export default function EkstreModal({ setImportOpen, importFileName, importReadi
                                 }}
                                 title={r.uyari ? `${r.uyari} — düzenlemek için tıklayın` : 'Öğrenci eşleştirmesini düzenle'}
                               >
-                                {r.isaretle ? <CheckCircle2 size={12} style={{ flexShrink: 0 }} /> : r.ogrenciId ? <Circle size={12} style={{ flexShrink: 0 }} /> : <UserCheck size={12} style={{ flexShrink: 0 }} />}
+                                {r.isaretle ? <CheckCircle2 size={12} style={{ flexShrink: 0 }} /> : ilk?.ogrenciId ? <Circle size={12} style={{ flexShrink: 0 }} /> : <UserCheck size={12} style={{ flexShrink: 0 }} />}
                                 <span style={{ overflow: 'hidden', minWidth: 0 }}>
-                                  <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.ogrenciId ? (ogrenciAdMap.get(r.ogrenciId) || '—') : 'Elle eşleştir'}</span>
-                                  {hedef && <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, opacity: 0.85 }}>{hedef}{r.ay ? ` · ${AYLAR[r.ay]}` : ''}{r.tutaraGore ? ' (tutara göre)' : ''}</span>}
+                                  {!ilk?.ogrenciId && !cok
+                                    ? <span style={{ display: 'block' }}>Elle eşleştir</span>
+                                    : r.parcalar.map((p, j) => (
+                                      <span key={j} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: j ? 3 : 0 }}>
+                                        {(j === 0 || p.ogrenciId !== r.parcalar[j - 1].ogrenciId) && <span style={{ display: 'block' }}>{p.ogrenciId ? (ogrenciAdMap.get(p.ogrenciId) || '—') : 'öğrenci seçilmedi'}</span>}
+                                        <span style={{ fontWeight: 500, opacity: 0.85 }}>{hedefAdi(p.hedef) || 'tür seçilmedi'}{p.ay ? ` · ${AYLAR[p.ay]}` : ''}{cok ? ` · ${fmtTL(p.tutar)}` : ''}</span>
+                                      </span>
+                                    ))}
+                                  {r.tutaraGore && <span style={{ display: 'block', fontWeight: 500, opacity: 0.7 }}>(tutara göre)</span>}
                                 </span>
                               </button>
                             )}
@@ -247,6 +255,7 @@ function SonucGorunumu({ sonuc, kapat }: { sonuc: ImportSonuc; kapat: () => void
         <StatPil label="Ödendi işaretlenen" value={String(sonuc.isaretlenen)} color="var(--accent)" />
         {sonuc.tarihiGuncellenen > 0 && <StatPil label="Tarihi ekstreden düzeltilen" value={String(sonuc.tarihiGuncellenen)} color="var(--accent)" />}
         {sonuc.zatenVardi > 0 && <StatPil label="Zaten işaretliydi" value={String(sonuc.zatenVardi)} />}
+        {sonuc.taksitAcilan > 0 && <StatPil label="Kısmi ödemeye taksit açıldı" value={String(sonuc.taksitAcilan)} color="var(--accent)" />}
         {sonuc.hata > 0 && <StatPil label="Hata" value={String(sonuc.hata)} color="var(--danger)" />}
       </div>
       {sonuc.elle.length > 0 ? (

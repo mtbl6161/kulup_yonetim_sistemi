@@ -2,16 +2,14 @@
 import type React from 'react'
 import { fmtTL, tarihFmt } from '@/lib/hesaplama'
 import { IsletmeHareket, IsletmeTur } from '@/lib/types'
+import type { OdemeParcasi } from '@/lib/ekstreEslesme'
 
 export const bugunISO = () => new Date().toISOString().split('T')[0]
 
 export interface ParsedRow {
   tarih: string; tutar: number; tur: IsletmeTur; aciklama: string; belge: string; gecerli: boolean
-  /** Ödemenin işleneceği yer: 'kulup' (Ödeme Takibi) ya da `k<kategori id>` (Tahsilat Takip) */
-  hedef: string | null
-  ogrenciId: number | null
-  /** Aylık hedefte ödenen ay */
-  ay: number | null
+  /** Satırın öğrenci ödemeleri: tek ödeme bir parça; birleşik (personel + kırtasiye) ya da kardeş ödemesi birden fazla */
+  parcalar: OdemeParcasi[]
   isaretle: boolean
   /** Otomatik işaretlenemediyse nedeni */
   uyari: string | null
@@ -28,7 +26,20 @@ export interface ImportSonuc {
   tarihiGuncellenen: number
   zatenVardi: number
   hata: number
+  /** Planı olmayan kısmi ödemeler için açılan taksit planı sayısı */
+  taksitAcilan: number
   elle: { tarih: string; aciklama: string; tutar: number; neden: string }[]
+}
+
+/** Satır Tahsilat Takip'e işlenebilir mi? Değilse eksiğin nedeni */
+export function parcaEksigi(r: Pick<ParsedRow, 'parcalar' | 'tutar'>): string | null {
+  if (!r.parcalar.length) return 'Öğrenci seçilmedi'
+  if (r.parcalar.some(p => !p.ogrenciId)) return 'Öğrenci seçilmedi'
+  if (r.parcalar.some(p => !p.hedef)) return 'Ödeme türü seçilmedi'
+  if (r.parcalar.some(p => !(p.tutar > 0))) return 'Parça tutarı girilmedi'
+  const toplam = r.parcalar.reduce((t, p) => t + p.tutar, 0)
+  if (Math.abs(toplam - r.tutar) > 0.01) return `Parçaların toplamı (${fmtTL(toplam)}) satır tutarına (${fmtTL(r.tutar)}) eşit değil`
+  return null
 }
 
 // Türk formatındaki tutarı sayıya çevir ("1.234,56" -> 1234.56). İşaret ayrı ele alınır.
