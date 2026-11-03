@@ -19,6 +19,7 @@ import {
 import { hataMesaji } from '@/lib/hata'
 import { useYukleme } from '@/lib/useYukleme'
 import { useDegisince } from '@/lib/useDegisince'
+import { hepsiniCek } from '@/lib/hepsiniCek'
 import { bugunISO, ParsedRow, parcaEksigi, type ImportSonuc, parseTutar, parseTarih, cellStr, ekstreBasligiBul, ColMap, autoDetect, FormState, bosForm, DefterTablo, turBtn } from './yardimcilar'
 import EkstreModal from '@/app/isletme-defteri/EkstreModal'
 import { defterKapagi, makamSatirlari, BIRIM_HESAP_ADI, type KapakVerisi } from './kapakPdf'
@@ -71,6 +72,8 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
   const [odemeVerisiYuklendi, setOdemeVerisiYuklendi] = useState(false)
   const [gelismisAcik, setGelismisAcik] = useState(false)
   const [eslesmePop, setEslesmePop] = useState<{ idx: number; rect: DOMRect } | null>(null)
+  // 'defter': satırlar dosyadan değil deftere önceden aktarılmış banka gelirlerinden geldi
+  const [importKaynak, setImportKaynak] = useState<'dosya' | 'defter'>('dosya')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -386,6 +389,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
     const file = e.target.files?.[0]
     e.target.value = '' // aynı dosyayı tekrar seçebilmek için
     if (!file) return
+    setImportKaynak('dosya')
     setImportReading(true)
     setImportFileName(file.name)
     setOnizleme(null)
@@ -405,6 +409,33 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
       setColMap(autoDetect(rows, basSatirAtla))
     } catch (err) {
       bilgi('❌ Dosya okunamadı: ' + (hataMesaji(err, 'Bilinmiyor')), 5000)
+    } finally {
+      setImportReading(false)
+    }
+  }
+
+  // Deftere daha önce aktarılmış banka gelirlerini dosyasız yeniden eşleştirir: satırlar ekstre tablosu gibi
+  // önizlemeye konur; kaydederken deftere yeni satır yazılmaz, yalnız Tahsilat Takip işlenir
+  async function defterdenEslestir() {
+    setImportKaynak('defter')
+    setImportOpen(true)
+    setImportFileName(`${yil} yılı defterdeki banka gelirleri`)
+    setImportReading(true)
+    setOnizleme(null)
+    setImportSonuc(null)
+    setEslesmePop(null)
+    try {
+      const satirlar = await hepsiniCek<{ tarih: string; tutar: number; aciklama: string | null; belge_no: string | null }>((bas, son) =>
+        supabase.from('isletme_defteri').select('tarih, tutar, aciklama, belge_no').eq('birim', birim).eq('kaynak', 'banka').eq('tur', 'gelir').eq('yil', yil)
+          .order('tarih').order('id').range(bas, son))
+      if (!satirlar.length) { bilgi(`⚠️ ${yil} yılında defterde bankadan aktarılmış gelir satırı yok.`); setImportOpen(false); return }
+      const tarihTR = (t: string) => t.split('-').reverse().join('.')
+      setImportRows([['Tarih', 'Tutar', 'Açıklama', 'Belge No'], ...satirlar.map(s => [tarihTR(s.tarih), String(Number(s.tutar)), s.aciklama || '', s.belge_no || ''])])
+      setColMap({ tarih: 0, tutar: 1, yon: -1, aciklama: 2, belge: 3 })
+      setBasSatirAtla(true)
+    } catch (err) {
+      bilgi('❌ Defter okunamadı: ' + (hataMesaji(err, 'Bilinmiyor')), 5000)
+      setImportOpen(false)
     } finally {
       setImportReading(false)
     }
@@ -461,12 +492,13 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
 
     // Mükerrer koruması: aynı tarih+tutar+tür+belge+açıklama zaten varsa atla
     // (açıklama dahil: aynı gün aynı tutarda iki velinin ödemesi tek satır sayılmasın)
+    // Satırlar defterin kendisinden geldiyse deftere hiçbir şey yazılmaz
     const anahtar = (t: string, tt: number, tr: string, b: string | null, a: string | null) => `${t}|${Number(tt).toFixed(2)}|${tr}|${(b || '').trim()}|${(a || '').trim()}`
     const yillar = Array.from(new Set(payloads.map(p => p.yil)))
-    const { data: mevcut } = await supabase.from('isletme_defteri').select('tarih, tutar, tur, belge_no, aciklama').eq('birim', birim).in('yil', yillar)
+    const { data: mevcut } = importKaynak === 'defter' ? { data: [] } : await supabase.from('isletme_defteri').select('tarih, tutar, tur, belge_no, aciklama').eq('birim', birim).in('yil', yillar)
     const mevcutSet = new Set((mevcut || []).map(m => anahtar(m.tarih, Number(m.tutar), m.tur, m.belge_no, m.aciklama)))
-    const yeni = payloads.filter(p => !mevcutSet.has(anahtar(p.tarih, p.tutar, p.tur, p.belge_no, p.aciklama)))
-    const atlanan = payloads.length - yeni.length
+    const yeni = importKaynak === 'defter' ? [] : payloads.filter(p => !mevcutSet.has(anahtar(p.tarih, p.tutar, p.tur, p.belge_no, p.aciklama)))
+    const atlanan = importKaynak === 'defter' ? 0 : payloads.length - yeni.length
 
     if (yeni.length) {
       const { error } = await supabase.from('isletme_defteri').insert(yeni)
@@ -475,7 +507,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
 
     // Tahsilat Takip / Ödeme Takibi: işaretli gelir satırlarının her parçası ekstredeki tarihle ödendi işaretlenir.
     // Defterde zaten olan satırlar da işlenir; böylece aynı ekstre yeniden yüklenince eksik işaretler tamamlanır.
-    const sonuc: ImportSonuc = { hareket: yeni.length, mukerrer: atlanan, isaretlenen: 0, tarihiGuncellenen: 0, zatenVardi: 0, hata: 0, taksitAcilan: 0, elle: [] }
+    const sonuc: ImportSonuc = { defterden: importKaynak === 'defter', hareket: yeni.length, mukerrer: atlanan, isaretlenen: 0, tarihiGuncellenen: 0, zatenVardi: 0, hata: 0, taksitAcilan: 0, elle: [] }
     const elle = (r: ParsedRow, neden: string, p?: OdemeParcasi) => sonuc.elle.push({
       tarih: r.tarih, aciklama: r.aciklama, tutar: p && r.parcalar.length > 1 ? p.tutar : r.tutar,
       neden: p && r.parcalar.length > 1 ? `${ogrenciAdMap.get(p.ogrenciId ?? -1) || 'öğrenci seçilmedi'} · ${odemeHedefleri.find(h => h.anahtar === p.hedef)?.ad || 'tür seçilmedi'}: ${neden}` : neden,
@@ -572,7 +604,10 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
     setImportSaving(false)
     setImportSonuc(sonuc)
     const farkliYil = yeni.some(p => p.yil !== yil)
-    bilgi(`✅ ${yeni.length} hareket içe aktarıldı.${atlanan ? ` ${atlanan} mükerrer atlandı.` : ''}${farkliYil ? ' (Bazıları farklı yıla işlendi.)' : ''} Tahsilat Takip: ${sonuc.isaretlenen} işaretlendi${sonuc.elle.length ? `, ${sonuc.elle.length} satır elle işaretlenmeli` : ''}.`, 8000)
+    const tahsilatOzeti = `Tahsilat Takip: ${sonuc.isaretlenen} işaretlendi${sonuc.tarihiGuncellenen ? `, ${sonuc.tarihiGuncellenen} tarihi düzeltildi` : ''}${sonuc.elle.length ? `, ${sonuc.elle.length} satır elle işaretlenmeli` : ''}.`
+    bilgi(importKaynak === 'defter'
+      ? `✅ ${tahsilatOzeti}`
+      : `✅ ${yeni.length} hareket içe aktarıldı.${atlanan ? ` ${atlanan} mükerrer atlandı.` : ''}${farkliYil ? ' (Bazıları farklı yıla işlendi.)' : ''} ${tahsilatOzeti}`, 8000)
     load()
   }
 
@@ -721,9 +756,14 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
               {editId ? 'Hareketi Düzenle' : 'Yeni Hareket'}
             </span>
             {!editId && birim !== 'kulup' && (
-              <button className="btn btn-secondary btn-sm" onClick={() => { setImportOpen(true); setOnizleme(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
-                <FileSpreadsheet size={14} /> Ekstre Aktar
-              </button>
+              <span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <button className="btn btn-secondary btn-sm" onClick={defterdenEslestir} title="Deftere önceden aktarılmış banka gelirlerini Tahsilat Takip'le eşleştir (dosya gerekmez)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
+                  <ListChecks size={14} /> Tahsilatla Eşleştir
+                </button>
+                <button className="btn btn-secondary btn-sm" onClick={() => { importKapat(); setImportKaynak('dosya'); setImportOpen(true) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
+                  <FileSpreadsheet size={14} /> Ekstre Aktar
+                </button>
+              </span>
             )}
           </div>
 
@@ -842,7 +882,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
         )}
       </div>
 
-      {importOpen && <EkstreModal setImportOpen={setImportOpen} importFileName={importFileName} importReading={importReading} dosyaSec={dosyaSec} importRows={importRows} colCount={colCount} gelismisAcik={gelismisAcik} setGelismisAcik={setGelismisAcik} colMap={colMap} setColMap={setColMap} sutunSecenekleri={sutunSecenekleri} basSatirAtla={basSatirAtla} setBasSatirAtla={setBasSatirAtla} onizleme={onizleme} setOnizleme={setOnizleme} setEslesmePop={setEslesmePop} ogrencilerSirali={ogrencilerSirali} ogrenciAdMap={ogrenciAdMap} importSaving={importSaving} importKaydet={importKaydet} importSonuc={importSonuc} importKapat={importKapat} hedefAdi={(a: string | null) => odemeHedefleri.find(h => h.anahtar === a)?.ad ?? null} />}
+      {importOpen && <EkstreModal defterden={importKaynak === 'defter'} setImportOpen={setImportOpen} importFileName={importFileName} importReading={importReading} dosyaSec={dosyaSec} importRows={importRows} colCount={colCount} gelismisAcik={gelismisAcik} setGelismisAcik={setGelismisAcik} colMap={colMap} setColMap={setColMap} sutunSecenekleri={sutunSecenekleri} basSatirAtla={basSatirAtla} setBasSatirAtla={setBasSatirAtla} onizleme={onizleme} setOnizleme={setOnizleme} setEslesmePop={setEslesmePop} ogrencilerSirali={ogrencilerSirali} ogrenciAdMap={ogrenciAdMap} importSaving={importSaving} importKaydet={importKaydet} importSonuc={importSonuc} importKapat={importKapat} hedefAdi={(a: string | null) => odemeHedefleri.find(h => h.anahtar === a)?.ad ?? null} />}
 
       {/* Tahsilat Takip eşleştirme penceresi: satır bir ya da birden fazla parçaya (öğrenci × ödeme kalemi) bölünebilir */}
       {eslesmePop && onizleme && onizleme[eslesmePop.idx] && (() => {

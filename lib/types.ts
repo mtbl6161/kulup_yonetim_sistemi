@@ -294,6 +294,12 @@ export interface TahsilatKategori {
   created_at?: string
 }
 
+/** Öğrencinin türüne göre kategorinin varsayılan ücreti; o türün ücreti boşsa diğer türün ücreti kullanılır */
+export function kategoriUcreti(k: Pick<TahsilatKategori, 'varsayilan_tutar' | 'varsayilan_tutar_okul'>, o: { ogrenci_turu?: OgrenciTuru | null }): number | null {
+  const v = kulupOgrencisi(o) ? (k.varsayilan_tutar ?? k.varsayilan_tutar_okul) : (k.varsayilan_tutar_okul ?? k.varsayilan_tutar)
+  return v != null ? Number(v) : null
+}
+
 export interface TahsilatKategoriOgrenci {
   id: number
   kategori_id: number

@@ -1,7 +1,7 @@
 'use client'
 import type React from 'react'
 import { AYLAR } from '@/lib/hesaplama'
-import { TahsilatKategori, TahsilatKategoriTip, TahsilatVeriKaynagi, TahsilatKapsam, TahsilatKaydi, TahsilatTaksitPlani, Ogrenci, kulupOgrencisi } from '@/lib/types'
+import { TahsilatKategori, TahsilatKategoriTip, TahsilatVeriKaynagi, TahsilatKapsam, TahsilatKaydi, TahsilatTaksitPlani, Ogrenci, kulupOgrencisi, kategoriUcreti } from '@/lib/types'
 import { taksitKey } from '@/lib/taksit'
 import { CalendarRange, CalendarDays, Ticket, Search, X } from 'lucide-react'
 
@@ -38,10 +38,9 @@ export interface PlanForm {
 
 export type TurFiltre = 'hepsi' | 'kulup' | 'okul'
 
-/** Öğrencinin türüne göre kategorinin varsayılan ücreti (okul ücreti boşsa kulüp ücreti kullanılır) */
+/** Öğrencinin türüne göre kategorinin varsayılan ücreti (bir türün ücreti boşsa diğerininki kullanılır) */
 export function ucretBul(k: TahsilatKategori, o: Ogrenci): number | null {
-  const v = kulupOgrencisi(o) ? k.varsayilan_tutar : (k.varsayilan_tutar_okul ?? k.varsayilan_tutar)
-  return v != null ? Number(v) : null
+  return kategoriUcreti(k, o)
 }
 
 /** Kategoriye dahil öğrenciler — otomatik (kulüp aidatı) kategorisi yalnız kulüp öğrencilerini kapsar */

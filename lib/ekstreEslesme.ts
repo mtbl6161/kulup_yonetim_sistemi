@@ -9,7 +9,7 @@
 // Türkçe yerel küçük harfe çevirmede "I" -> "ı" olur ("i" değil), bu da "KIRTASIYE"
 // gibi ASCII yazılmış kelimelerin "kırtasiye" ile eşleşmesini engelliyordu.
 // ============================================================
-import { kulupOgrencisi, type Ogrenci, type TahsilatKategori, type TahsilatTaksitPlani } from './types'
+import { kategoriUcreti, kulupOgrencisi, type Ogrenci, type TahsilatKategori, type TahsilatTaksitPlani } from './types'
 
 const AY_INDEX: Record<string, number> = {
   ocak: 1, subat: 2, mart: 3, nisan: 4, mayis: 5, haziran: 6, temmuz: 7,
@@ -180,10 +180,7 @@ export function hedefleriHazirla(
       anahtar: `k${k.id}`, ad: k.ad, tip: k.tip, kategori: k, aile,
       kelimeler: kelimeler(ad).filter(w => w.length >= 4 && !GENEL.has(w) && !(aile && AILE[aile].test(w))),
       kapsar: (o: Ogrenci) => k.kapsam === 'tumu' || uyeler.has(o.id),
-      ucret: (o: Ogrenci) => {
-        const v = kulupOgrencisi(o) ? k.varsayilan_tutar : (k.varsayilan_tutar_okul ?? k.varsayilan_tutar)
-        return v != null ? Number(v) : null
-      },
+      ucret: (o: Ogrenci) => kategoriUcreti(k, o),
       taksitler: (o: Ogrenci) => planlar.filter(pl => pl.kategori_id === k.id && pl.ogrenci_id === o.id).flatMap(pl => pl.tutarlar.map(Number)),
     }
   })

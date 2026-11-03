@@ -111,6 +111,12 @@ describe('odemeTahminEt', () => {
     expect(tahmin("POYRAZ 'DAN Remzi Gürel eylul ayi okul parasi,kirtasiye,temizlik", 21085)).toMatchObject({ isaretle: false, uyari: 'Birden fazla ödeme: tutar dağılımını kontrol edin' })
     expect(tahmin('PARS NOYAN ÇOBAN SEHVEN YATIRILAN PERSONEL ÜCRETİN İADESİ', 6000)).toMatchObject({ odemeDegil: true, uyari: null })
   })
+  it('kulüp öğrencisi ücreti boşsa okul öğrencisi ücretiyle eşleştirir', () => {
+    const kulupAidat = kat({ ad: 'KULÜP AİDAT ÜCRETİ', kapsam: 'secili', varsayilan_tutar_okul: 5850 })
+    const h = hedefleriHazirla([kirtasiye, personel, kulupAidat], [{ kategori_id: kulupAidat.id, ogrenci_id: hafsa.id }], { dahil: false })
+    expect(odemeTahminEt("BİLAL CAN 'DAN Hafsa Can okul katkı payı , Yapı ve Kredi Bankası A.Ş.", 5850, '2026-10-15', ogrenciler, h))
+      .toMatchObject({ isaretle: true, tutaraGore: true, parcalar: [{ ogrenciId: hafsa.id, hedef: `k${kulupAidat.id}`, ay: 10 }] })
+  })
 })
 
 describe('dönem hesabı', () => {

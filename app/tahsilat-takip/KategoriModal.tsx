@@ -61,7 +61,7 @@ export default function KategoriModal({ birim, editId, form, setForm, otomatikKi
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <label className="form-label">Kulüp Öğrencisi Ücreti (₺)</label>
-                  <input className="form-input" type="text" inputMode="decimal" value={form.varsayilan_tutar} onChange={e => setForm(f => ({ ...f, varsayilan_tutar: e.target.value }))} placeholder="Opsiyonel" />
+                  <input className="form-input" type="text" inputMode="decimal" value={form.varsayilan_tutar} onChange={e => setForm(f => ({ ...f, varsayilan_tutar: e.target.value }))} placeholder={form.varsayilan_tutar_okul ? `Boşsa ${form.varsayilan_tutar_okul}` : 'Opsiyonel'} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label className="form-label">Okul Öğrencisi Ücreti (₺)</label>
@@ -69,7 +69,7 @@ export default function KategoriModal({ birim, editId, form, setForm, otomatikKi
                 </div>
               </div>
               <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
-                &quot;Ödedi&quot; işaretlenince öğrencinin türüne göre bu ücret yazılır. Ücret farkı yoksa ikisine aynı tutarı girin (okul ücreti boş bırakılırsa kulüp ücreti kullanılır).
+                &quot;Ödedi&quot; işaretlenince öğrencinin türüne göre bu ücret yazılır. Ücret farkı yoksa birini girmeniz yeter: boş bırakılan türe diğer türün ücreti uygulanır.
                 {form.tip !== 'aylik' && ' Taksit isteyen öğrenciye, takip ekranında hücredeki taksit düğmesiyle bu ücret üzerinden plan açılır.'}
               </div>
             </div>

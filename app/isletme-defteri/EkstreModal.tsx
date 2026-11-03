@@ -5,14 +5,16 @@ import type { Ogrenci } from '@/lib/types'
 import { perdeKapat } from '@/lib/perdeKapat'
 import type { ColMap, ImportSonuc, ParsedRow } from './yardimcilar'
 import { AYLAR, fmtTL, tarihFmt } from '@/lib/hesaplama'
-import { Save, X, FileSpreadsheet, CheckCircle2, AlertTriangle, UserCheck, ChevronDown, ChevronUp, Circle } from 'lucide-react'
+import { Save, X, FileSpreadsheet, CheckCircle2, AlertTriangle, UserCheck, ChevronDown, ChevronUp, Circle, ListChecks } from 'lucide-react'
 import { StatPil } from './yardimcilar'
 
 /** Öğrenci ödemesi olup Tahsilat Takip'e otomatik işlenmeyecek gelir satırı */
 const elleGerekir = (r: ParsedRow) => r.gecerli && r.tur === 'gelir' && !r.odemeDegil && !r.isaretle
 
 // Banka ekstresi içe aktarma penceresi: dosya seçimi, sütun eşleme, önizleme ve aktarım sonucu
-export default function EkstreModal({ setImportOpen, importFileName, importReading, dosyaSec, importRows, colCount, gelismisAcik, setGelismisAcik, colMap, setColMap, sutunSecenekleri, basSatirAtla, setBasSatirAtla, onizleme, setOnizleme, setEslesmePop, ogrencilerSirali, ogrenciAdMap, importSaving, importKaydet, importSonuc, importKapat, hedefAdi }: {
+export default function EkstreModal({ defterden, setImportOpen, importFileName, importReading, dosyaSec, importRows, colCount, gelismisAcik, setGelismisAcik, colMap, setColMap, sutunSecenekleri, basSatirAtla, setBasSatirAtla, onizleme, setOnizleme, setEslesmePop, ogrencilerSirali, ogrenciAdMap, importSaving, importKaydet, importSonuc, importKapat, hedefAdi }: {
+  /** Satırlar dosyadan değil deftere önceden aktarılmış banka gelirlerinden geldi */
+  defterden: boolean
   setImportOpen: (acik: boolean) => void
   importFileName: string
   importReading: boolean
@@ -45,18 +47,27 @@ export default function EkstreModal({ setImportOpen, importFileName, importReadi
       <div className="card" style={{ width: '100%', maxWidth: 1020, maxHeight: '92vh', overflowY: 'auto', padding: '22px 24px', marginBottom: 0 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <FileSpreadsheet size={20} style={{ color: 'var(--accent)' }} /> Banka Ekstresi Aktar
+            {defterden
+              ? <><ListChecks size={20} style={{ color: 'var(--accent)' }} /> Banka Gelirlerini Tahsilatla Eşleştir</>
+              : <><FileSpreadsheet size={20} style={{ color: 'var(--accent)' }} /> Banka Ekstresi Aktar</>}
           </h2>
           <button onClick={kapat} aria-label="Kapat" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)' }}><X size={20} /></button>
         </div>
 
         {importSonuc ? <SonucGorunumu sonuc={importSonuc} kapat={importKapat} /> : <>
         <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--text3)', lineHeight: 1.5 }}>
-          Bankadan indirdiğiniz ekstre dosyasını (.xlsx / .xls / .csv) yükleyin — sütunlar otomatik tanınır. Öğrenci ödemeleri Tahsilat Takip&rsquo;e ekstredeki tarihle &ldquo;ödendi&rdquo; olarak işlenir.
+          {defterden
+            ? <>Deftere daha önce bankadan aktarılmış gelir satırları açıklamalarından yeniden eşleştirilir. Deftere yeni satır eklenmez; öğrenci ödemeleri Tahsilat Takip&rsquo;e defterdeki tarihle &ldquo;ödendi&rdquo; olarak işlenir, elle işaretlenmiş ödemelerin tarihi düzeltilir.</>
+            : <>Bankadan indirdiğiniz ekstre dosyasını (.xlsx / .xls / .csv) yükleyin — sütunlar otomatik tanınır. Öğrenci ödemeleri Tahsilat Takip&rsquo;e ekstredeki tarihle &ldquo;ödendi&rdquo; olarak işlenir.</>}
         </p>
 
-        {/* Dosya seçimi */}
-        {!importFileName && !importReading ? (
+        {/* Dosya seçimi (defterden eşleştirmede yalnız kaynak gösterilir) */}
+        {defterden ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg)', fontSize: 12.5 }}>
+            <ListChecks size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>{importReading ? 'Defter okunuyor…' : <><strong>{importFileName}</strong> — {Math.max(0, importRows.length - 1)} satır</>}</span>
+          </div>
+        ) : !importFileName && !importReading ? (
           <div style={{ border: '1.5px dashed var(--border)', borderRadius: 10, padding: '18px', textAlign: 'center', background: 'var(--bg)' }}>
             <label className="btn btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <FileSpreadsheet size={15} /> Dosya Seç
@@ -78,7 +89,7 @@ export default function EkstreModal({ setImportOpen, importFileName, importReadi
         )}
 
         {/* Gelişmiş: sütun eşleştirme (varsayılan kapalı — otomatik tanıma genelde yeterli) */}
-        {colCount > 0 && (
+        {colCount > 0 && !defterden && (
           <div style={{ marginTop: 12 }}>
             <button type="button" onClick={() => setGelismisAcik(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 11.5, fontWeight: 600, padding: '4px 0' }}>
               {gelismisAcik ? <ChevronUp size={14} /> : <ChevronDown size={14} />} Sütun eşleştirmeyi göster
@@ -237,7 +248,7 @@ export default function EkstreModal({ setImportOpen, importFileName, importReadi
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
           <button className="btn btn-secondary" onClick={() => setImportOpen(false)} disabled={importSaving}>İptal</button>
           <button className="btn btn-primary" onClick={importKaydet} disabled={importSaving || !onizleme || !onizleme.some(r => r.gecerli)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <Save size={15} /> {importSaving ? 'Kaydediliyor...' : 'İçe Aktar'}
+            <Save size={15} /> {importSaving ? 'Kaydediliyor...' : defterden ? 'Tahsilat Takip’e İşle' : 'İçe Aktar'}
           </button>
         </div>
         </>}
@@ -250,7 +261,7 @@ function SonucGorunumu({ sonuc, kapat }: { sonuc: ImportSonuc; kapat: () => void
   return (
     <div style={{ marginTop: 12 }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-        <StatPil label="Deftere eklenen" value={String(sonuc.hareket)} color="var(--success)" />
+        {!sonuc.defterden && <StatPil label="Deftere eklenen" value={String(sonuc.hareket)} color="var(--success)" />}
         {sonuc.mukerrer > 0 && <StatPil label="Defterde zaten vardı" value={String(sonuc.mukerrer)} />}
         <StatPil label="Ödendi işaretlenen" value={String(sonuc.isaretlenen)} color="var(--accent)" />
         {sonuc.tarihiGuncellenen > 0 && <StatPil label="Tarihi ekstreden düzeltilen" value={String(sonuc.tarihiGuncellenen)} color="var(--accent)" />}
@@ -262,7 +273,7 @@ function SonucGorunumu({ sonuc, kapat }: { sonuc: ImportSonuc; kapat: () => void
         <>
           <div className="alert alert-warn" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12.5, marginBottom: 10 }}>
             <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-            <div><strong>{sonuc.elle.length} ödeme Tahsilat Takip&rsquo;e işlenemedi — elle işaretleyin.</strong> Bu satırlar işletme defterine yazıldı; öğrencinin ödemesini Tahsilat Takip ekranından aşağıdaki tarih ve tutarla işaretleyin.</div>
+            <div><strong>{sonuc.elle.length} ödeme Tahsilat Takip&rsquo;e işlenemedi — elle işaretleyin.</strong> Bu satırlar işletme defterinde; daha önce elle işaretlemediyseniz öğrencinin ödemesini Tahsilat Takip ekranından aşağıdaki tarih ve tutarla işaretleyin.</div>
           </div>
           <div style={{ maxHeight: 340, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
             <table className="data-table" style={{ width: '100%' }}>

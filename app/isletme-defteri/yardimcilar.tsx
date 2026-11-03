@@ -20,6 +20,8 @@ export interface ParsedRow {
 
 /** İçe aktarma sonrası Tahsilat Takip'e işlenemeyen, elle işaretlenmesi gereken satırlar */
 export interface ImportSonuc {
+  /** Satırlar dosyadan değil defterden geldi: deftere yazım yapılmadı */
+  defterden: boolean
   hareket: number
   mukerrer: number
   isaretlenen: number

@@ -634,7 +634,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
                         })()}
                         {!otomatik && (k.varsayilan_tutar != null || k.varsayilan_tutar_okul != null) && (
                           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                            <span><TurRozet okul={false} /> {k.varsayilan_tutar != null ? <strong style={{ color: 'var(--text)' }}>{fmtTL(Number(k.varsayilan_tutar))}</strong> : '—'}</span>
+                            <span><TurRozet okul={false} /> <strong style={{ color: 'var(--text)' }}>{fmtTL(Number(k.varsayilan_tutar ?? k.varsayilan_tutar_okul ?? 0))}</strong></span>
                             <span><TurRozet okul /> <strong style={{ color: 'var(--text)' }}>{fmtTL(Number(k.varsayilan_tutar_okul ?? k.varsayilan_tutar ?? 0))}</strong></span>
                           </div>
                         )}
