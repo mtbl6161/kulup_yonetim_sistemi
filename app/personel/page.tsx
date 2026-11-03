@@ -9,7 +9,8 @@ import { useAuth } from '@/lib/AuthContext'
 import { Personel, Ayarlar } from '@/lib/types'
 import ConfirmModal from '@/components/ConfirmModal'
 import PersonelModal from '@/components/PersonelModal'
-import { Plus, Pencil, Trash2, RotateCcw, FileSpreadsheet } from 'lucide-react'
+import { Plus, Pencil, Trash2, RotateCcw, FileSpreadsheet, X } from 'lucide-react'
+import { kisiTekillestir } from '@/lib/hesaplama'
 import { excelIndir, bugunEtiketi } from '@/lib/excel'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
@@ -115,10 +116,15 @@ function PersonelIc() {
     return 9;
   };
 
-  const sorted = [...personel]
-    .filter(p => {
-      return listeTuru === 'aktif' ? p.aktif !== false : p.aktif === false
-    })
+  // Aynı kişinin birden fazla görev kaydı (ör. Başkan Yrd. + Koordinatör Öğretmen) tek satırda gösterilir;
+  // üst görev satırda kalır, diğerleri ek görev rozeti olur (bordroda zaten yalnız biri ödenir)
+  const { tekil, ekGorevler } = kisiTekillestir(
+    personel.filter(p => listeTuru === 'aktif' ? p.aktif !== false : p.aktif === false),
+    p => getPriority(p.gorev)
+  )
+  const gorevler = (p: Personel) => [p, ...(ekGorevler.get(p.id) || [])]
+
+  const sorted = [...tekil]
     .sort((a, b) => {
       const p1 = getPriority(a.gorev);
       const p2 = getPriority(b.gorev);
@@ -128,7 +134,7 @@ function PersonelIc() {
 
   const excelAktar = () => excelIndir(`Personel_Listesi_${listeTuru === 'arsiv' ? 'Arsiv_' : ''}${bugunEtiketi()}`, 'Personel',
     ['Sıra', 'Ad soyad', 'T.C. Kimlik No', 'Görev', 'Meslek kodu', 'Sigorta', 'Emekli', 'SGK no', 'IBAN', 'E-posta'],
-    sorted.map((p, i) => [i + 1, p.ad, p.tc, p.gorev, p.meslek_kodu, p.sgk_li ? "SGK'lı" : 'Kadrolu', p.is_retired ? 'Evet' : 'Hayır', p.sgk_no, p.iban, p.email]))
+    sorted.map((p, i) => [i + 1, p.ad, p.tc, gorevler(p).map(x => x.gorev).join(' / '), p.meslek_kodu, p.sgk_li ? "SGK'lı" : 'Kadrolu', p.is_retired ? 'Evet' : 'Hayır', p.sgk_no, p.iban, p.email]))
 
   return (
     <div>
@@ -191,8 +197,22 @@ function PersonelIc() {
                         </div>
                       </td>
                       <td>
-                        <div style={{ marginBottom: 4 }}>
+                        <div style={{ marginBottom: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                           <span className="badge badge-blue" style={{ fontSize: 10 }}>{p.gorev}</span>
+                          {(ekGorevler.get(p.id) || []).map(e => (
+                            <span key={e.id} className="badge badge-gray" style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                              title="Aynı kişinin ek görev kaydı — bordroda yalnız ücreti yüksek görev ödenir">
+                              <button type="button" onClick={() => duzenle(e)} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: 'inherit', font: 'inherit' }}>+ {e.gorev}</button>
+                              {listeTuru === 'aktif' && (
+                                <button type="button" onClick={() => setSilOnayId(e.id)} title="Bu görev kaydını arşive kaldır" aria-label={`${e.gorev} görev kaydını arşive kaldır`}
+                                  style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: 'inherit', display: 'inline-flex' }}><X size={10} /></button>
+                              )}
+                              {listeTuru === 'arsiv' && (
+                                <button type="button" onClick={() => geriYukle(e.id)} title="Bu görev kaydını geri yükle" aria-label={`${e.gorev} görev kaydını geri yükle`}
+                                  style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: 'inherit', display: 'inline-flex' }}><RotateCcw size={10} /></button>
+                              )}
+                            </span>
+                          ))}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>
                           Kod: {p.meslek_kodu || '-'}
@@ -263,7 +283,7 @@ function PersonelIc() {
         return (
           <ConfirmModal
             baslik="Personeli Sil ve Arşive Kaldır"
-            mesaj={`"${hedef?.ad}" adlı personeli silmek istediğinizden emin misiniz? Personel listeden kaldırılır ancak geçmiş dönemlerdeki tüm bordro ve puantaj verileri ismiyle beraber korunmaya devam eder. Dilediğiniz zaman "Silinenler / Arşiv" seçeneğinden personeli tüm geçmiş bilgileriyle birlikte geri yükleyebilirsiniz.`}
+            mesaj={`"${hedef?.ad}" adlı personelin "${hedef?.gorev}" görev kaydını silmek istediğinizden emin misiniz? Kayıt listeden kaldırılır (kişinin başka görev kaydı varsa o kalır) ancak geçmiş dönemlerdeki tüm bordro ve puantaj verileri ismiyle beraber korunmaya devam eder. Dilediğiniz zaman "Silinenler / Arşiv" seçeneğinden personeli tüm geçmiş bilgileriyle birlikte geri yükleyebilirsiniz.`}
             onayMetni="Evet, Sil ve Arşivle"
             iptalMetni="İptal"
             onOnayla={() => sil(silOnayId)}

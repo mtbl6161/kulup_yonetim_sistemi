@@ -4,7 +4,7 @@ import Topbar from '@/components/Topbar'
 import { useAy } from '@/lib/AyContext'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { ayLabel, gunSayisi, haftaIciMi, tatilMi } from '@/lib/hesaplama'
+import { ayLabel, gunSayisi, haftaIciMi, tatilMi, isOgretmen, kisiTekillestir } from '@/lib/hesaplama'
 import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAc, PDF_RENK, PDF_KENAR } from '@/lib/pdf'
 import type { RowInput, CellInput } from '@/lib/pdf'
 import { Personel, Puantaj, Ayarlar, SinifDefteri, Tatil } from '@/lib/types'
@@ -57,19 +57,23 @@ export default function PuantajPage() {
   const daysInMonth = gunSayisi(yil, ay)
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1)
 
-  const filteredPersonel = useMemo(() => {
-    return personel.filter(p => {
-      const gorev = (p.gorev || '').toLowerCase();
-      if (gorev.includes('denetim')) return false;
+  // Bu ay puantajda yer alabilecek kayıtlar (denetim yetkilisi hariç; ayrılanlar yalnız saati varsa)
+  const adayPersonel = useMemo(() => personel.filter(p => {
+    if ((p.gorev || '').toLowerCase().includes('denetim')) return false
+    return p.aktif !== false || puantaj.some(x => x.personel_id === p.id && Number(x.saat) > 0)
+  }), [personel, puantaj])
 
-      const type = p.sgk_li ? 'sgk' : 'kadrolu';
-      if (type !== activeType) return false;
+  // Aynı kişinin iki görev kaydı (ör. Başkan Yrd. + Koordinatör Öğretmen) tek satırda görünür:
+  // saati girilmiş kayıt, yoksa saatle çalışan (öğretmen) görev kalır, diğeri ek görev olarak yazılır
+  const { tekil: tekilPersonel, ekGorevler } = useMemo(() => kisiTekillestir(adayPersonel, p =>
+    puantaj.some(x => x.personel_id === p.id && Number(x.saat) > 0) ? 0 : isOgretmen(p.gorev) ? 1 : 2
+  ), [adayPersonel, puantaj])
+  const gorevEtiketi = (p: Personel) => [p.gorev, ...(ekGorevler.get(p.id) || []).map(x => x.gorev)].join(' / ')
 
-      if (p.aktif !== false) return true;
-      const hasHours = puantaj.some(x => x.personel_id === p.id && Number(x.saat) > 0);
-      return hasHours;
-    })
-  }, [personel, activeType, puantaj])
+  const filteredPersonel = useMemo(
+    () => tekilPersonel.filter(p => (p.sgk_li ? 'sgk' : 'kadrolu') === activeType),
+    [tekilPersonel, activeType]
+  )
 
   const handlePdfDownload = async () => {
     const { pdf, autoTable } = await pdfHazirla('landscape')
@@ -140,7 +144,7 @@ export default function PuantajPage() {
       return [
         (idx + 1).toString(),
         p.ad + (p.aktif === false ? ' (Ayrıldı)' : ''),
-        p.gorev,
+        gorevEtiketi(p),
         ...days,
         total.toString(),
         ''
@@ -219,7 +223,8 @@ export default function PuantajPage() {
       const startDate = `${yil}-${String(ay).padStart(2, '0')}-01`
       const lastDay = gunSayisi(yil, ay)
       const endDate = `${yil}-${String(ay).padStart(2, '0')}-${lastDay}T23:59:59`
-      const ids = filteredPersonel.map(p => p.id)
+      // Tek satırda görünen kişinin diğer görev kayıtlarındaki eski saatler de temizlenir
+      const ids = filteredPersonel.flatMap(p => [p.id, ...(ekGorevler.get(p.id) || []).map(x => x.id)])
       if (ids.length > 0) {
         const { error: delErr } = await supabase.from('puantaj').delete().in('personel_id', ids).gte('tarih', startDate).lte('tarih', endDate)
         if (delErr) throw delErr
@@ -401,7 +406,7 @@ export default function PuantajPage() {
                             {p.ad}
                             {p.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 10, marginLeft: 6 }} className="no-print"> (Ayrıldı)</span>}
                           </td>
-                          <td style={{ fontSize: 11 }}>{p.gorev}</td>
+                          <td style={{ fontSize: 11 }}>{gorevEtiketi(p)}</td>
                           {daysArray.map(d => {
                             const val = getPuantajValue(p.id, d)
                             const isWeekend = !haftaIciMi(yil, ay, d)

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   gunSayisi, isGunuSayisi, tatilMi, saatUcretiHesapla, ogrenciUcretiHesapla,
-  gelirVergisiHesapla, gorevTavanYuzdesi, tavanHesapla, bordroHesapla, tahakkukDagitimHesapla,
+  gelirVergisiHesapla, gorevTavanYuzdesi, tavanHesapla, bordroHesapla, tahakkukDagitimHesapla, kisiTekillestir,
 } from './hesaplama'
 import type { Ayarlar } from './types'
 
@@ -169,5 +169,28 @@ describe('tahakkuk dağılımı', () => {
     const t = tahakkukDagitimHesapla(1234.57, ayarlar())
     const toplam = t.temel_gider + t.ogretmen_havuzu + t.baskan + t.baskan_yrd + t.muhasebe + t.temizlik + t.denetim
     expect(Math.round(toplam * 100) / 100).toBe(1234.57)
+  })
+})
+
+describe('kişi tekilleştirme', () => {
+  const p = (id: number, ad: string, gorev: string, tc: string | null, iban: string | null = null) => ({ id, ad, gorev, tc, iban })
+  it('aynı T.C. ya da aynı IBAN + ad ile açılmış görev kayıtlarını tek kişiye indirir, sırayı korur', () => {
+    const liste = [
+      p(1, 'AYŞE KAYA', 'Öğretmen', '111'),
+      p(93, 'HAFİZE BÜŞRA GÜZEL', 'Başkan Yrd.', '222'),
+      p(5, 'ALİ VURAL', 'Temizlik Personeli', '333', 'TR01'),
+      p(102, 'HAFIZE BÜŞRA GÜZEL', 'Koordinatör Öğretmen', '222'),
+      p(7, 'ALİ VURAL', 'Muhasebe Personeli', null, 'TR01'),
+    ]
+    const { tekil, ekGorevler } = kisiTekillestir(liste)
+    expect(tekil.map(x => x.id)).toEqual([1, 93, 5])
+    expect(ekGorevler.get(93)?.map(x => x.id)).toEqual([102])
+    expect(ekGorevler.get(5)?.map(x => x.id)).toEqual([7])
+  })
+  it('önceliği en küçük kaydı bırakır', () => {
+    const liste = [p(93, 'HAFİZE BÜŞRA GÜZEL', 'Başkan Yrd.', '222'), p(102, 'HAFIZE BÜŞRA GÜZEL', 'Koordinatör Öğretmen', '222')]
+    const { tekil, ekGorevler } = kisiTekillestir(liste, x => (x.gorev.includes('Öğretmen') ? 0 : 1))
+    expect(tekil.map(x => x.id)).toEqual([102])
+    expect(ekGorevler.get(102)?.map(x => x.gorev)).toEqual(['Başkan Yrd.'])
   })
 })

@@ -5,7 +5,7 @@
 // anında o anki kopyaları depoya kaydedilir.
 // ============================================================
 import { supabase } from './supabase'
-import { AYLAR, fmt, gunSayisi, tahakkukDagitimHesapla, detectActiveCategories, isDenetim } from './hesaplama'
+import { AYLAR, fmt, gunSayisi, tahakkukDagitimHesapla, detectActiveCategories, isDenetim, kisiTekillestir } from './hesaplama'
 import { Ayarlar } from './types'
 import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAltBilgi, type Pdf as PdfBelgesi } from './pdf'
 
@@ -182,14 +182,14 @@ async function donemVerisiGetir(okulId: number, yil: number, ay: number): Promis
   }
 }
 
-/** Dönemde çalışan (bordroda ya da puantajda yer alan, ya da aktif) personel; denetim yetkilisi hariç */
-function donemPersoneli(v: DonemVerisi): PersonelSatir[] {
-  return v.personel.filter(p => {
-    if (isDenetim(p.gorev)) return false
-    if (v.bordro.some(b => b.personel_id === p.id)) return true
-    if (v.puantaj.some(x => x.personel_id === p.id && Number(x.saat) > 0)) return true
-    return p.aktif !== false
-  })
+/** Dönemde çalışan (bordroda ya da puantajda yer alan, ya da aktif) personel; denetim yetkilisi hariç.
+ *  Aynı kişinin iki görev kaydı varsa kişi bir kez yer alır: bordrosu olan görev (puantaj cetvelinde saati olan) */
+function donemPersoneli(v: DonemVerisi, once: 'bordro' | 'puantaj' = 'bordro'): PersonelSatir[] {
+  const bordrolu = (p: PersonelSatir) => v.bordro.some(b => b.personel_id === p.id)
+  const saatli = (p: PersonelSatir) => v.puantaj.some(x => x.personel_id === p.id && Number(x.saat) > 0)
+  const calisan = v.personel.filter(p => !isDenetim(p.gorev) && (bordrolu(p) || saatli(p) || p.aktif !== false))
+  const [birinci, ikinci] = once === 'bordro' ? [bordrolu, saatli] : [saatli, bordrolu]
+  return kisiTekillestir(calisan, p => birinci(p) ? 0 : ikinci(p) ? 1 : 2).tekil
 }
 
 const GOREV_SIRA = ['Başkan', 'Başkan Yrd.', 'Koordinatör Öğretmen', 'Öğretmen', 'Usta Öğretici', 'Muhasebe Personeli', 'Temizlik Personeli']
@@ -223,7 +223,7 @@ export async function otomatikBelgeUret(kod: OtomatikKod, okulId: number, yil: n
   if (kod === 'puantaj_sgk' || kod === 'puantaj_kadrolu') {
     const { pdf, autoTable } = await yeniPdf('landscape')
     baslikYaz(pdf, kurum, `${turAd.toLocaleUpperCase('tr-TR')} PERSONEL PUANTAJ CETVELİ`, donem)
-    const liste = donemPersoneli(v).filter(p => !!p.sgk_li === sgkMi).sort(gorevSirala)
+    const liste = donemPersoneli(v, 'puantaj').filter(p => !!p.sgk_li === sgkMi).sort(gorevSirala)
     if (liste.length === 0) {
       bosNotYaz(pdf, `Bu dönemde ${turAd.toLocaleLowerCase('tr-TR')} personel bulunmamaktadır.`)
     } else {

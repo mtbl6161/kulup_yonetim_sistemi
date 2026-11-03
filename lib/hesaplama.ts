@@ -397,6 +397,31 @@ export function kisiGruplari(personel: { id: number; ad: string; tc?: string | n
 }
 
 /**
+ * Aynı kişinin (kisiGruplari) birden fazla görev kaydını tek kayda indirir: puantaj, personel listesi ve
+ * resmî belgelerde kişi bir kez sayılır. Her kişiden önceliği en küçük kayıt kalır (eşitlikte listede önce
+ * gelen); kişinin diğer görev kayıtları ekGorevler'de kalan kaydın id'siyle döner. Sıra korunur.
+ */
+export function kisiTekillestir<T extends { id: number; ad: string; tc?: string | null; iban?: string | null }>(
+  personel: T[], oncelik: (p: T) => number = () => 0
+): { tekil: T[]; ekGorevler: Map<number, T[]> } {
+  const grup = kisiGruplari(personel)
+  const secilen = new Map<string, T>()
+  for (const p of personel) {
+    const k = grup.get(p.id)!
+    const m = secilen.get(k)
+    if (!m || oncelik(p) < oncelik(m)) secilen.set(k, p)
+  }
+  const tekil: T[] = []
+  const ekGorevler = new Map<number, T[]>()
+  for (const p of personel) {
+    const asil = secilen.get(grup.get(p.id)!)!
+    if (asil === p) tekil.push(p)
+    else ekGorevler.set(asil.id, [...(ekGorevler.get(asil.id) || []), p])
+  }
+  return { tekil, ekGorevler }
+}
+
+/**
  * Aynı kişinin birden fazla görev satırı varsa yalnızca brütü en yüksek olanı bırakır.
  * Elenen satırlar { kalan, elenen } olarak döner (elenenlerin ücreti okulda kalır).
  */
