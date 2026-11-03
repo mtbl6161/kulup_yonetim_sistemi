@@ -120,20 +120,30 @@ export function useHesapKontrol(okulId: number, yil: number, ay: number): HesapK
           ? supabase.from('hesap_hareketleri').select('kaynak_id').eq('okul_id', okulId).eq('kaynak', 'tahsilat').in('kaynak_id', buAy.map(t => t.id))
           : Promise.resolve({ data: [] as { kaynak_id: number }[], error: null }),
         tcler.length
-          ? supabase.from('personel').select('tc, okul_id').in('tc', tcler).neq('okul_id', okulId)
-          : Promise.resolve({ data: [] as { tc: string; okul_id: number }[], error: null }),
+          ? supabase.from('personel').select('id, tc, okul_id, aktif, created_at').in('tc', tcler).neq('okul_id', okulId)
+          : Promise.resolve({ data: [] as { id: number; tc: string; okul_id: number; aktif: boolean | null; created_at: string | null }[], error: null }),
         ogrIdleri.length
           ? supabase.from('ogrenciler').select('id, ad, soyad').in('id', ogrIdleri)
           : Promise.resolve({ data: [] as { id: number; ad: string; soyad: string }[], error: null }),
       ])
       const ogrAdi = new Map((ogr.data || []).map(o => [o.id, [o.ad, o.soyad].filter(Boolean).join(' ')]))
-      const digerOkulIdleri = Array.from(new Set((digerPer.data || []).map(x => x.okul_id)))
+      // Diğer kulüpteki kayıt o kulüpte bu aya bordrosu varsa ya da aktif olup bu ay bitmeden açılmışsa sayılır:
+      // ayrılıp pasife alınmış eski kayıt ya da sonradan açılan yeni kayıt (ör. başka okula görevlendirilen
+      // öğretmen) çalışmadığı ay için uyarı üretmez
+      const aktifSayilir = (x: { aktif: boolean | null; created_at: string | null }) => x.aktif !== false && (!x.created_at || x.created_at < sonraki)
+      const bakilacakIdler = (digerPer.data || []).filter(x => !aktifSayilir(x)).map(x => x.id)
+      const { data: digerBordro } = bakilacakIdler.length
+        ? await supabase.from('bordro').select('personel_id').in('personel_id', bakilacakIdler).eq('ay', ay).eq('yil', yil)
+        : { data: [] as { personel_id: number }[] }
+      const buAyCalisan = new Set((digerBordro || []).map(x => x.personel_id))
+      const digerKayitlar = (digerPer.data || []).filter(x => aktifSayilir(x) || buAyCalisan.has(x.id))
+      const digerOkulIdleri = Array.from(new Set(digerKayitlar.map(x => x.okul_id)))
       const { data: digerOkullar } = digerOkulIdleri.length
         ? await supabase.from('okullar').select('id, ad').in('id', digerOkulIdleri)
         : { data: [] as { id: number; ad: string }[] }
       const okulAdi = new Map((digerOkullar || []).map(o => [o.id, o.ad]))
       const tcOkullar = new Map<string, string[]>()
-      for (const x of digerPer.data || []) {
+      for (const x of digerKayitlar) {
         const ad = okulAdi.get(x.okul_id) || `Okul #${x.okul_id}`
         const l = tcOkullar.get(x.tc) || []
         if (!l.includes(ad)) l.push(ad)
