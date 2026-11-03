@@ -578,7 +578,7 @@ export default function DenetimPage() {
           )
         )}
 
-        {okulSekme === 'hesap' && <DenetciHesapKontrol veri={hesapVeri} />}
+        {okulSekme === 'hesap' && <DenetciHesapKontrol veri={hesapVeri} okulAd={selectedOkul?.ad || ''} />}
 
         {okulSekme === 'rapor' && (
           <DenetimRaporu key={`rapor-${secilenOkulId}-${secilenAyKey}`} okulId={secilenOkulId} yil={selYil} ay={selAy} hesap={hesapVeri}

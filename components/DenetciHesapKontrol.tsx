@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { fmt } from '@/lib/hesaplama'
 import { hesapKontrolEt, BANKA_TARIH_TOLERANSI, HesapKontrolSonuc, KontrolBulgu, KontrolDurum, KontrolBordro, KisiKontrol } from '@/lib/hesapKontrol'
 import { Ayarlar, Personel } from '@/lib/types'
-import { AlertTriangle, CheckCircle2, XCircle, Info, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, XCircle, Info, RefreshCw, ChevronDown, ChevronRight, FileDown } from 'lucide-react'
 import { useYukleme } from '@/lib/useYukleme'
 
 const RENK: Record<KontrolDurum, { bg: string; fg: string; border: string; ad: string }> = {
@@ -65,6 +65,8 @@ function hucre(k: KisiKontrol, basliklar: string[]): React.CSSProperties {
 }
 
 export interface HesapKontrolVeri {
+  ay: number
+  yil: number
   sonuc: HesapKontrolSonuc | null
   hataMsg: string | null
   yukleniyor: boolean
@@ -175,14 +177,24 @@ export function useHesapKontrol(okulId: number, yil: number, ay: number): HesapK
 
   useYukleme(yukle)
 
-  return { sonuc, hataMsg, yukleniyor, yukle }
+  return { ay, yil, sonuc, hataMsg, yukleniyor, yukle }
 }
 
-export default function DenetciHesapKontrol({ veri }: { veri: HesapKontrolVeri }) {
+export default function DenetciHesapKontrol({ veri, okulAd }: { veri: HesapKontrolVeri; okulAd: string }) {
   const { sonuc, hataMsg, yukleniyor, yukle } = veri
   // Hata/uyarı içeren satırlar varsayılan açık; kullanıcının değiştirdikleri bu kümede tutulur
   const [degisen, setDegisen] = useState<Set<number>>(new Set())
   const [sadeceSorunlu, setSadeceSorunlu] = useState(false)
+  const [pdfHazirlaniyor, setPdfHazirlaniyor] = useState(false)
+
+  async function pdfAl() {
+    if (!sonuc) return
+    setPdfHazirlaniyor(true)
+    try {
+      const { hesapKontrolPdf } = await import('@/lib/hesapKontrolPdf')
+      await hesapKontrolPdf(sonuc, { okulAd, ay: veri.ay, yil: veri.yil })
+    } finally { setPdfHazirlaniyor(false) }
+  }
 
   if (yukleniyor) return <div style={{ padding: 40, color: 'var(--text3)' }}>⏳ Kontroller yapılıyor...</div>
   if (hataMsg || !sonuc) return <div style={{ padding: 24 }}><div style={{ ...kart, background: 'var(--danger-light)', color: 'var(--danger)' }}>{hataMsg}</div></div>
@@ -200,7 +212,10 @@ export default function DenetciHesapKontrol({ veri }: { veri: HesapKontrolVeri }
           Kaydedilmiş bordroya göre · <b style={{ color: 'var(--text)' }}>{ozet.ok} / {kisiler.length}</b> personel sorunsuz
           {(ozet.hata > 0 || ozet.uyari > 0) && <> · {ozet.hata} hata, {ozet.uyari} uyarı (sorunlu personelin ayrıntısı açık)</>}
         </span>
-        <button type="button" onClick={yukle} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text)' }}>
+        <button type="button" onClick={pdfAl} disabled={pdfHazirlaniyor} title="Personel adlarıyla bordro kontrolü, genel toplamlar ve muhtasar beyanname özeti" style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 13, fontWeight: 600, cursor: pdfHazirlaniyor ? 'wait' : 'pointer', fontFamily: 'inherit', color: 'var(--text)' }}>
+          <FileDown size={14} aria-hidden="true" /> {pdfHazirlaniyor ? 'PDF hazırlanıyor…' : 'PDF indir'}
+        </button>
+        <button type="button" onClick={yukle} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text)' }}>
           <RefreshCw size={14} aria-hidden="true" /> Yeniden kontrol et
         </button>
       </div>

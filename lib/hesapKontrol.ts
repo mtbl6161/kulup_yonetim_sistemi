@@ -647,9 +647,28 @@ export function hesapKontrolEt(girdi: {
   })
 
   // ---------- Muhtasar özeti ----------
+  const muhtasar = muhtasarOzeti(kisiler)
+
+  const tum = [...genel, ...kisiler.flatMap(k => k.bulgular)]
+  const ozet = {
+    hata: tum.filter(x => x.durum === 'hata').length, // havuz aşımları genel bulgularda tek satırda sayılır
+    uyari: tum.filter(x => x.durum === 'uyari').length,
+    ok: kisiler.filter(k => k.durum === 'ok').length,
+  }
+
+  return {
+    toplamGelir, tavanKatsayi, genel, banka, dagitim,
+    birimSaat: { beklenen: birimSaat, manuel: manuelSaat, toplamSaat: toplamOgretmenSaat, havuz: havuz.ogretmen },
+    kisiler, muhtasar, ozet,
+  }
+}
+
+/** Muhtasar beyanname özeti: vergi/SGK toplamları denetim yetkilisi hariç, brüt/net herkes dahil.
+ *  Raporda SGK'lı / kadrolu kırılımı için personelin bir alt kümesiyle de çağrılır. */
+export function muhtasarOzeti(kisiler: KisiKontrol[]): HesapKontrolSonuc['muhtasar'] {
   const vergili = kisiler.filter(k => k.kategori !== 'denetim')
   const top = (f: (k: KisiKontrol) => number, liste = vergili) => r2(liste.reduce((s, k) => s + f(k), 0))
-  const muhtasar = {
+  return {
     gvMatrah: top(k => Number(k.satir.gv_matrah ?? 0)),
     gvHesaplanan: top(k => Number(k.satir.gv_hesaplanan || 0) || Number(k.satir.gv_tutar || 0) + Number(k.satir.gv_istisna_tutari || 0)),
     gvIstisna: top(k => Number(k.satir.gv_istisna_tutari || 0)),
@@ -664,19 +683,6 @@ export function hesapKontrolEt(girdi: {
     net: top(k => Number(k.satir.net || 0), kisiler),
     sgkliSayisi: kisiler.filter(k => k.satir.personel?.sgk_li).length,
     kadroluSayisi: kisiler.filter(k => !k.satir.personel?.sgk_li).length,
-  }
-
-  const tum = [...genel, ...kisiler.flatMap(k => k.bulgular)]
-  const ozet = {
-    hata: tum.filter(x => x.durum === 'hata').length, // havuz aşımları genel bulgularda tek satırda sayılır
-    uyari: tum.filter(x => x.durum === 'uyari').length,
-    ok: kisiler.filter(k => k.durum === 'ok').length,
-  }
-
-  return {
-    toplamGelir, tavanKatsayi, genel, banka, dagitim,
-    birimSaat: { beklenen: birimSaat, manuel: manuelSaat, toplamSaat: toplamOgretmenSaat, havuz: havuz.ogretmen },
-    kisiler, muhtasar, ozet,
   }
 }
 

@@ -137,6 +137,19 @@ export function pdfAltBilgi(pdf: Pdf, belge?: string) {
   pdf.setTextColor(...PDF_RENK.metin)
 }
 
+/** Alt bilgiyi ekleyip PDF'i verilen adla indirir (yeni sekmede açılan blob'un adı anlamsız bir numara olur).
+ *  Dosya adındaki işletim sisteminin kabul etmediği karakterler atılır. */
+export function pdfIndir(pdf: Pdf, dosyaAdi: string, belge?: string) {
+  pdfAltBilgi(pdf, belge)
+  const ad = dosyaAdi.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim()
+  pdf.setProperties({ title: ad.replace(/\.pdf$/i, '') })
+  const url = URL.createObjectURL(pdf.output('blob'))
+  const a = document.createElement('a')
+  a.href = url; a.download = /\.pdf$/i.test(ad) ? ad : `${ad}.pdf`
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
+
 /** Alt bilgiyi ekleyip PDF'i yeni sekmede açar. altBilgi: false → alt bilgi basılmaz (ör. resmî defter). */
 export function pdfAc(pdf: Pdf, belge?: string, altBilgi: boolean = true) {
   if (altBilgi) pdfAltBilgi(pdf, belge)
