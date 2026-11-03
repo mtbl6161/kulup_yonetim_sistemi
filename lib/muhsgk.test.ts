@@ -72,6 +72,8 @@ describe('muhsgkXml', () => {
   })
 
   it('mükellef bilgisini GİB düzeninde yazar', () => {
+    expect(xml).toContain('<beyanname kodVer="MUHSGK_22"')
+    expect(xml).toContain('xsi:noNamespaceSchemaLocation="MUHSGK_22.xsd"')
     expect(xml).toContain('<vdKodu>045252</vdKodu>')
     expect(xml).toContain('<hsv sifat="kendisi">')
     expect(xml).toContain('<alanKodu>506</alanKodu>')

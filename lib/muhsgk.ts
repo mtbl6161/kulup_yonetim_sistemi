@@ -1,10 +1,17 @@
 // ============================================================
-// Muhtasar ve Prim Hizmet Beyannamesi (MUHSGK_21) XML'i
+// Muhtasar ve Prim Hizmet Beyannamesi (MUHSGK) XML'i
 // GİB e-Beyanname düzeni: muhtasar matrahları + SGK aylık bildirimi tek dosyada.
 // Biçim, muhasebecinin GİB'e yüklediği gerçek bir MUHSGK_21 dosyasıyla hizalanmıştır.
 // ============================================================
 import type { Ayarlar, Bordro, Personel } from './types'
 import { eksikGunSayisi, primGunu } from './sgkEksikGun'
+
+/**
+ * GİB'in kabul ettiği beyanname sürümü (kodVer, şema ve dosya adında geçer).
+ * 22: 2026/Ekim döneminden (1 Kasım 2026'dan) itibaren; Ekler sayfasına GVK 23/20 nitelikli hizmet
+ * personeli istisna bildirimi eklendi. Bu bildirim çocuk kulüplerinde boştur, diğer alanlar 21 ile aynı.
+ */
+export const MUHSGK_SURUM = 'MUHSGK_22'
 
 export type MuhsgkSatir = Bordro & { personel: Personel }
 
@@ -233,7 +240,7 @@ export function muhsgkXml(g: MuhsgkGirdi): string {
   const v = { ...MUHSGK_VARSAYILAN, ...b }
 
   return `<?xml version="1.0" encoding="ISO-8859-9"?>
-<beyanname kodVer="MUHSGK_21" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="MUHSGK_21.xsd">
+<beyanname kodVer="${MUHSGK_SURUM}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="${MUHSGK_SURUM}.xsd">
 \t<genel>
 \t\t<idari>
 \t\t<vdKodu>${b.vd_kodu || ''}</vdKodu>

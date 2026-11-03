@@ -12,7 +12,7 @@ import { useYukleme } from '@/lib/useYukleme'
 import { useAuth } from '@/lib/AuthContext'
 import { EKSIK_GUN_NEDENLERI, eksikGunAdi } from '@/lib/sgkEksikGun'
 import type { EksikGunKaydi } from '@/lib/sgkEksikGun'
-import { adSoyadAyir, latin5Kodla, muhsgkEksikleri, muhsgkOzet, muhsgkXml, muhtasaraGirer, sgkGunleri, MUHSGK_VARSAYILAN, type MuhsgkBilgileri, type MuhsgkSatir } from '@/lib/muhsgk'
+import { adSoyadAyir, latin5Kodla, muhsgkEksikleri, muhsgkOzet, muhsgkXml, muhtasaraGirer, sgkGunleri, MUHSGK_VARSAYILAN, MUHSGK_SURUM, type MuhsgkBilgileri, type MuhsgkSatir } from '@/lib/muhsgk'
 import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAc } from '@/lib/pdf'
 
 // Sorgu personel(*) ile birleştirir; her bordro satırının personeli vardır
@@ -163,7 +163,7 @@ export default function MuhasebePage() {
     const son = new Date(activeYear, activeMonth, 0).getDate()
     const donem = `${String(activeMonth).padStart(2, '0')}${activeYear}`
     a.href = url
-    a.download = `${bilgiler.vd_kodu}_${settings.vergi_no}_MUHSGK_21_01${donem}_${son}${donem}.xml`
+    a.download = `${bilgiler.vd_kodu}_${settings.vergi_no}_${MUHSGK_SURUM}_01${donem}_${son}${donem}.xml`
     a.click()
     URL.revokeObjectURL(url)
   }
