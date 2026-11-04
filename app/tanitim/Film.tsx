@@ -32,15 +32,15 @@ export function kaydiriciBul(el: HTMLElement | null): HTMLElement | null {
   return null
 }
 
-function useGorunur(ref: RefObject<HTMLElement | null>) {
+function useGorunur(ref: RefObject<HTMLElement | null>, esik = 0.35) {
   const [gorunur, setGorunur] = useState(false)
   useEffect(() => {
     const el = ref.current
     if (!el || !('IntersectionObserver' in window)) return
-    const io = new IntersectionObserver(([e]) => setGorunur(e.isIntersecting), { root: kaydiriciBul(el), threshold: 0.35 })
+    const io = new IntersectionObserver(([e]) => setGorunur(e.isIntersecting), { root: kaydiriciBul(el), threshold: esik })
     io.observe(el)
     return () => io.disconnect()
-  }, [ref])
+  }, [ref, esik])
   return gorunur
 }
 
@@ -140,10 +140,16 @@ function OynatDugmesi({ oynuyor, onClick }: { oynuyor: boolean; onClick: () => v
  * Ana oynatıcı: setin bütün bölümleri sırayla, altyazılı.
  * onBuyut verilirse sağ altta büyütme düğmesi çıkar (tam ekran izleme katmanını açar).
  * hep: görünürlüğe bakmadan oynar (tam ekran katmanında kullanılır).
+ * onKare: her karede (bölüm, 0–1 ilerleme) bildirilir; dışarıdaki göstergeler (ör. ay şeridi) için.
+ * atla: { bolum, n } verilip n değiştikçe film o bölüme atlar.
+ * esik: oynamaya başlaması için görünmesi gereken oran (sayfanın girişindeki film için düşük tutulur).
  */
-export function Film({ set = KULUP_SETI, baslangic = 0, onBuyut, hep = false }: { set?: FilmSeti; baslangic?: number; onBuyut?: (bolum: number) => void; hep?: boolean }) {
+export function Film({ set = KULUP_SETI, baslangic = 0, onBuyut, hep = false, onKare, atla, esik }: {
+  set?: FilmSeti; baslangic?: number; onBuyut?: (bolum: number) => void; hep?: boolean
+  onKare?: (bolum: number, t: number) => void; atla?: { bolum: number; n: number }; esik?: number
+}) {
   const kap = useRef<HTMLDivElement>(null)
-  const gorunur = useGorunur(kap) || hep
+  const gorunur = useGorunur(kap, esik) || hep
   const hareketAz = useHareketAz()
   // null: kendiliğinden (hareketi azaltma tercihinde durur), true/false: kullanıcının seçimi
   const [secim, setSecim] = useState<boolean | null>(null)
@@ -154,6 +160,16 @@ export function Film({ set = KULUP_SETI, baslangic = 0, onBuyut, hep = false }: 
 
   const b = set.bolumler[d.bolum]
   const t = hareketAz && secim === null ? 1 : d.t
+
+  useEffect(() => { onKare?.(d.bolum, Math.min(t, 1)) }, [onKare, d.bolum, t])
+  // Dışarıdan atlama isteği: n değiştiğinde çizim sırasında algılanır (efekt içinde durum güncellenmez)
+  const [sonAtla, setSonAtla] = useState(atla?.n)
+  if (atla && atla.n !== sonAtla) {
+    setSonAtla(atla.n)
+    gonder({ tip: 'git', bolum: atla.bolum })
+    setSecim(true)
+  }
+
   const altyazi = [...b.altyazi].reverse().find(([z]) => Math.min(t, 1) >= z)?.[1] ?? ''
 
   return (

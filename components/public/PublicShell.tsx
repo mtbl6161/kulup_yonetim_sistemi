@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import Image from 'next/image'
+import { BrandMark, Wordmark } from '@/components/brand/Logo'
 import PublicNav from './PublicNav'
 
 /**
@@ -17,9 +17,9 @@ export default function PublicShell({ children }: { children: React.ReactNode })
       <footer className="pub-footer">
         <div className="pub-container pub-footer-inner">
           <div className="pub-footer-brand">
-            <Image src="/logo.png" alt="Klüp360" width={64} height={64} />
+            <BrandMark size={40} tone="blue" title="" />
             <div>
-              <div className="pub-footer-name">Klüp360</div>
+              <Wordmark height={26} onDark />
               <div className="pub-footer-tag">MEB Çocuk Kulüpleri Yönetim Sistemi</div>
             </div>
           </div>

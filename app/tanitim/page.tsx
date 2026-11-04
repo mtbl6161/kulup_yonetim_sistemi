@@ -1,374 +1,299 @@
 'use client'
 import Link from 'next/link'
-import Image from 'next/image'
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
-import {
-  Users, Calendar, Clock, BarChart3, Landmark, TrendingUp, FileText, School, CheckCircle, Shield, ArrowRight, ArrowUpRight,
-  Building2, Eye, MapPin, Activity, BarChart2, UserCheck, Bell, PlayCircle, HeartHandshake, Receipt, CalendarRange, GraduationCap, Menu, X,
-} from 'lucide-react'
+import { useCallback, useRef, useState, type MouseEvent } from 'react'
+import { Check, Menu, PlayCircle, X } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
-import { Film, MiniFilm, Sinema, FILM_CSS, KULUP_SETI, kaydiriciBul, type FilmSeti } from './Film'
+import { Film, Sinema, FILM_CSS, KULUP_SETI, kaydiriciBul, type FilmSeti } from './Film'
 import { BOLUMLER } from './sahneler'
 import { DENETCI_SETI, DENETCI_CSS } from './denetciSahneleri'
+import { AySeridi, AY_CSS, type AyOlayi, type AySeridiTutamak } from './AySeridi'
 import { BrandMark, Wordmark } from '@/components/brand/Logo'
+import { AYLIK_UCRET, DENEME_GUN, YILLIK_UCRET, tl } from '@/lib/abonelikPlanlari'
 
-/* ----------------------------------------------------------------- data */
+/* ----------------------------------------------------------------- içerik */
 
-// Filmde gösterilmeyen ama sistemde bulunan modüller
-const dahasi = [
-  { icon: Calendar, title: 'Ders programı', desc: 'Sınıf ve öğretmen bazlı haftalık program; sınıf defterine tek tıkla aktarılır.' },
-  { icon: GraduationCap, title: 'Personel', desc: 'Görev, SGK durumu, IBAN ve iletişim bilgileri tek kartta.' },
-  { icon: School, title: 'Sınıflar ve kontenjan', desc: 'Sınıf, yaş grubu ve kapasite tanımları; doluluk oranı panelde izlenir.' },
-  { icon: Receipt, title: 'Tahsilat takip', desc: 'Kırtasiye, gezi, etkinlik gibi aidat dışı ödemeler ve taksit planları.' },
-  { icon: BarChart3, title: 'Gelir / gider ve bilanço', desc: 'Aylık kâr-zarar, ücret dağıtım bilançosu ve hesap hareketleri.' },
-  { icon: Landmark, title: 'Muhtasar ve SGK', desc: 'Muhtasar beyanname dosyası ve eksik gün nedenleriyle SGK bildirimi.' },
-  { icon: HeartHandshake, title: 'Okul Aile Birliği', desc: 'Birliğin bağış, aidat tahsilatı ve kendi işletme defteri.' },
-  { icon: CalendarRange, title: 'Akıllı takip', desc: 'Geciken ödeme, eksik puantaj, yaklaşan beyanname son günü uyarıları.' },
+// Ay şeridindeki olaylar. bolum: filmdeki karşılığı; hedef: sayfadaki bölüm
+const AY_OLAYLARI: AyOlayi[] = [
+  { gun: 1, ad: 'Kayıt', bolum: 0 },
+  { gun: 2, ad: 'Her gün yoklama', bolum: 1, satir: 2 },
+  { gun: 10, ad: 'Tahsilat', bolum: 2 },
+  { gun: 20, ad: 'Bordro', bolum: 3 },
+  { gun: 26, ad: 'Muhtasar', hedef: 'muhtasar' },
+  { gun: 30, ad: 'Ay sonu', bolum: 4, satir: 2, hizala: 'son' },
+  { gun: 31, ad: 'Denetim', bolum: 5, hizala: 'son' },
 ]
 
-const steps = [
-  { num: '01', title: 'Kurumunuzu kaydedin', desc: 'Birkaç dakikada okul bilgilerinizi ve SGK / vergi parametrelerinizi tanımlayın.' },
-  { num: '02', title: 'Personel ve öğrencileri girin', desc: 'Mevcut verilerinizi içe aktarın ya da sıfırdan kayıt oluşturun.' },
-  { num: '03', title: 'Ayı tek akışta yönetin', desc: 'Yoklama, tahsilat, bordro, işletme defteri ve denetim dosyası aynı sistemde birbirine bağlı.' },
+// Filmde gösterilmeyen ama sistemde bulunan modüller (fihrist)
+const FIHRIST = [
+  ['Ders programı', 'Sınıf ve öğretmen bazlı haftalık program; sınıf defterine aktarılır'],
+  ['Personel', 'Görev, SGK durumu, IBAN ve iletişim bilgileri tek kayıtta'],
+  ['Sınıflar ve kontenjan', 'Yaş grubu ve kapasite; doluluk panelde izlenir'],
+  ['Tahsilat takip', 'Kırtasiye, gezi, etkinlik ödemeleri ve taksit planları'],
+  ['Gelir, gider ve bilanço', 'Aylık kâr-zarar, ücret dağıtım bilançosu, hesap hareketleri'],
+  ['Okul Aile Birliği', 'Bağış ve aidat tahsilatı, birliğin kendi işletme defteri'],
+  ['Hatırlatmalar', 'Geciken ödeme, eksik puantaj ve yaklaşan beyanname günü'],
+  ['Raporlar', 'Aylık özet, işletme defteri ve bilanço PDF olarak'],
 ]
 
-const audit = [
-  { icon: MapPin, title: 'İl geneli özet', desc: 'İldeki kulüplerin öğrenci, personel ve dosya durumlarını tek ekranda görün; ilçeye göre süzün.' },
-  { icon: Building2, title: 'Okul bazlı izleme', desc: 'Bağlı her kulübün dosyasına inin; mevcut öğrenci ve kapasite kontrolleri anlık hesaplanır.' },
-  { icon: FileText, title: 'Aylık denetim dosyası', desc: 'Kulüplerin gönderdiği evrakı madde madde inceleyin, onaylayın ya da notla iade edin.' },
-  { icon: BarChart2, title: 'Bordro kontrolü', desc: 'Beyan edilen bordroları inceleyin; hesap hataları ve eksikler madde madde listelenir.' },
-  { icon: Calendar, title: 'Sınıf defteri ve yoklama', desc: 'Hangi öğretmenin hangi sınıfta derste olduğunu fiili devam defterinden inceleyin.' },
-  { icon: UserCheck, title: 'Salt okunur erişim', desc: 'Denetim yetkilisi veriyi değiştiremez veya silemez; kayıtlar olduğu gibi yansır.' },
+const DENETIM_MADDELERI = [
+  ['İl geneli özet', 'İldeki kulüplerin öğrenci, personel ve dosya durumu tek ekranda; ilçeye göre süzülür.'],
+  ['Okul okul dosya', 'Her kulübün dosyasına inilir; öğrenci ve kapasite kontrolleri o anda hesaplanır.'],
+  ['Madde madde evrak', 'Gönderilen belgeler tek tek incelenir, onaylanır ya da notla iade edilir.'],
+  ['Bordro kontrolü', 'Beyan edilen bordro sistemin yeniden hesaplamasıyla karşılaştırılır; farklar listelenir.'],
+  ['Fiilî devam', 'Hangi öğretmenin hangi sınıfta derste olduğu sınıf defterinden görülür.'],
+  ['Yalnızca okuma', 'Denetim yetkilisi kayıtları değiştiremez ve silemez.'],
 ]
 
-const trust = [
-  { icon: Shield, title: 'Şifreli altyapı', desc: 'Tüm verileriniz şifrelenmiş olarak bulutta saklanır; izniniz olmadan kimse erişemez.' },
-  { icon: CheckCircle, title: 'MEB ve SGK uyumu', desc: 'Bordro hesabı MEB katsayıları ve güncel SGK / vergi parametreleriyle yapılır.' },
-  { icon: Building2, title: 'Kurumlar birbirinden ayrı', desc: 'Her kurumun verisi ayrı tutulur; bir okul başka bir okulun kaydını göremez.' },
-  { icon: Activity, title: 'Kurulum gerektirmez', desc: 'Tarayıcıdan çalışır; program yüklemeden bilgisayardan da telefondan da açılır.' },
-  { icon: Bell, title: 'Proaktif uyarılar', desc: 'Geciken ödemeler, eksik belgeler ve yaklaşan son günler panelde sizi bekler.' },
-  { icon: TrendingUp, title: 'Hazır raporlar', desc: 'Aylık özet, işletme defteri ve bilançoyu PDF olarak saniyeler içinde alın.' },
+const SORULAR = [
+  ['Denetçi verilerimizi değiştirebilir mi?', 'Hayır. Denetim yetkilisi kayıtları yalnızca görüntüler; değiştiremez, silemez. Gönderdiğiniz dosyayı onaylar ya da notla size iade eder.'],
+  ['Başka bir okul bizim kayıtlarımızı görebilir mi?', 'Hayır. Her kurumun verisi ayrı tutulur ve yalnızca o kurumun kullanıcılarına açılır. Veriler şifrelenmiş olarak bulutta saklanır.'],
+  ['Bordro neye göre hesaplanıyor?', 'Puantajdaki ders saatlerinden; MEB katsayıları, güncel SGK oranları ve gelir vergisi dilimleriyle. Vergi dilimlerini ayarlardan kendiniz de güncelleyebilirsiniz.'],
+  ['Bilgisayara program kurmam gerekiyor mu?', 'Hayır. Klüp360 tarayıcıda çalışır; okuldaki bilgisayardan da telefonunuzdan da açılır.'],
+  ['Deneme bitince ne olur?', `${DENEME_GUN} günlük deneme bitince aylık ₺${tl(AYLIK_UCRET)} ya da yıllık ₺${tl(YILLIK_UCRET)} ile devam edersiniz. Abone olmazsanız girdiğiniz kayıtlar silinmez; abone olduğunuzda kaldığınız yerden sürer.`],
 ]
 
-/* ----------------------------------------------------------------- page */
+/* ----------------------------------------------------------------- sayfa */
 
 export default function TanitimPage() {
   const { user, profil } = useAuth()
-  const rootRef = useRef<HTMLDivElement>(null)
-
-  // Uygulama iç içe bir overflow:auto kabında kaydığı için (html/body overflow:hidden) gözlemci o kaba bağlanır
-  useEffect(() => {
-    const root = rootRef.current
-    if (!root) return
-    root.classList.add('tz-js')
-    const els = Array.from(root.querySelectorAll<HTMLElement>('.tz-reveal'))
-    const revealAll = () => els.forEach(el => el.classList.add('tz-in'))
-
-    if (!('IntersectionObserver' in window)) { revealAll(); return }
-
-    let scroller: HTMLElement | null = root.parentElement
-    while (scroller) {
-      const oy = getComputedStyle(scroller).overflowY
-      if ((oy === 'auto' || oy === 'scroll') && scroller.scrollHeight > scroller.clientHeight + 4) break
-      scroller = scroller.parentElement
-    }
-
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          e.target.classList.add('tz-in')
-          io.unobserve(e.target)
-        }
-      })
-    }, { root: scroller, threshold: 0.1, rootMargin: '0px 0px -8% 0px' })
-
-    els.forEach(el => io.observe(el))
-    const failsafe = window.setTimeout(revealAll, 2500)
-    return () => { io.disconnect(); window.clearTimeout(failsafe) }
-  }, [])
-
   const panelUrl = profil?.rol === 'super_admin' ? '/yonetim' : (profil?.rol === 'denetim_yetkilisi' ? '/denetim' : '/')
+
   // Filmler sayfadan ayrılmadan tam ekran izleme katmanında açılır
   const [sinema, setSinema] = useState<{ set: FilmSeti; bolum: number; donus?: HTMLElement | null } | null>(null)
   const sinemayiKapat = useCallback(() => setSinema(null), [])
   const [menuAcik, setMenuAcik] = useState(false)
 
-  // Sayfa içi bağlantılar: iç kaydırma kabını yumuşakça kaydır, sabit üst menünün altında kalmasın
-  const bolumeGit = (e: MouseEvent, id: string) => {
+  // Ay şeridi ↔ film: film her karede şeridi günceller (yalnızca şerit yeniden çizilir), şerit filmi bölüme atlatır
+  const serit = useRef<AySeridiTutamak>(null)
+  const kareBildir = useCallback((bolum: number, t: number) => serit.current?.guncelle(bolum, t), [])
+  const [atla, setAtla] = useState<{ bolum: number; n: number } | undefined>(undefined)
+  const bolumeAtla = useCallback((bolum: number) => setAtla(a => ({ bolum, n: (a?.n ?? 0) + 1 })), [])
+
+  // Sayfa içi bağlantılar: iç kaydırma kabını kaydır, sabit üst menünün altında kalmasın
+  const git = useCallback((id: string, e?: MouseEvent) => {
     const el = document.getElementById(id), s = kaydiriciBul(el)
     if (!el || !s) return
-    e.preventDefault()
+    e?.preventDefault()
     setMenuAcik(false)
     const hareketAz = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    s.scrollTo({ top: el.getBoundingClientRect().top - s.getBoundingClientRect().top + s.scrollTop - 68, behavior: hareketAz ? 'auto' : 'smooth' })
+    s.scrollTo({ top: el.getBoundingClientRect().top - s.getBoundingClientRect().top + s.scrollTop - 72, behavior: hareketAz ? 'auto' : 'smooth' })
     history.replaceState(null, '', `#${id}`)
-  }
+  }, [])
 
   return (
-    <div ref={rootRef} className="tz">
-      <style>{CSS + FILM_CSS + DENETCI_CSS}</style>
+    <div className="tz">
+      <style>{CSS + AY_CSS + FILM_CSS + DENETCI_CSS}</style>
 
-      {/* ---------------------------------------------------------- NAV */}
+      {/* ---------------------------------------------------------- MENÜ */}
       <nav className="tz-nav">
-        <div className="tz-nav-inner">
-          <Link href="/tanitim" className="tz-brand">
-            <BrandMark size={38} title="" />
-            <Wordmark height={30} />
+        <div className="tz-nav-ic">
+          <Link href="/tanitim" className="tz-marka" aria-label="Klüp360 ana sayfa">
+            <BrandMark size={36} title="" />
+            <Wordmark height={28} />
           </Link>
 
-          <div className="tz-nav-links">
-            <a href="#film" onClick={e => bolumeGit(e, 'film')}>Nasıl çalışır</a>
-            <Link href="/rehber" className="tz-nav-tool">Rehber ve Araçlar</Link>
+          <div className="tz-nav-baglantilar">
+            <a href="#ay" onClick={e => git('ay', e)}>Nasıl çalışır</a>
+            <a href="#muhtasar" onClick={e => git('muhtasar', e)}>Muhtasar</a>
             <Link href="/fiyatlandirma">Fiyatlandırma</Link>
+            <Link href="/rehber">Rehber ve araçlar</Link>
             <Link href="/tanitim/iletisim">İletişim</Link>
           </div>
 
-          <div className="tz-nav-cta">
+          <div className="tz-nav-eylem">
             {user ? (
-              <Link href={panelUrl} className="tz-userpill">
-                <span className="tz-avatar">{user.email?.[0]?.toUpperCase()}</span>
-                <span>Panele Dön</span>
-              </Link>
+              <Link href={panelUrl} className="tz-dugme tz-dugme-ikincil">Panele dön</Link>
             ) : (
               <>
-                <Link href="/login" className="tz-nav-login">Giriş Yap</Link>
-                <Link href="/signup" className="tz-btn tz-btn-primary">Ücretsiz Başla <ArrowRight size={16} /></Link>
+                <Link href="/login" className="tz-nav-giris">Giriş yap</Link>
+                <Link href="/signup" className="tz-dugme tz-dugme-ana">Ücretsiz deneyin</Link>
               </>
             )}
-            <button type="button" className="tz-menu-btn" onClick={() => setMenuAcik(v => !v)} aria-expanded={menuAcik} aria-controls="tz-mobil-menu" aria-label={menuAcik ? 'Menüyü kapat' : 'Menüyü aç'}>
+            <button type="button" className="tz-menu-dugme" onClick={() => setMenuAcik(v => !v)} aria-expanded={menuAcik} aria-controls="tz-mobil-menu" aria-label={menuAcik ? 'Menüyü kapat' : 'Menüyü aç'}>
               {menuAcik ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
         </div>
         {menuAcik && (
           <div id="tz-mobil-menu" className="tz-mobil-menu" onKeyDown={e => { if (e.key === 'Escape') setMenuAcik(false) }}>
-            <a href="#film" onClick={e => bolumeGit(e, 'film')}>Nasıl çalışır</a>
-            <Link href="/rehber" onClick={() => setMenuAcik(false)}>Rehber ve Araçlar</Link>
+            <a href="#ay" onClick={e => git('ay', e)}>Nasıl çalışır</a>
+            <a href="#muhtasar" onClick={e => git('muhtasar', e)}>Muhtasar</a>
             <Link href="/fiyatlandirma" onClick={() => setMenuAcik(false)}>Fiyatlandırma</Link>
+            <Link href="/rehber" onClick={() => setMenuAcik(false)}>Rehber ve araçlar</Link>
             <Link href="/tanitim/iletisim" onClick={() => setMenuAcik(false)}>İletişim</Link>
-            {!user && <Link href="/login" onClick={() => setMenuAcik(false)} className="tz-mobil-giris">Giriş Yap</Link>}
+            {!user && <Link href="/login" onClick={() => setMenuAcik(false)} className="tz-mobil-giris">Giriş yap</Link>}
           </div>
         )}
       </nav>
 
-      {/* ---------------------------------------------------------- HERO + FİLM */}
-      <header className="tz-hero" id="film">
-        <div className="tz-hero-glow" aria-hidden />
-        <div className="tz-container tz-hero-inner">
-          <span className="tz-badge">
-            <span className="tz-badge-dot" />
-            MEB Çocuk Kulüpleri Yönergesi’ne uygun
-          </span>
+      {/* ---------------------------------------------------------- GİRİŞ: başlık, ay şeridi, film */}
+      <header className="tz-giris" id="film">
+        <div className="tz-kap">
+          <div className="tz-giris-metin">
+            <h1 className="tz-h1">Kulübün bir ayı, kayıttan denetime.</h1>
+            <p className="tz-giris-ozet">
+              Yoklama, bordro, aidat, muhtasar beyannamesi ve aylık denetim dosyası aynı sistemde birbirine bağlı.
+              Aşağıda bir ayın tamamını izleyin; ekranlar sistemin kendisi, veriler örnek.
+            </p>
+            <div className="tz-eylemler">
+              <Link href="/signup" className="tz-dugme tz-dugme-ana tz-dugme-buyuk">{DENEME_GUN} gün ücretsiz deneyin</Link>
+              <span className="tz-not">Kredi kartı istenmez. Hesaplar MEB Çocuk Kulüpleri Yönergesi’ne göre yapılır.</span>
+            </div>
+          </div>
 
-          <h1 className="tz-h1">
-            Bir çocuk kulübünün ayı, <span className="tz-grad">bir dakikada.</span>
-          </h1>
-
-          <p className="tz-hero-lead">
-            Kayıttan denetim dosyasına kadar bir ayın tamamını Klüp360’ta nasıl yönettiğinizi izleyin.
-            Ekranlar sistemin birebir canlandırması, veriler örnektir.
-          </p>
-
+          <div className="tz-ay">
+            <AySeridi ref={serit} olaylar={AY_OLAYLARI} onBolum={bolumeAtla} onHedef={id => git(id)} />
+          </div>
           <div className="tz-film">
-            <Film onBuyut={b => setSinema({ set: KULUP_SETI, bolum: b })} />
-          </div>
-
-          <div className="tz-hero-actions">
-            <Link href="/signup" className="tz-btn tz-btn-primary tz-btn-lg">
-              Ücretsiz Başlayın <ArrowRight size={18} />
-            </Link>
-            <a href="#ay" onClick={e => bolumeGit(e, 'ay')} className="tz-btn tz-btn-ghost tz-btn-lg">
-              Adım adım inceleyin
-            </a>
-          </div>
-          <div className="tz-hero-note">
-            <CheckCircle size={15} /> Kredi kartı gerekmez · Kurulum dakikalar sürer
+            <Film onKare={kareBildir} atla={atla} esik={0.12} onBuyut={b => setSinema({ set: KULUP_SETI, bolum: b })} />
           </div>
         </div>
       </header>
 
-      {/* ---------------------------------------------------------- BİR AY, ADIM ADIM */}
-      <section className="tz-section" id="ay">
-        <div className="tz-container">
-          <div className="tz-head tz-reveal">
-            <span className="tz-eyebrow"><PlayCircle size={15} /> Bir ay, adım adım</span>
-            <h2 className="tz-h2">Bir kez girilen bilgi, sonraki işe aktarılır</h2>
-            <p className="tz-lead tz-lead-center">
-              Öğrencinin aidatı kayıtla birlikte hesaplanır; sınıf defterindeki dersler puantaja, puantaj
-              bordroya geçer. Tahsilatlar işletme defterine, bordro ve puantaj denetim dosyasına kendiliğinden yansır.
+      {/* ---------------------------------------------------------- AYIN AKIŞI */}
+      <section className="tz-bolum" id="ay">
+        <div className="tz-kap">
+          <div className="tz-bas">
+            <h2 className="tz-h2">Bir kez girdiğiniz bilgi ayın sonuna kadar taşınır</h2>
+            <p className="tz-ozet">
+              Öğrencinin aidatı kayıtla birlikte hesaplanır. Sınıf defterindeki dersler puantaja, puantaj bordroya geçer.
+              Tahsilatlar işletme defterine, bordro ve puantaj denetim dosyasına kendiliğinden yansır.
             </p>
           </div>
 
           <ol className="tz-akis">
-            {BOLUMLER.map((b, i) => (
-              <li key={b.id} className={`tz-adim ${i % 2 ? 'ters' : ''}`}>
-                <div className="tz-adim-metin tz-reveal">
-                  <div className="tz-adim-ust">
-                    <span className="tz-adim-no">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="tz-adim-gun">{b.gun}</span>
-                  </div>
-                  <h3>{b.baslik}</h3>
+            {BOLUMLER.flatMap((b, i) => {
+              const satir = (
+                <AkisSatiri key={b.id} gun={b.gun} baslik={b.baslik}
+                  eylem={<button type="button" className="tz-metin-dugme" onClick={e => setSinema({ set: KULUP_SETI, bolum: i, donus: e.currentTarget })}><PlayCircle size={16} /> Bu adımı izleyin</button>}>
                   <p>{b.anlatim}</p>
-                  <ul className="tz-adim-maddeler">
-                    {b.maddeler.map(m => <li key={m}><CheckCircle size={15} />{m}</li>)}
-                  </ul>
-                  <button type="button" className="tz-adim-izle" onClick={e => setSinema({ set: KULUP_SETI, bolum: i, donus: e.currentTarget })}>
-                    <PlayCircle size={16} /> Anlatımlı izle
-                  </button>
-                </div>
-                <div className="tz-adim-film tz-reveal">
-                  <MiniFilm bolum={i} />
-                </div>
-              </li>
-            ))}
+                  <ul className="tz-maddeler">{b.maddeler.map(m => <li key={m}>{m}</li>)}</ul>
+                </AkisSatiri>
+              )
+              if (b.id !== 'bordro') return [satir]
+              return [satir, (
+                <AkisSatiri key="muhtasar" gun="Ayın 26’sı" baslik="Muhtasar ve prim hizmet beyannamesi hazır" vurgu
+                  eylem={<a href="#muhtasar" className="tz-metin-dugme" onClick={e => git('muhtasar', e)}>Dosyaya bakın</a>}>
+                  <p>Bordrodaki tutarlar ve puantajdaki günler, e-Beyanname’ye yüklenecek XML dosyasına dönüşür. Muhasebeciye ayrıca bordro göndermeniz gerekmez.</p>
+                </AkisSatiri>
+              )]
+            })}
           </ol>
         </div>
       </section>
 
-      {/* ---------------------------------------------------------- DAHASI */}
-      <section className="tz-section tz-section-alt">
-        <div className="tz-container">
-          <div className="tz-head tz-reveal">
-            <span className="tz-eyebrow"><Users size={15} /> Ve dahası</span>
-            <h2 className="tz-h2">Kulübün diğer işleri de burada</h2>
-            <p className="tz-lead tz-lead-center">
-              Ders programından Okul Aile Birliği’ne kadar, kulübünüzün geri kalan işleri de
-              aynı sistemde ve aynı verilerle yürür.
+      {/* ---------------------------------------------------------- MUHTASAR */}
+      <section className="tz-bolum tz-muhtasar" id="muhtasar">
+        <div className="tz-kap tz-muh">
+          <div>
+            <h2 className="tz-h2">Muhtasar beyannamesini yeniden yazmayın.</h2>
+            <p className="tz-ozet">
+              Bordro bittiğinde muhtasar ve prim hizmet beyannamesinin XML dosyası da hazırdır. Dosyayı indirip e-Beyanname’ye
+              yüklemeniz yeterli; personel bilgileri, prim günleri ve kazançlar yeniden girilmez.
             </p>
+            <ul className="tz-tikler">
+              <li>GİB’in Ekim 2026 döneminden itibaren istediği 22. sürüm</li>
+              <li>Muhtasar matrahları ve SGK prim hizmet bildirimi tek dosyada</li>
+              <li>Eksik gün sayısı ve nedeni puantajdan gelir</li>
+              <li>Vergi dairesi kodu gibi eksik bir bilgi varsa dosya üretilmeden önce uyarır</li>
+            </ul>
           </div>
-          <div className="tz-dahasi">
-            {dahasi.map((d, i) => (
-              <div key={d.title} className="tz-dcard tz-reveal" style={{ transitionDelay: `${(i % 4) * 60}ms` }}>
-                <span className="tz-ficon"><d.icon size={19} /></span>
-                <h3>{d.title}</h3>
-                <p>{d.desc}</p>
-              </div>
-            ))}
-          </div>
+          <figure className="tz-dosya">
+            <figcaption className="tz-dosya-ust">
+              <span>MUHSGK_22_2026-10.xml</span>
+              <span className="tz-dosya-etiket">Örnek dosya</span>
+            </figcaption>
+            <pre aria-label="Muhtasar beyannamesi XML dosyasından kısaltılmış satırlar">{XML_ORNEK}</pre>
+            <div className="tz-dosya-alt">
+              <p><b>Önce:</b> bordrolar muhasebeciye gider, her personel e-Beyanname’de tek tek yeniden girilir.</p>
+              <p><b>Şimdi:</b> dosyayı indirin, yükleyin.</p>
+            </div>
+          </figure>
         </div>
       </section>
 
-      {/* ---------------------------------------------------------- AUDIT (dark) */}
-      <section className="tz-audit">
-        <div className="tz-audit-glow" aria-hidden />
-        <div className="tz-container tz-audit-inner">
-          <div className="tz-head tz-reveal">
-            <span className="tz-eyebrow tz-eyebrow-light"><Eye size={15} /> İl millî eğitim denetçileri için</span>
-            <h2 className="tz-h2 tz-h2-light">Denetçinin gördüğü ekran</h2>
-            <p className="tz-lead tz-lead-center tz-lead-light">
-              İlinizdeki kulüplerin aylık dosyaları tek bir kuyrukta toplanır. Belgeleri açar, bordroyu sistemin
-              yeniden hesaplamasıyla kontrol eder, onaylar ya da notla iade edersiniz. Aşağıda bir dosyanın yolculuğunu izleyin.
+      {/* ---------------------------------------------------------- FİHRİST */}
+      <section className="tz-bolum tz-bolum-ince">
+        <div className="tz-kap">
+          <div className="tz-bas">
+            <h2 className="tz-h2">Kulübün diğer işleri de aynı sistemde</h2>
+          </div>
+          <dl className="tz-fihrist">
+            {FIHRIST.map(([ad, ne]) => (
+              <div key={ad}><dt>{ad}</dt><dd>{ne}</dd></div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      {/* ---------------------------------------------------------- DENETÇİ */}
+      <section className="tz-denetci">
+        <div className="tz-kap">
+          <div className="tz-bas">
+            <h2 className="tz-h2">Denetçinin gördüğü ekran</h2>
+            <p className="tz-ozet">
+              İl millî eğitim denetçileri için: ildeki kulüplerin aylık dosyaları tek kuyrukta toplanır. Belgeleri açar,
+              bordroyu sistemin yeniden hesaplamasıyla kontrol eder, onaylar ya da notla iade edersiniz.
             </p>
           </div>
-
-          <div className="tz-film tz-film-denetci tz-reveal">
+          <div className="tz-film">
             <Film set={DENETCI_SETI} onBuyut={b => setSinema({ set: DENETCI_SETI, bolum: b })} />
           </div>
+          <div className="tz-tutanak">
+            <ul>
+              {DENETIM_MADDELERI.map(([ad, ne]) => (
+                <li key={ad}><Check size={18} strokeWidth={3} aria-hidden /><span><b>{ad}.</b> {ne}</span></li>
+              ))}
+            </ul>
+            <Link href="/login?type=denetim" className="tz-dugme tz-dugme-acik">Denetçi olarak giriş yapın</Link>
+          </div>
+        </div>
+      </section>
 
-          <div className="tz-audit-grid">
-            {audit.map((a, i) => (
-              <div key={a.title} className="tz-acard tz-reveal" style={{ transitionDelay: `${(i % 3) * 60}ms` }}>
-                <span className="tz-acard-ic"><a.icon size={22} /></span>
-                <h3>{a.title}</h3>
-                <p>{a.desc}</p>
-              </div>
+      {/* ---------------------------------------------------------- SORULAR */}
+      <section className="tz-bolum">
+        <div className="tz-kap">
+          <div className="tz-bas">
+            <h2 className="tz-h2">Okulların ilk sorduğu sorular</h2>
+          </div>
+          <dl className="tz-sorular">
+            {SORULAR.map(([s, c]) => (
+              <div key={s}><dt>{s}</dt><dd>{c}</dd></div>
             ))}
-          </div>
+          </dl>
+        </div>
+      </section>
 
-          <div className="tz-audit-cta tz-reveal">
-            <Link href="/login?type=denetim" className="tz-btn tz-btn-white tz-btn-lg">
-              Denetçi Girişi Yapın <ArrowRight size={18} />
-            </Link>
+      {/* ---------------------------------------------------------- KAPANIŞ */}
+      <section className="tz-kapanis">
+        <div className="tz-kap">
+          <h2 className="tz-h2">Bu ayı Klüp360’ta kapatın.</h2>
+          <ol className="tz-adimlar">
+            <li>Kurumunuzu kaydedin; okul, SGK ve vergi bilgilerini girin.</li>
+            <li>Personel ve öğrencileri ekleyin ya da Excel’den aktarın.</li>
+            <li>Ayı yönetin: yoklama, tahsilat, bordro, muhtasar ve denetim dosyası.</li>
+          </ol>
+          <div className="tz-eylemler">
+            <Link href="/signup" className="tz-dugme tz-dugme-ana tz-dugme-buyuk">{DENEME_GUN} gün ücretsiz deneyin</Link>
+            <Link href="/fiyatlandirma" className="tz-metin-dugme">Fiyatları görün</Link>
           </div>
         </div>
       </section>
 
-      {/* ---------------------------------------------------------- STEPS */}
-      <section className="tz-section">
-        <div className="tz-container">
-          <div className="tz-head tz-reveal">
-            <span className="tz-eyebrow"><Clock size={15} /> Dakikalar içinde kurulum</span>
-            <h2 className="tz-h2">3 adımda sisteme geçin</h2>
-            <p className="tz-lead tz-lead-center">
-              Karmaşık entegrasyonlar yok. Öğle aranızda bile sistemi kurup kullanmaya başlayabilirsiniz.
-            </p>
-          </div>
-
-          <div className="tz-steps">
-            {steps.map((s, i) => (
-              <div key={s.num} className="tz-step tz-reveal" style={{ transitionDelay: `${i * 80}ms` }}>
-                <span className="tz-step-num">{s.num}</span>
-                <h3>{s.title}</h3>
-                <p>{s.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------- TRUST */}
-      <section className="tz-section tz-section-alt">
-        <div className="tz-container">
-          <div className="tz-head tz-reveal">
-            <span className="tz-eyebrow"><Shield size={15} /> Kurumsal güven</span>
-            <h2 className="tz-h2">Güvenli ve uyumlu</h2>
-            <p className="tz-lead tz-lead-center">
-              Verileriniz şifrelenerek saklanır, hesaplamalar MEB mevzuatına göre yapılır.
-            </p>
-          </div>
-
-          <div className="tz-trust">
-            {trust.map((t, i) => (
-              <div key={t.title} className="tz-tcard tz-reveal" style={{ transitionDelay: `${(i % 3) * 60}ms` }}>
-                <span className="tz-tcard-ic"><t.icon size={20} /></span>
-                <div>
-                  <h3>{t.title}</h3>
-                  <p>{t.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------- CTA */}
-      <section className="tz-ctawrap">
-        <div className="tz-container">
-          <div className="tz-cta tz-reveal">
-            <div className="tz-cta-glow" aria-hidden />
-            <div className="tz-cta-inner">
-              <h2>Gelecek ayı Klüp360’ta yönetin</h2>
-              <p>
-                İzlediğiniz akışı kendi kulübünüzün verileriyle deneyin. Kurulum dakikalar sürer,
-                kredi kartı gerekmez.
-              </p>
-              <div className="tz-hero-actions tz-cta-actions">
-                <Link href="/signup" className="tz-btn tz-btn-white tz-btn-lg">
-                  Ücretsiz Başlayın <ArrowUpRight size={18} />
-                </Link>
-                <Link href="/fiyatlandirma" className="tz-btn tz-btn-outline-light tz-btn-lg">
-                  Fiyatları İnceleyin
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------- FOOTER */}
-      <footer className="tz-footer">
-        <div className="tz-container tz-footer-inner">
-          <div className="tz-footer-brand">
-            <Image src="/logo.png" alt="Klüp360" width={64} height={64} />
+      {/* ---------------------------------------------------------- ALTBİLGİ */}
+      <footer className="tz-alt">
+        <div className="tz-kap tz-alt-ic">
+          <div className="tz-alt-marka">
+            <BrandMark size={40} tone="blue" title="" />
             <div>
-              <div className="tz-footer-name">Klüp360</div>
-              <div className="tz-footer-tag">MEB Çocuk Kulüpleri Yönetim Sistemi</div>
+              <Wordmark height={26} onDark />
+              <div className="tz-alt-etiket">MEB çocuk kulüpleri yönetim sistemi</div>
             </div>
           </div>
-          <div className="tz-footer-links">
-            <Link href="/rehber">Rehber ve Araçlar</Link>
+          <div className="tz-alt-baglantilar">
+            <Link href="/rehber">Rehber ve araçlar</Link>
             <Link href="/fiyatlandirma">Fiyatlandırma</Link>
-            <Link href="/tanitim/kullanim-kosullari">Kullanım Koşulları</Link>
+            <Link href="/tanitim/kullanim-kosullari">Kullanım koşulları</Link>
             <Link href="/tanitim/gizlilik-politikasi">Gizlilik</Link>
             <Link href="/tanitim/kvkk-aydinlatma-metni">KVKK</Link>
             <Link href="/tanitim/iade-politikasi">İade</Link>
@@ -376,9 +301,7 @@ export default function TanitimPage() {
             <Link href="/login">Giriş</Link>
           </div>
         </div>
-        <div className="tz-container tz-footer-copy">
-          © {new Date().getFullYear()} Klüp360 — Tüm hakları saklıdır.
-        </div>
+        <div className="tz-kap tz-alt-telif">© {new Date().getFullYear()} Klüp360. Tüm hakları saklıdır.</div>
       </footer>
 
       {sinema && <Sinema set={sinema.set} bolum={sinema.bolum} donus={sinema.donus} onKapat={sinemayiKapat} />}
@@ -386,240 +309,192 @@ export default function TanitimPage() {
   )
 }
 
-/* ----------------------------------------------------------------- styles */
+function AkisSatiri({ gun, baslik, eylem, vurgu, children }: { gun: string; baslik: string; eylem: React.ReactNode; vurgu?: boolean; children: React.ReactNode }) {
+  return (
+    <li className={`tz-akis-satir${vurgu ? ' vurgu' : ''}`}>
+      <div className="tz-akis-gun">{gun}</div>
+      <div className="tz-akis-icerik">
+        <h3>{baslik}</h3>
+        {children}
+        {eylem}
+      </div>
+    </li>
+  )
+}
+
+// Sistemin ürettiği dosyanın kısaltılmış satırları; etiket adları lib/muhsgk.ts ile aynı
+const XML_ORNEK = `<?xml version="1.0" encoding="ISO-8859-9"?>
+<beyanname kodVer="MUHSGK_22" …>
+  <genel>
+    <idari>
+      <vdKodu>…</vdKodu>
+      <donem>
+        <tip>aylik</tip><yil>2026</yil><ay>10</ay>
+      </donem>
+    </idari> …
+  </genel>
+  <ozel>
+    <matrahBildirimleri>
+      <matrahBildirimi>
+        <turKodu>…</turKodu>
+        <gayrisafiTutar>…</gayrisafiTutar> …
+  </ozel>
+  <ekler> … <calisanBilgisi>
+    <eksikGunSayisi>…</eksikGunSayisi>
+    <eksikGunNedeni>…</eksikGunNedeni> …
+  </ekler>
+</beyanname>`
+
+/* ----------------------------------------------------------------- stiller */
 
 const CSS = `
-.tz {
-  --g: #2347D9; --g-d: #1B38B8; --g-dd: #0E1116;
-  --gold:#8EA3EE; --gold-d:#5D78E8;
-  --bg: #F5F6F8; --surf: #FFFFFF; --line: #E3E6EB; --line-2: #E3E6EB;
-  --tx: #0E1116; --tx2: #3F4753; --tx3: #5F6876;
-  font-family: var(--font-sans);
-  color: var(--tx); background: var(--bg);
-  -webkit-font-smoothing: antialiased;
+.tz{
+  --tz-kagit:#FFFFFF; --tz-zemin:#F6F8FC; --tz-cizgi:#DCE3F3; --tz-murekkep:#1A2233;
+  --tz-mavi:#2347D9; --tz-mavi-koyu:#1B38B8; --tz-acik:#8EA3EE; --tz-kalem:#C8322B;
+  --tz-mavi-soluk:#E6ECFC; --tz-mavi-soluk-cizgi:#C9D4FA;
+  --tz-tx2:#465066; --tz-tx3:#66708A; --tz-gece:#141C2E;
+  --tz-baslik:var(--font-tz-baslik), var(--font-display), system-ui, sans-serif;
+  --tz-govde:var(--font-tz-govde), var(--font-sans), system-ui, sans-serif;
+  font-family:var(--tz-govde); font-size:17px; line-height:1.6; color:var(--tz-murekkep); background:var(--tz-kagit);
+  -webkit-font-smoothing:antialiased;
 }
-.tz *, .tz *::before, .tz *::after { box-sizing: border-box; }
-.tz :where(a) { text-decoration: none; color: inherit; }
-.tz img { max-width: 100%; display: block; }
-.tz-container { width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 clamp(20px, 5vw, 48px); }
+.tz *,.tz *::before,.tz *::after{box-sizing:border-box}
+.tz :where(a){color:inherit;text-decoration:none}
+.tz :where(h1,h2,h3,p,ul,ol,dl,dd,figure){margin:0}
+.tz-kap{width:100%;max-width:1120px;margin:0 auto;padding:0 clamp(16px,4vw,40px)}
 
-/* reveal (only active once JS confirmed) */
-.tz-js .tz-reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s cubic-bezier(.16,1,.3,1); }
-.tz-js .tz-reveal.tz-in { opacity: 1; transform: none; }
-@media (prefers-reduced-motion: reduce) {
-  .tz-js .tz-reveal { opacity: 1 !important; transform: none !important; transition: none; }
-  .tz * { animation: none !important; }
+/* yazı ölçeği: 14 · 17 · 21 · 28 · 40 · 60 */
+.tz-h1,.tz-h2,.tz h3,.tz-akis-gun{font-family:var(--tz-baslik);font-weight:700;letter-spacing:-.012em}
+.tz-h1{font-size:clamp(38px,5.4vw,60px);line-height:1.04;max-width:17ch;text-wrap:balance}
+.tz-h2{font-size:clamp(28px,3.6vw,40px);line-height:1.12;max-width:22ch}
+.tz h3{font-size:21px;line-height:1.25}
+.tz-ozet{color:var(--tz-tx2);max-width:62ch;margin-top:14px}
+
+/* düğmeler */
+.tz-dugme{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:10px;
+  font:600 15px/1 var(--tz-govde);border:1px solid transparent;cursor:pointer;white-space:nowrap}
+.tz-dugme-buyuk{min-height:52px;padding:0 24px;font-size:16.5px}
+.tz-dugme-ana{background:var(--tz-mavi);color:#fff}
+.tz-dugme-ana:hover{background:var(--tz-mavi-koyu)}
+.tz-dugme-ikincil{background:var(--tz-kagit);color:var(--tz-murekkep);border-color:var(--tz-cizgi)}
+.tz-dugme-ikincil:hover{border-color:var(--tz-mavi)}
+.tz-dugme-acik{background:#fff;color:var(--tz-gece)}
+.tz-dugme-acik:hover{background:var(--tz-mavi-soluk)}
+.tz-metin-dugme{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0;border:0;background:none;cursor:pointer;
+  font:600 15px/1 var(--tz-govde);color:var(--tz-mavi);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:5px}
+.tz-metin-dugme:hover{text-decoration-thickness:2px}
+.tz a:focus-visible,.tz button:focus-visible{outline:3px solid var(--tz-mavi);outline-offset:3px;border-radius:6px}
+.tz-eylemler{display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;margin-top:28px}
+.tz-not{font-size:14px;color:var(--tz-tx3);max-width:40ch;line-height:1.45}
+
+/* menü */
+.tz-nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.94);border-bottom:1px solid var(--tz-cizgi)}
+.tz-nav-ic{max-width:1120px;margin:0 auto;height:68px;padding:0 clamp(16px,4vw,40px);display:flex;align-items:center;gap:28px}
+.tz-marka{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.tz-nav-baglantilar{display:flex;gap:24px;margin-right:auto}
+.tz-nav-baglantilar a{font-size:15px;color:var(--tz-tx2)}
+.tz-nav-baglantilar a:hover{color:var(--tz-murekkep);text-decoration:underline;text-underline-offset:5px}
+.tz-nav-eylem{display:flex;align-items:center;gap:16px;margin-left:auto}
+.tz-nav-giris{font-size:15px;font-weight:600}
+.tz-menu-dugme{display:none;width:44px;height:44px;border-radius:10px;border:1px solid var(--tz-cizgi);background:var(--tz-kagit);color:var(--tz-murekkep);align-items:center;justify-content:center;cursor:pointer}
+.tz-mobil-menu{display:none}
+
+/* giriş */
+.tz-giris{padding:clamp(40px,6vw,72px) 0 clamp(48px,6vw,72px);border-bottom:1px solid var(--tz-cizgi)}
+.tz-giris-metin{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:22px 56px;align-items:end}
+.tz-giris-metin .tz-h1{grid-column:1/-1;max-width:none}
+.tz-giris-ozet{font-size:clamp(17px,1.6vw,19px);color:var(--tz-tx2);max-width:56ch}
+.tz-giris-metin .tz-eylemler{margin-top:0;flex-direction:column;align-items:flex-start;gap:10px}
+.tz-giris-metin .tz-not{max-width:34ch}
+.tz-ay{margin-top:clamp(36px,4.5vw,52px)}
+.tz-film{margin-top:16px}
+
+/* bölümler */
+.tz-bolum{padding:clamp(64px,8vw,104px) 0;border-bottom:1px solid var(--tz-cizgi)}
+.tz-bolum-ince{padding:clamp(56px,6vw,80px) 0}
+.tz-bas{margin-bottom:clamp(32px,4vw,48px)}
+
+/* ayın akışı: sol sütun gün, sağ sütun anlatım */
+.tz-akis{list-style:none;padding:0;border-top:2px solid var(--tz-murekkep)}
+.tz-akis-satir{display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px;padding:28px 0;border-bottom:1px solid var(--tz-cizgi)}
+.tz-akis-gun{font-size:21px;color:var(--tz-mavi);padding-top:1px}
+.tz-akis-icerik{max-width:68ch}
+.tz-akis-icerik p{color:var(--tz-tx2);margin-top:10px}
+.tz-akis-icerik .tz-metin-dugme{margin-top:8px}
+.tz-akis-satir.vurgu .tz-akis-gun{color:var(--tz-murekkep)}
+.tz-akis-satir.vurgu .tz-akis-gun::after{content:"";display:block;width:32px;height:4px;border-radius:2px;background:var(--tz-mavi);margin-top:10px}
+.tz-maddeler{list-style:none;padding:0;margin-top:12px;display:flex;flex-wrap:wrap;gap:6px 8px}
+.tz-maddeler li{font-size:14px;color:var(--tz-murekkep);background:var(--tz-zemin);border:1px solid var(--tz-cizgi);border-radius:6px;padding:3px 9px}
+
+/* muhtasar */
+.tz-muhtasar{background:var(--tz-zemin)}
+.tz-muh{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(32px,5vw,64px);align-items:start}
+.tz-tikler{list-style:none;padding:0;margin-top:24px;display:grid;gap:10px}
+.tz-tikler li{position:relative;padding-left:28px}
+.tz-tikler li::before{content:"";position:absolute;left:2px;top:7px;width:14px;height:8px;border-left:3px solid var(--tz-mavi);border-bottom:3px solid var(--tz-mavi);transform:rotate(-45deg)}
+.tz-dosya{background:var(--tz-kagit);border:1px solid var(--tz-cizgi);border-radius:12px;overflow:hidden}
+.tz-dosya-ust{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--tz-gece);color:#fff;padding:10px 14px;font:600 14.5px/1.3 var(--tz-govde)}
+.tz-dosya-etiket{font-weight:500;font-size:13px;color:rgba(255,255,255,.66)}
+.tz-dosya pre{margin:0;padding:16px 18px;font:12.5px/1.6 ui-monospace,'SF Mono',Consolas,monospace;color:#2A3550;white-space:pre-wrap;word-break:break-word;border-bottom:1px solid var(--tz-cizgi)}
+.tz-dosya-alt{padding:14px 18px;font-size:15px;display:grid;gap:4px}
+
+/* fihrist: noktalı kılavuz çizgisiyle iki sütun */
+.tz-fihrist{display:grid;grid-template-columns:1fr 1fr;gap:0 56px;border-top:2px solid var(--tz-murekkep)}
+.tz-fihrist>div{display:grid;grid-template-columns:minmax(0,max-content) 1fr;align-items:baseline;gap:0 10px;padding:16px 0;border-bottom:1px solid var(--tz-cizgi)}
+.tz-fihrist dt{font-weight:600;display:flex;align-items:baseline;gap:10px;white-space:nowrap}
+.tz-fihrist dt::after{content:"";flex:1;min-width:24px;border-bottom:2px dotted var(--tz-cizgi);transform:translateY(-4px)}
+.tz-fihrist dd{color:var(--tz-tx2);font-size:15.5px}
+
+/* denetçi (koyu) */
+.tz-denetci{background:var(--tz-gece);color:#fff;padding:clamp(64px,8vw,104px) 0}
+.tz-denetci .tz-ozet{color:rgba(255,255,255,.74)}
+.tz-tutanak{margin-top:clamp(32px,4vw,48px);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px 48px;align-items:end}
+.tz-tutanak ul{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:14px 40px}
+.tz-tutanak li{display:flex;gap:12px;align-items:flex-start;color:rgba(255,255,255,.78);font-size:15.5px}
+.tz-tutanak li svg{color:#F06A5F;flex-shrink:0;margin-top:3px}
+.tz-tutanak b{color:#fff;font-weight:600}
+
+/* sorular */
+.tz-sorular{display:grid;grid-template-columns:1fr 1fr;gap:32px 56px}
+.tz-sorular dt{font-family:var(--tz-baslik);font-weight:700;font-size:19px;line-height:1.3}
+.tz-sorular dd{color:var(--tz-tx2);margin-top:8px;max-width:58ch}
+
+/* kapanış */
+.tz-kapanis{padding:clamp(64px,8vw,104px) 0}
+.tz-adimlar{list-style:decimal;margin-top:24px;padding-left:24px;display:grid;gap:8px;max-width:62ch;color:var(--tz-tx2)}
+.tz-adimlar li::marker{font-family:var(--tz-baslik);font-weight:700;color:var(--tz-mavi)}
+
+/* altbilgi */
+.tz-alt{background:var(--tz-gece);color:#fff;padding:44px 0 26px}
+.tz-alt-ic{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;padding-bottom:24px;border-bottom:1px solid rgba(255,255,255,.12)}
+.tz-alt-marka{display:flex;align-items:center;gap:12px}
+.tz-alt-etiket{font-size:13px;color:rgba(255,255,255,.6);margin-top:4px}
+.tz-alt-baglantilar{display:flex;flex-wrap:wrap;gap:8px 22px}
+.tz-alt-baglantilar a{font-size:14px;color:rgba(255,255,255,.72)}
+.tz-alt-baglantilar a:hover{color:#fff;text-decoration:underline;text-underline-offset:4px}
+.tz-alt-telif{font-size:13px;color:rgba(255,255,255,.62);padding-top:20px}
+
+@media (max-width:960px){
+  .tz-nav-baglantilar{display:none}
+  .tz-menu-dugme{display:inline-flex}
+  .tz-mobil-menu{display:flex;flex-direction:column;padding:4px clamp(16px,4vw,40px) 12px;border-top:1px solid var(--tz-cizgi);background:var(--tz-kagit)}
+  .tz-mobil-menu a{display:flex;align-items:center;min-height:48px;font-weight:600;border-bottom:1px solid var(--tz-cizgi)}
+  .tz-mobil-menu a:last-child{border-bottom:0}
+  .tz-mobil-menu .tz-mobil-giris{color:var(--tz-mavi)}
+  .tz-muh{grid-template-columns:1fr}
+  .tz-tutanak{grid-template-columns:1fr}
+  .tz-giris-metin{grid-template-columns:1fr}
 }
-
-/* buttons */
-.tz-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  font-family: inherit; font-weight: 600; font-size: 14px; border-radius: 12px;
-  padding: 10px 18px; cursor: pointer; border: 1px solid transparent; white-space: nowrap;
-  transition: transform .2s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease; }
-.tz-btn-lg { font-size: 16px; padding: 15px 30px; border-radius: 14px; }
-.tz-btn-primary { background: var(--g); color: #fff; box-shadow: 0 8px 22px rgba(35,71,217,.22); }
-.tz-btn-primary:hover { background: var(--g-d); transform: translateY(-2px); box-shadow: 0 14px 30px rgba(35,71,217,.28); }
-.tz-btn-ghost { background: var(--surf); color: var(--tx); border-color: var(--line-2); }
-.tz-btn-ghost:hover { border-color: var(--g); color: var(--g); transform: translateY(-2px); }
-.tz-btn-white { background: #fff; color: var(--g-dd); box-shadow: 0 10px 26px rgba(0,0,0,.14); }
-.tz-btn-white:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(0,0,0,.2); }
-.tz-btn-outline-light { background: rgba(255,255,255,.06); color: #fff; border-color: rgba(255,255,255,.28); backdrop-filter: blur(6px); }
-.tz-btn-outline-light:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.5); transform: translateY(-2px); }
-
-/* nav */
-.tz-nav { position: sticky; top: 0; z-index: 100; background: rgba(245,246,248,.84);
-  backdrop-filter: saturate(160%) blur(14px); border-bottom: 1px solid var(--line); }
-.tz-nav-inner { max-width: 1180px; margin: 0 auto; height: 68px; padding: 0 clamp(20px,5vw,48px);
-  display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-.tz-brand { display: flex; align-items: center; gap: 10px; }
-.tz-brand-mark { width: 38px; height: 38px; }
-.tz-brand-name { font-family: var(--font-display); font-weight: 800; font-size: 22px; color: var(--g-d); letter-spacing: -.01em; }
-.tz-brand-360 { color: var(--gold); }
-.tz-nav-links { display: flex; align-items: center; gap: 28px; }
-.tz-nav-links a { font-size: 14.5px; font-weight: 500; color: var(--tx2); transition: color .15s; }
-.tz-nav-links a:hover { color: var(--g); }
-.tz-nav-tool { display: inline-flex; align-items: center; gap: 6px; font-weight: 600 !important; color: var(--g-d) !important; }
-.tz-nav-tool::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
-.tz-nav-tool:hover { color: var(--gold) !important; }
-.tz-nav-cta { display: flex; align-items: center; gap: 14px; }
-.tz-nav-login { font-size: 14.5px; font-weight: 600; color: var(--tx); }
-.tz-nav-login:hover { color: var(--g); }
-.tz-userpill { display: flex; align-items: center; gap: 10px; padding: 6px 16px 6px 6px; border-radius: 999px;
-  background: var(--surf); border: 1px solid var(--line-2); box-shadow: 0 2px 8px rgba(0,0,0,.05);
-  font-size: 14px; font-weight: 600; transition: transform .2s, border-color .2s; }
-.tz-userpill:hover { border-color: var(--g); transform: translateY(-1px); }
-.tz-avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,var(--g),var(--g-d));
-  color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
-
-/* hero */
-.tz-hero { position: relative; overflow: hidden; padding: clamp(64px,9vw,120px) 0 0;
-  background: radial-gradient(120% 70% at 50% -10%, #EEF2FE 0%, var(--bg) 60%); text-align: center; }
-.tz-hero-glow { position: absolute; top: -140px; left: 50%; transform: translateX(-50%);
-  width: min(760px,90vw); height: 460px; background: radial-gradient(closest-side, rgba(35,71,217,.16), transparent);
-  filter: blur(30px); pointer-events: none; }
-.tz-hero-inner { position: relative; z-index: 2; }
-.tz-badge { display: inline-flex; align-items: center; gap: 9px; background: var(--surf);
-  border: 1px solid var(--line-2); border-radius: 999px; padding: 8px 18px; font-size: 13px; font-weight: 600;
-  color: var(--g-d); box-shadow: 0 4px 16px rgba(35,71,217,.06); }
-.tz-badge-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold);
-  box-shadow: 0 0 0 4px rgba(142,163,238,.25); }
-.tz-h1 { font-family: var(--font-display); font-weight: 800; letter-spacing: -.02em;
-  font-size: clamp(36px, 6.2vw, 74px); line-height: 1.08; margin: 28px auto 22px; max-width: 15ch; }
-.tz-grad { background: linear-gradient(100deg, var(--g) 0%, var(--gold) 100%);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-.tz-hero-lead { font-size: clamp(16px,2vw,20px); color: var(--tx2); line-height: 1.65; max-width: 620px; margin: 0 auto 36px; }
-.tz-hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-.tz-hero-note { display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; font-size: 13.5px; color: var(--tx3); font-weight: 500; }
-.tz-hero-note svg { color: var(--g); }
-
-/* generic section */
-.tz-section { padding: clamp(72px,10vw,120px) 0; }
-.tz-section-alt { background: linear-gradient(180deg,var(--surf),var(--bg)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.tz-head { text-align: center; max-width: 660px; margin: 0 auto clamp(48px,6vw,72px); }
-.tz-eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .08em; color: var(--g); margin-bottom: 16px; }
-.tz-eyebrow svg { color: var(--gold); }
-.tz-eyebrow-light { color: rgba(255,255,255,.9); }
-.tz-eyebrow-light svg { color: var(--gold); }
-.tz-h2 { font-family: var(--font-display); font-weight: 800; letter-spacing: -.015em;
-  font-size: clamp(28px,4vw,46px); line-height: 1.15; margin: 0 0 18px; }
-.tz-h2-light { color: #fff; }
-.tz-lead { font-size: clamp(15px,1.6vw,18px); color: var(--tx2); line-height: 1.65; margin: 0; }
-.tz-lead-center { margin-left: auto; margin-right: auto; }
-.tz-lead-light { color: rgba(255,255,255,.72); }
-
-/* audit (dark) */
-.tz-audit { position: relative; overflow: hidden; padding: clamp(72px,10vw,120px) 0;
-  background: linear-gradient(160deg,var(--g-dd) 0%,#16245E 100%); }
-.tz-audit-glow { position: absolute; bottom: -20%; right: -5%; width: 620px; height: 620px; border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(142,163,238,.18), transparent); filter: blur(20px); pointer-events: none; }
-.tz-audit-inner { position: relative; z-index: 2; }
-.tz-audit .tz-head .tz-btn { margin-top: 30px; }
-.tz-audit-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
-.tz-acard { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); border-radius: 18px;
-  padding: 28px; transition: transform .3s, background .3s, border-color .3s; }
-.tz-acard:hover { transform: translateY(-4px); background: rgba(255,255,255,.07); border-color: rgba(142,163,238,.55); }
-.tz-acard-ic { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 14px;
-  background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.14); color: #fff; margin-bottom: 18px; }
-.tz-acard:hover .tz-acard-ic { color: var(--gold); border-color: rgba(142,163,238,.5); }
-.tz-acard h3 { font-size: 16px; font-weight: 700; color: #fff; margin: 0 0 10px; }
-.tz-acard p { font-size: 14px; color: rgba(255,255,255,.62); line-height: 1.6; margin: 0; }
-
-/* steps */
-.tz-steps { display: grid; grid-template-columns: repeat(3,1fr); gap: 22px; position: relative; }
-.tz-steps::before { content: ''; position: absolute; top: 46px; left: 12%; right: 12%; height: 2px;
-  background: linear-gradient(90deg, transparent, var(--line-2) 15%, var(--line-2) 85%, transparent); }
-.tz-step { position: relative; text-align: center; background: var(--surf); border: 1px solid var(--line);
-  border-radius: 20px; padding: 40px 28px 32px; transition: transform .3s cubic-bezier(.16,1,.3,1), box-shadow .3s, border-color .3s; }
-.tz-step:hover { transform: translateY(-6px); border-color: #C9D4FA; box-shadow: 0 24px 44px -24px rgba(35,71,217,.4); }
-.tz-step-num { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%;
-  background: var(--surf); border: 1px solid var(--line-2); box-shadow: 0 6px 18px rgba(35,71,217,.1);
-  font-family: var(--font-display); font-size: 24px; font-weight: 800; color: var(--g);
-  margin: -72px auto 20px; position: relative; }
-.tz-step h3 { font-size: 17px; font-weight: 700; margin: 0 0 10px; }
-.tz-step p { font-size: 14px; color: var(--tx2); line-height: 1.6; margin: 0; }
-
-/* trust */
-.tz-trust { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
-.tz-tcard { display: flex; gap: 16px; background: var(--surf); border: 1px solid var(--line); border-radius: 18px;
-  padding: 26px 24px; transition: transform .3s, box-shadow .3s, border-color .3s; }
-.tz-tcard:hover { transform: translateY(-4px); border-color: #C9D4FA; box-shadow: 0 20px 38px -22px rgba(35,71,217,.35); }
-.tz-tcard-ic { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 13px; flex-shrink: 0;
-  background: linear-gradient(135deg,var(--bg),var(--surf)); border: 1px solid var(--line-2); color: var(--g); }
-.tz-tcard h3 { font-size: 15.5px; font-weight: 700; margin: 2px 0 7px; }
-.tz-tcard p { font-size: 13.5px; color: var(--tx2); line-height: 1.6; margin: 0; }
-
-/* CTA */
-.tz-ctawrap { padding: clamp(56px,8vw,96px) 0; background: var(--surf); border-top: 1px solid var(--line); }
-.tz-cta { position: relative; overflow: hidden; border-radius: clamp(24px,4vw,36px);
-  background: linear-gradient(135deg,var(--g-d) 0%,var(--g-dd) 100%); padding: clamp(48px,7vw,84px) clamp(24px,5vw,48px); text-align: center; }
-.tz-cta-glow { position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(60% 120% at 85% -10%, rgba(142,163,238,.3), transparent 60%),
-              radial-gradient(50% 120% at 10% 120%, rgba(35,71,217,.5), transparent 60%); }
-.tz-cta-inner { position: relative; z-index: 2; }
-.tz-cta h2 { font-family: var(--font-display); font-weight: 800; letter-spacing: -.015em;
-  font-size: clamp(28px,4.5vw,52px); line-height: 1.15; color: #fff; margin: 0 0 18px; }
-.tz-cta p { font-size: clamp(15px,1.8vw,18px); color: rgba(255,255,255,.78); line-height: 1.6; max-width: 540px; margin: 0 auto 36px; }
-.tz-cta-actions { margin-top: 0; }
-
-/* footer */
-.tz-footer { background: var(--g-dd); color: #fff; padding: 48px 0 28px; }
-.tz-footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; padding-bottom: 26px;
-  border-bottom: 1px solid rgba(255,255,255,.1); }
-.tz-footer-brand { display: flex; align-items: center; gap: 12px; }
-.tz-footer-brand img { width: 40px; height: 40px; }
-.tz-footer-name { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
-.tz-footer-tag { font-size: 12.5px; color: rgba(255,255,255,.5); margin-top: 2px; }
-.tz-footer-links { display: flex; gap: 22px; flex-wrap: wrap; }
-.tz-footer-links a { font-size: 13.5px; color: rgba(255,255,255,.65); transition: color .15s; }
-.tz-footer-links a:hover { color: #fff; }
-.tz-footer-copy { font-size: 12.5px; color: rgba(255,255,255,.62); padding-top: 22px; }
-
-/* film */
-.tz-hero { padding-top: clamp(40px,6vw,80px); }
-.tz-hero .tz-h1 { max-width: 19ch; font-size: clamp(34px,5.4vw,64px); margin: 22px auto 18px; }
-.tz-hero .tz-hero-lead { margin-bottom: 0; }
-.tz-film.tz-film-denetci { margin-top: 0; margin-bottom: clamp(44px,6vw,64px); }
-.tz-audit-cta { text-align: center; margin-top: clamp(36px,5vw,52px); }
-.tz-film { max-width: 1040px; margin: clamp(36px,5vw,56px) auto clamp(36px,5vw,48px); }
-
-/* bir ay, adım adım */
-.tz-akis { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: clamp(56px,8vw,104px); position: relative; }
-.tz-adim { display: grid; grid-template-columns: .85fr 1.15fr; gap: clamp(32px,5vw,64px); align-items: center; }
-.tz-adim.ters .tz-adim-metin { order: 2; }
-.tz-adim-ust { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.tz-adim-no { font-family: var(--font-display); font-size: 15px; font-weight: 800; color: #fff; background: var(--g);
-  width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; }
-.tz-adim-gun { font-size: 12.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--g-d);
-  background: #E8EDFD; padding: 5px 11px; border-radius: 999px; }
-.tz-adim h3 { font-family: var(--font-display); font-size: clamp(22px,2.6vw,30px); font-weight: 800; letter-spacing: -.015em; line-height: 1.2; margin: 0 0 14px; }
-.tz-adim p { font-size: 15.5px; color: var(--tx2); line-height: 1.7; margin: 0 0 18px; }
-.tz-adim-maddeler { list-style: none; margin: 0 0 22px; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 9px 16px; }
-.tz-adim-maddeler li { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; font-weight: 600; color: var(--tx); }
-.tz-adim-maddeler svg { color: var(--g); flex-shrink: 0; margin-top: 2px; }
-.tz-adim-izle { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; font-family: inherit; font-size: 14px; font-weight: 700; color: var(--g);
-  background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 0 16px; cursor: pointer; transition: border-color .15s, background .15s; }
-.tz-adim-izle:hover { border-color: var(--g); background: #F3F5FE; }
-
-/* telefon / tablet menüsü */
-.tz-menu-btn { display: none; width: 44px; height: 44px; border-radius: 11px; border: 1px solid var(--line); background: var(--surf); color: var(--tx); align-items: center; justify-content: center; cursor: pointer; }
-.tz-mobil-menu { display: none; }
-
-/* dahası */
-.tz-dahasi { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
-.tz-dcard { background: var(--surf); border: 1px solid var(--line); border-radius: 16px; padding: 22px 20px; transition: transform .3s cubic-bezier(.16,1,.3,1), box-shadow .3s, border-color .3s; }
-.tz-dcard:hover { transform: translateY(-4px); border-color: #C9D4FA; box-shadow: 0 22px 40px -22px rgba(35,71,217,.4); }
-.tz-ficon { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 12px;
-  background: linear-gradient(135deg,#EEF2FE,#DCE3FB); color: var(--g); margin-bottom: 16px; }
-.tz-dcard h3 { font-size: 15.5px; font-weight: 700; margin: 0 0 7px; }
-.tz-dcard p { font-size: 13.5px; color: var(--tx2); line-height: 1.6; margin: 0; }
-
-/* ---------------- responsive ---------------- */
-@media (max-width: 980px) {
-  .tz-adim, .tz-adim.ters { grid-template-columns: 1fr; }
-  .tz-adim.ters .tz-adim-metin { order: 0; }
-  .tz-dahasi { grid-template-columns: repeat(2,1fr); }
-  .tz-audit-grid, .tz-trust { grid-template-columns: repeat(2,1fr); }
+@media (max-width:760px){
+  .tz-akis-satir{grid-template-columns:1fr;gap:6px;padding:24px 0}
+  .tz-fihrist,.tz-sorular,.tz-tutanak ul{grid-template-columns:1fr}
+  .tz-fihrist>div{grid-template-columns:1fr}
+  .tz-fihrist dt::after{display:none}
+  .tz-fihrist dd{margin-top:2px}
 }
-@media (max-width: 860px) {
-  .tz-nav-links { display: none; }
-  .tz-menu-btn { display: inline-flex; }
-  .tz-mobil-menu { display: flex; flex-direction: column; padding: 8px clamp(20px,5vw,48px) 16px; border-top: 1px solid var(--line); background: var(--surf); }
-  .tz-mobil-menu a { display: flex; align-items: center; min-height: 48px; font-size: 15.5px; font-weight: 600; color: var(--tx); border-bottom: 1px solid var(--line); }
-  .tz-mobil-menu a:last-child { border-bottom: none; }
-  .tz-mobil-menu .tz-mobil-giris { color: var(--g); }
-  .tz-steps { grid-template-columns: 1fr; gap: 44px; }
-  .tz-steps::before { display: none; }
-  .tz-step-num { margin-top: 0; }
-}
-@media (max-width: 620px) {
-  /* Telefonda küçük filmler okunmayacak kadar küçülüyor ve sayfayı uzatıyor; "Anlatımlı izle" tam ekranda açar */
-  .tz-adim-film { display: none; }
-  .tz-akis { gap: 40px; }
-  .tz-nav-cta .tz-btn-primary { padding: 10px 14px; }
-  .tz-dahasi, .tz-audit-grid, .tz-trust { grid-template-columns: 1fr; }
-  .tz-adim-maddeler { grid-template-columns: 1fr; }
-  .tz-nav-login { display: none; }
-  .tz-tcard { padding: 20px; }
+@media (max-width:520px){
+  .tz-nav-giris{display:none}
+  .tz-nav-eylem .tz-dugme-ana{padding:0 14px}
+  .tz-marka svg:last-child{display:none !important}
 }
 `
