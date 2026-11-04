@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/AuthContext'
 import { Film, MiniFilm, Sinema, FILM_CSS, KULUP_SETI, kaydiriciBul, type FilmSeti } from './Film'
 import { BOLUMLER } from './sahneler'
 import { DENETCI_SETI, DENETCI_CSS } from './denetciSahneleri'
+import { BrandMark, Wordmark } from '@/components/brand/Logo'
 
 /* ----------------------------------------------------------------- data */
 
@@ -111,8 +112,8 @@ export default function TanitimPage() {
       <nav className="tz-nav">
         <div className="tz-nav-inner">
           <Link href="/tanitim" className="tz-brand">
-            <Image src="/logo.png" alt="Klüp360" width={64} height={64} className="tz-brand-mark" />
-            <span className="tz-brand-name">Klüp<span className="tz-brand-360">360</span></span>
+            <BrandMark size={38} title="" />
+            <Wordmark height={30} />
           </Link>
 
           <div className="tz-nav-links">

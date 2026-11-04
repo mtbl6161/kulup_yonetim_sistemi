@@ -1,10 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { Home } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
+import { BrandMark, Wordmark } from '@/components/brand/Logo'
 
 const LINKS = [
   { href: '/rehber', label: 'Rehber ve Araçlar', tool: true },
@@ -21,8 +21,8 @@ export default function PublicNav() {
     <nav className="pub-nav">
       <div className="pub-nav-inner">
         <Link href="/tanitim" className="pub-brand">
-          <Image src="/logo.png" alt="Klüp360" width={64} height={64} className="pub-brand-mark" />
-          <span className="pub-brand-name">Klüp<span className="pub-brand-360">360</span></span>
+          <BrandMark size={38} title="" />
+          <Wordmark height={30} />
         </Link>
 
         <div className="pub-nav-links">

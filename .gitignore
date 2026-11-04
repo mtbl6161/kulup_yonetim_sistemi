@@ -60,4 +60,5 @@ worksheets/
 *.xlsm
 tmp/
 scripts/*
+!scripts/marka-uret.ts
 !scripts/create-admin.mjs

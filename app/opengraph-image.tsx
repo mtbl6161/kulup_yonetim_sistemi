@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { YAZI, isaretSvg, yaziSvg } from '@/components/brand/geometri'
 
 export const alt = 'Klüp360 · Çocuk kulübü yönetim platformu'
 export const size = { width: 1200, height: 630 }
@@ -22,14 +23,11 @@ export default async function Image() {
 
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '64px 72px', width: 700, position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <svg width="64" height="64" viewBox="0 0 64 64">
-              <rect width="64" height="64" rx="14" fill="#FFFFFF" />
-              <circle cx="31" cy="31" r="15" fill="none" stroke="#0E1116" strokeWidth="5" />
-              <circle cx="46" cy="46" r="6.5" fill="#2347D9" stroke="#FFFFFF" strokeWidth="3" />
-            </svg>
-            <div style={{ display: 'flex', marginLeft: 20, fontSize: 44, fontWeight: 700, letterSpacing: -1.5 }}>
-              Klüp<span style={{ color: '#8EA3EE' }}>360</span>
-            </div>
+            {/* ImageResponse (satori) yalnızca <img> destekler */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`data:image/svg+xml;base64,${Buffer.from(isaretSvg('acik')).toString('base64')}`} width={64} height={64} alt="" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`data:image/svg+xml;base64,${Buffer.from(yaziSvg(true)).toString('base64')}`} width={Math.round(52 * YAZI.oran)} height={52} alt="" style={{ marginLeft: 22 }} />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column' }}>

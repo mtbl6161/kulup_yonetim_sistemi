@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { logLoginAttempt } from '@/app/actions/logLogin'
 import { Mail, Lock, AlertTriangle, CheckCircle, ArrowLeft, UserPlus, ShieldCheck, BarChart3, Home, Calculator } from 'lucide-react'
 import Link from 'next/link'
-import { BrandMark } from '@/components/brand/Logo'
+import { BrandMark, Wordmark } from '@/components/brand/Logo'
 import { HeroComposition } from '@/components/brand/Illustrations'
 import { hataMesaji } from '@/lib/hata'
 
@@ -73,8 +73,8 @@ export default function LoginPage() {
       <aside className="au-brand">
         <div className="au-brand-inner">
           <Link href="/tanitim" className="au-logo">
-            <BrandMark size={40} tone="light" />
-            <span>Klüp<i>360</i></span>
+            <BrandMark size={40} tone="light" title="" />
+            <Wordmark height={32} onDark />
           </Link>
           <div className="au-brand-mid">
             <h2>Kulübünüzün tüm yönetimi, tek panelde.</h2>

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { BrandMark } from '@/components/brand/Logo'
+import { BrandMark, Wordmark } from '@/components/brand/Logo'
 import { createBrowserClient } from '@supabase/ssr'
 import {
   Eye,
@@ -336,8 +336,8 @@ function AuthBrand() {
     <aside className="su-brand">
       <div className="su-brand-inner">
         <Link href="/tanitim" className="su-logo">
-          <BrandMark size={40} tone="light" />
-          <span>Klüp<i>360</i></span>
+          <BrandMark size={40} tone="light" title="" />
+          <Wordmark height={32} onDark />
         </Link>
         <div className="su-brand-mid">
           <h2>Kurumunuzu dakikalar içinde dijitale taşıyın.</h2>

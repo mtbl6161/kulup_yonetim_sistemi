@@ -1,35 +1,57 @@
-// Klüp360 marka işareti: halka (360°) + yörüngedeki nokta.
-// Tek kaynak: public/brand/logo-mark.svg ve app/icon.svg ile aynı geometri.
+// Klüp360 marka işareti (gülümseyen ü) ve logo yazısı.
+// Geometri tek kaynaktan: components/brand/geometri.ts (statik dosyalar: npx tsx scripts/marka-uret.ts)
+import { ISARET, YAZI, isaretRenkleri, yaziRenkleri, type Ton } from './geometri'
 
-type MarkProps = { size?: number; tone?: 'dark' | 'light' | 'mono'; title?: string }
+type MarkProps = { size?: number; tone?: 'dark' | 'light' | 'blue' | 'mono'; title?: string }
 
+const TON: Record<NonNullable<MarkProps['tone']>, Ton> = { dark: 'koyu', light: 'acik', blue: 'mavi', mono: 'tek' }
+
+/** Kare uygulama işareti (title="" verilirse yanında yazı olduğu için ekran okuyucudan gizlenir). dark: lacivert zemin, light: beyaz zemin (koyu sayfalarda), blue: mavi zemin, mono: zeminsiz tek renk */
 export function BrandMark({ size = 32, tone = 'dark', title = 'Klüp360' }: MarkProps) {
-  const bg = tone === 'dark' ? '#0E1116' : tone === 'light' ? '#FFFFFF' : 'none'
-  const ring = tone === 'light' ? '#0E1116' : tone === 'mono' ? 'currentColor' : '#FFFFFF'
-  const dot = tone === 'light' ? '#2347D9' : '#2347D9'
-  const cut = tone === 'dark' ? '#0E1116' : tone === 'light' ? '#FFFFFF' : 'var(--surface)'
+  const r = isaretRenkleri(TON[tone])
+  const { noktaSol: a, noktaSag: b } = ISARET
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" role="img" aria-label={title} style={{ flexShrink: 0, display: 'block' }}>
-      {bg !== 'none' && <rect width="64" height="64" rx="14" fill={bg} />}
-      <circle cx="31" cy="31" r="15" fill="none" stroke={ring} strokeWidth="5" />
-      <circle cx="46" cy="46" r="6.5" fill={dot} stroke={cut} strokeWidth="3" />
+    <svg width={size} height={size} viewBox={ISARET.viewBox} style={{ flexShrink: 0, display: 'block' }}
+      {...(title ? { role: 'img', 'aria-label': title } : { 'aria-hidden': true })}>
+      {r.zemin && <rect width="64" height="64" rx={ISARET.koseYaricap} fill={r.zemin} />}
+      <path d={ISARET.yay} fill="none" stroke={r.cizgi} strokeWidth={ISARET.yayKalinlik} strokeLinecap="round" />
+      <circle cx={a.cx} cy={a.cy} r={a.r} fill={r.sol} />
+      <circle cx={b.cx} cy={b.cy} r={b.r} fill={r.sag} />
+    </svg>
+  )
+}
+
+/** Özel çizilmiş "Klüp360" yazısı. height: SVG yüksekliği (harf yüksekliği bunun ~%60'ı) */
+export function Wordmark({ height = 24, onDark = false, title = 'Klüp360' }: { height?: number; onDark?: boolean; title?: string }) {
+  const r = yaziRenkleri(onDark)
+  const k = YAZI.kalinlik
+  const cizgi = { fill: 'none', strokeWidth: k, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+  const s = YAZI.sifir
+  return (
+    <svg height={height} width={height * YAZI.oran} viewBox={YAZI.viewBox} role="img" aria-label={title} style={{ flexShrink: 0, display: 'block' }}>
+      {YAZI.harfler.map(d => <path key={d} d={d} stroke={r.harf} {...cizgi} />)}
+      <circle {...YAZI.pHalka} stroke={r.harf} fill="none" strokeWidth={k} />
+      <circle {...YAZI.noktaSol} fill={r.sol} />
+      <circle {...YAZI.noktaSag} fill={r.sag} />
+      {YAZI.rakamlar.map(d => <path key={d} d={d} stroke={r.rakam} {...cizgi} />)}
+      <circle {...YAZI.altiHalka} stroke={r.rakam} fill="none" strokeWidth={k} />
+      <rect x={s.x} y={s.y} width={s.width} height={s.height} rx={s.rx} stroke={r.rakam} fill="none" strokeWidth={k} />
     </svg>
   )
 }
 
 type LogoProps = { size?: number; tone?: 'onLight' | 'onDark'; showTagline?: boolean }
 
+/** İşaret + yazı. size: işaretin kenar uzunluğu */
 export default function Logo({ size = 28, tone = 'onLight', showTagline = false }: LogoProps) {
   const onDark = tone === 'onDark'
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: size * 0.36, textDecoration: 'none' }}>
-      <BrandMark size={size} tone={onDark ? 'light' : 'dark'} />
-      <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
-        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: size * 0.68, letterSpacing: '-0.04em', color: onDark ? '#fff' : 'var(--text)' }}>
-          Klüp<span style={{ color: onDark ? '#8EA3EE' : 'var(--accent)' }}>360</span>
-        </span>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: size * 0.34, textDecoration: 'none' }}>
+      <BrandMark size={size} tone={onDark ? 'blue' : 'dark'} title="" />
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <Wordmark height={size * 0.8} onDark={onDark} />
         {showTagline && (
-          <span style={{ fontSize: size * 0.34, color: onDark ? 'rgba(255,255,255,.6)' : 'var(--text3)', marginTop: 2 }}>
+          <span style={{ fontSize: size * 0.34, color: onDark ? 'rgba(255,255,255,.6)' : 'var(--text3)' }}>
             Okul Yönetim Platformu
           </span>
         )}
