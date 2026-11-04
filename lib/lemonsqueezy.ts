@@ -2,15 +2,48 @@
  * Lemon Squeezy Ödeme Yardımcıları
  */
 
+import { DONEM_ADI, planUcreti, tl, type AbonelikDonemi } from './abonelikPlanlari'
+
 const API_BASE = 'https://api.lemonsqueezy.com/v1'
 
-export async function createCheckoutLink(ogrenciId: number, okulId: number, variantId: string, interval?: string) {
+const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://www.klup360.com'
+
+// Ödeme sayfasının görünümü: uygulamanın renkleri (app/globals.css) ile aynı
+const ODEME_RENKLERI = {
+  background_color: '#ffffff',
+  headings_color: '#0e1116',
+  primary_text_color: '#0e1116',
+  secondary_text_color: '#5f6876',
+  links_color: '#2347d9',
+  borders_color: '#e3e6eb',
+  checkbox_color: '#2347d9',
+  active_state_color: '#2347d9',
+  button_color: '#2347d9',
+  button_text_color: '#ffffff',
+  terms_privacy_color: '#5f6876',
+}
+
+export interface OdemeBaglantisiSecenekleri {
+  okulId: number
+  variantId: string
+  donem: AbonelikDonemi
+  /** Forma önceden yazılır */
+  email?: string | null
+  kurumAdi?: string | null
+  /** Lemon Squeezy test modu (gerçek ödeme alınmaz) */
+  testModu?: boolean
+}
+
+export async function createCheckoutLink({ okulId, variantId, donem, email, kurumAdi, testModu }: OdemeBaglantisiSecenekleri) {
   const apiKey = process.env.LEMONSQUEEZY_API_KEY
   const storeId = process.env.LEMONSQUEEZY_STORE_ID
 
   if (!apiKey || !storeId) {
     throw new Error('Lemon Squeezy API anahtarı veya Store ID eksik (.env.local)')
   }
+
+  const yillik = donem === 'year'
+  const tutar = `₺${tl(planUcreti(donem))} / ${yillik ? 'yıl' : 'ay'}`
 
   const response = await fetch(`${API_BASE}/checkouts`, {
     method: 'POST',
@@ -23,14 +56,35 @@ export async function createCheckoutLink(ogrenciId: number, okulId: number, vari
       data: {
         type: 'checkouts',
         attributes: {
+          ...(testModu ? { test_mode: true } : {}),
           product_options: {
-            redirect_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.klup360.com'}/ayarlar?sekme=lisans&odeme=tamam`
+            name: `Klüp360 · ${DONEM_ADI[donem]} abonelik`,
+            description: `${kurumAdi ? `${kurumAdi} için ` : ''}Klüp360 çocuk kulübü yönetim sistemi, tüm modüller dahil (${tutar}). `
+              + `Aboneliğiniz her ${yillik ? 'yıl' : 'ay'} otomatik yenilenir; istediğiniz an Ayarlar › Abonelik'ten iptal edebilirsiniz.`,
+            // Ödeme sayfasında yalnızca seçilen plan görünür
+            enabled_variants: [Number(variantId)],
+            redirect_url: `${APP_URL()}/ayarlar?sekme=lisans&odeme=tamam`,
+            receipt_button_text: "Klüp360'a dön",
+            receipt_link_url: `${APP_URL()}/ayarlar?sekme=lisans`,
+            receipt_thank_you_note: "Klüp360'ı tercih ettiğiniz için teşekkür ederiz. Lisansınız ödemeyle birlikte otomatik olarak etkinleşti. "
+              + 'Faturalarınıza ve aboneliğinize her zaman Ayarlar › Abonelik bölümünden ulaşabilirsiniz.',
+          },
+          checkout_options: {
+            locale: 'tr',
+            media: false,        // ürünlerin görseli yok
+            discount: false,     // mağazada indirim kodu tanımlı değil; tanımlanırsa true yapın
+            logo: true,
+            desc: true,
+            subscription_preview: true,
+            ...ODEME_RENKLERI,
           },
           checkout_data: {
+            ...(email ? { email } : {}),
+            ...(kurumAdi ? { name: kurumAdi } : {}),
+            billing_address: { country: 'TR' },
             custom: {
               okul_id: String(okulId),
-              ogrenci_id: String(ogrenciId),
-              interval: interval || 'year'
+              interval: donem,
             }
           }
         },

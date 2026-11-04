@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createCheckoutLink } from '@/lib/lemonsqueezy'
-import { cagiraniGetir } from '@/lib/apiAuth'
+import { adminClient, cagiraniGetir } from '@/lib/apiAuth'
 import { variantDonemi } from '@/lib/abonelikPlanlari'
 
 export async function POST(req: NextRequest) {
@@ -17,7 +17,13 @@ export async function POST(req: NextRequest) {
     const okulId = cagiran.rol === 'super_admin' && istenenOkul ? Number(istenenOkul) : cagiran.okulId
     if (!okulId) return NextResponse.json({ error: 'Hesabınıza bağlı okul bulunamadı' }, { status: 400 })
 
-    const url = await createCheckoutLink(0, okulId, String(variantId), interval)
+    // Kurum adı forma önceden yazılır
+    const { data: okul } = await adminClient().from('okullar').select('ad').eq('id', okulId).maybeSingle()
+
+    const url = await createCheckoutLink({
+      okulId, variantId: String(variantId), donem: interval,
+      email: cagiran.user.email, kurumAdi: okul?.ad,
+    })
     if (!url) {
       return NextResponse.json({ error: 'Lemon Squeezy bağlantısı oluşturulamadı' }, { status: 500 })
     }
