@@ -31,8 +31,7 @@ import {
 } from 'lucide-react'
 import ConfirmModal from '@/components/ConfirmModal'
 import { Okul } from '@/lib/types'
-import { uyari, onayla } from '@/lib/diyalog'
-import { hataMesaji } from '@/lib/hata'
+import { onayla } from '@/lib/diyalog'
 import { useDegisince } from '@/lib/useDegisince'
 import LisansSekmesi from '@/components/ayarlar/LisansSekmesi'
 import GuvenlikSekmesi from '@/components/ayarlar/GuvenlikSekmesi'
@@ -90,6 +89,13 @@ export default function AyarlarPage() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [activeTab, setActiveTab] = useState<'kurumsal' | 'mali' | 'vergi' | 'kulup' | 'tatil' | 'guvenlik' | 'lisans'>('kurumsal')
+  // ?sekme=lisans ile doğrudan Abonelik sekmesi açılır (Lemon Squeezy ödeme dönüşü, panel bağlantıları)
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('sekme') !== 'lisans') return
+    // Sunucu çıktısı varsayılan sekmeyle eşleşsin diye ilk çizimden sonra geçilir
+    const t = setTimeout(() => setActiveTab('lisans'), 0)
+    return () => clearTimeout(t)
+  }, [])
   // Tatil Yönetimi Durumu
   const [tatiller, setTatiller] = useState<Tatil[]>([])
   const [tatilForm, setTatilForm] = useState({ ad: '', bas: '', bit: '', tip: 'ozel' })
@@ -143,8 +149,6 @@ export default function AyarlarPage() {
     message: string
   } | null>(null)
   const [okulData, setOkulData] = useState<Okul | null>(null)
-  const [checkoutLoading, setCheckoutLoading] = useState(false)
-  const [secilenPeriod, setSecilenPeriod] = useState<'month' | 'year'>('month')
 
   useEffect(() => {
     // 1. Ayarları Çek
@@ -183,36 +187,6 @@ export default function AyarlarPage() {
 
     fetchOkul()
   }, [])
-
-  const isDeneme = okulData?.odeme_durumu === 'deneme' && 
-                   okulData?.lisans_bitis != null && 
-                   new Date(okulData.lisans_bitis) > new Date()
-                   
-  const isAktif = okulData?.odeme_durumu === 'aktif' && 
-                  okulData?.lisans_bitis != null && 
-                  new Date(okulData.lisans_bitis) > new Date()
-
-  const lisansGecerli = isDeneme || isAktif
-
-  const handlePayment = async (variantId: string, interval: string) => {
-    if (!okulData) return
-    setCheckoutLoading(true)
-    try {
-      const { data: { session: oturum } } = await supabase.auth.getSession()
-      const res = await fetch('/api/lemonsqueezy/create-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${oturum?.access_token ?? ''}` },
-        body: JSON.stringify({ okulId: okulData.id, variantId, interval })
-      })
-      const data = await res.json()
-      if (data.url) window.location.href = data.url
-      else throw new Error(data.error || 'Bağlantı oluşturulamadı')
-    } catch (err) {
-      uyari("Ödeme bağlantısı oluşturulamadı: " + hataMesaji(err), "Hata")
-    } finally {
-      setCheckoutLoading(false)
-    }
-  }
 
   function setF(key: keyof Ayarlar, val: unknown) {
     setForm(f => ({ ...f, [key]: val }))
@@ -768,7 +742,7 @@ export default function AyarlarPage() {
             {activeTab === 'tatil' && <TatilSekmesi tatiller={tatiller} kbMevcut={kbMevcut} kbYil={kbYil} setKbYil={setKbYil} kbTarih={kbTarih} setKbTarih={setKbTarih} kbSaving={kbSaving} kulupBaslangicKaydet={kulupBaslangicKaydet} varsayilanEgitimYili={varsayilanEgitimYili} setTatilEkleAcik={setTatilEkleAcik} setTatilForm={setTatilForm} tatilSil={tatilSil} />}
 
             {/* TAB 6: LİSANS & ÖDEME */}
-            {activeTab === 'lisans' && <LisansSekmesi okulData={okulData} lisansGecerli={lisansGecerli} secilenPeriod={secilenPeriod} setSecilenPeriod={setSecilenPeriod} checkoutLoading={checkoutLoading} handlePayment={handlePayment} />}
+            {activeTab === 'lisans' && <LisansSekmesi okulData={okulData} />}
 
             {/* TAB 5: GÜVENLİK & PROFİL */}
             {activeTab === 'guvenlik' && <GuvenlikSekmesi passForm={passForm} setPassForm={setPassForm} passSaving={passSaving} sifreGuncelle={sifreGuncelle} />}

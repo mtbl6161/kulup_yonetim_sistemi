@@ -3,9 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Check, ArrowRight, CheckCircle } from 'lucide-react'
-
-const AYLIK = 750
-const YILLIK_TOPLAM = 7500
+import { AYLIK_UCRET as AYLIK, YILLIK_UCRET as YILLIK_TOPLAM, YILLIK_INDIRIM_ETIKETI } from '@/lib/abonelikPlanlari'
 const YILLIK_AYLIK = Math.round(YILLIK_TOPLAM / 12)
 
 const ozellikler = [
@@ -37,7 +35,7 @@ export default function FiyatlandirmaContent() {
         {(['aylik', 'yillik'] as const).map(d => (
           <button key={d} type="button" className={donem === d ? 'on' : ''} onClick={() => setDonem(d)}>
             {d === 'aylik' ? 'Aylık Fatura' : 'Yıllık Fatura'}
-            {d === 'yillik' && <span className="fp-save">%20 indirim</span>}
+            {d === 'yillik' && <span className="fp-save">{YILLIK_INDIRIM_ETIKETI}</span>}
           </button>
         ))}
       </div>

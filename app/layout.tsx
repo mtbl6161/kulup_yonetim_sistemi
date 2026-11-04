@@ -63,7 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               'applicationCategory': 'EducationalApplication, BusinessApplication',
               'offers': {
                 '@type': 'Offer',
-                'price': '750',
+                'price': '1250',
                 'priceCurrency': 'TRY'
               },
               'description': 'MEB Çocuk Kulüpleri Yönergesi\'ne uygun okul yönetim sistemi.'

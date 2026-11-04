@@ -4,7 +4,7 @@ import FiyatlandirmaContent from './FiyatlandirmaContent'
 
 export const metadata: Metadata = {
   title: 'Fiyatlandırma | Klüp360 — Tek Plan, Tüm Özellikler',
-  description: 'Klüp360 fiyatlandırması: tek plan, tüm modüller. Sınırsız öğretmen ve öğrenci, gizli ücret yok. Aylık ₺750, yıllıkta %20 indirim. 15 gün ücretsiz deneyin.',
+  description: 'Klüp360 fiyatlandırması: tek plan, tüm modüller. Sınırsız öğretmen ve öğrenci, gizli ücret yok. Aylık ₺1.250 veya yıllık ₺12.500. 15 gün ücretsiz deneyin.',
   alternates: { canonical: 'https://www.klup360.com/fiyatlandirma' },
   openGraph: {
     title: 'Klüp360 Fiyatlandırma — Tek Plan, Tüm Özellikler',
