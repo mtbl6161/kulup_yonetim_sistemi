@@ -32,10 +32,10 @@ export const EKSIK_GUN_NEDENLERI: { kod: string; ad: string }[] = [
 
 export const eksikGunAdi = (kod: string | null | undefined) => EKSIK_GUN_NEDENLERI.find(n => n.kod === kod)?.ad ?? ''
 
-/** SGK ayı 30 gün sayar: tam çalışan 30 gün bildirilir, eksik gün = 30 − prim günü. */
+/** Tam çalışan 30 gün bildirilir. Eksik günü olanda SGK, 31 çeken aylarda gün + eksik gün = 31 bekler. */
 export function primGunu(toplamSaat: number) {
   return Math.min(30, Math.round(toplamSaat / 7.5)) || 1
 }
-export const eksikGunSayisi = (gun: number) => Math.max(0, 30 - gun)
+export const eksikGunSayisi = (gun: number, ayGun = 30) => (gun >= 30 ? 0 : Math.max(30, ayGun) - gun)
 
 export interface EksikGunKaydi { id?: number; personel_id: number; yil: number; ay: number; kod: string; aciklama: string | null }

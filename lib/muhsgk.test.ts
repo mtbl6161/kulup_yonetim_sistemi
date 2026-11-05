@@ -32,6 +32,12 @@ describe('MUHSGK yardımcıları', () => {
     expect(sgkGunleri(28, 19, 2026, 9)).toEqual({ gun: 4, eksik: 8 })
     expect(sgkGunleri(225, null, 2026, 9)).toEqual({ gun: 30, eksik: 0 })
   })
+  it('31 çeken ayda eksik gün 31 üzerinden hesaplanır (SGK: "olması gereken eksik gün")', () => {
+    expect(sgkGunleri(0, null, 2026, 10)).toEqual({ gun: 1, eksik: 30 })
+    expect(sgkGunleri(75, null, 2026, 10)).toEqual({ gun: 10, eksik: 21 })
+    expect(sgkGunleri(225, null, 2026, 10)).toEqual({ gun: 30, eksik: 0 })
+    expect(sgkGunleri(75, null, 2026, 9)).toEqual({ gun: 10, eksik: 20 })
+  })
   it('Türkçe harfleri ISO-8859-9 olarak kodlar', () => {
     expect([...latin5Kodla('ĞİŞğışÇÖÜ')]).toEqual([0xd0, 0xdd, 0xde, 0xf0, 0xfd, 0xfe, 0xc7, 0xd6, 0xdc])
   })

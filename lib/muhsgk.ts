@@ -96,7 +96,7 @@ export function sgkGunleri(toplamSaat: number, iseGirisGun: number | null, yil: 
   const ayGun = new Date(yil, ay, 0).getDate()
   const kalan = iseGirisGun ? Math.max(1, Math.min(30, ayGun - iseGirisGun + 1)) : 30
   const gun = Math.min(kalan, primGunu(toplamSaat))
-  return { gun, eksik: iseGirisGun ? Math.max(0, kalan - gun) : eksikGunSayisi(gun) }
+  return { gun, eksik: iseGirisGun ? Math.max(0, kalan - gun) : eksikGunSayisi(gun, ayGun) }
 }
 
 export interface MuhsgkGirdi {
