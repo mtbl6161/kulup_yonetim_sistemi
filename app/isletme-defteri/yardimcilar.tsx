@@ -178,7 +178,7 @@ export function DefterTablo({ title, rows, nakli, toplam, sira0 }: { title: 'Gİ
 export function StatPil({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 1, padding: '6px 12px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', minWidth: 64 }}>
-      <span style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text3)', fontWeight: 600 }}>{label}</span>
+      <span style={{ fontSize: 11, letterSpacing: 0.5, color: 'var(--text3)', fontWeight: 600 }}>{label}</span>
       <span style={{ fontSize: 13, fontWeight: 700, color: color || 'var(--text)' }}>{value}</span>
     </div>
   )

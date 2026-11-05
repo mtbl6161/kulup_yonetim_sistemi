@@ -220,7 +220,7 @@ export default function GelirGiderPage() {
                         <tr key={h.id}>
                           <td>{tarihFmt(h.tarih)}</td>
                           <td>{h.aciklama || '-'}</td>
-                          <td><span className="badge badge-gray" style={{ fontSize: 10 }}>{h.kaynak || 'manuel'}</span></td>
+                          <td><span className="badge badge-gray" style={{ fontSize: 11.5 }}>{h.kaynak || 'manuel'}</span></td>
                           <td className="td-num" style={{ color: 'var(--success)', fontWeight: 600 }}>{fmtTL(Number(h.tutar))}</td>
                         </tr>
                       ))}
@@ -247,7 +247,7 @@ export default function GelirGiderPage() {
                         <tr key={h.id}>
                           <td>{tarihFmt(h.tarih)}</td>
                           <td>{h.aciklama || '-'}</td>
-                          <td><span className="badge badge-gray" style={{ fontSize: 10 }}>{h.kaynak || 'manuel'}</span></td>
+                          <td><span className="badge badge-gray" style={{ fontSize: 11.5 }}>{h.kaynak || 'manuel'}</span></td>
                           <td className="td-num" style={{ color: 'var(--danger)' }}>{fmtTL(Number(h.tutar))}</td>
                         </tr>
                       ))}
@@ -277,7 +277,7 @@ export default function GelirGiderPage() {
                       { label: `Denetim (%${tahakkuk.pct_denetim})`, val: tahakkuk.denetim },
                     ].map(({ label, val }) => (
                       <div key={label} className="stat-card" style={{ padding: '14px 16px' }}>
-                        <div className="stat-label" style={{ fontSize: 10 }}>{label}</div>
+                        <div className="stat-label" style={{ fontSize: 11.5 }}>{label}</div>
                         <div className="stat-value" style={{ fontSize: 20 }}>{fmtTL(val)}</div>
                       </div>
                     ))}

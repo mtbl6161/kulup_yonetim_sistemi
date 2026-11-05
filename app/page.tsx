@@ -381,6 +381,10 @@ export default function DashboardPage() {
   const gecmisAy = yil < simdi.getFullYear() || (yil === simdi.getFullYear() && ay < simdi.getMonth() + 1)
   const gunGecti = (gun: number) => gecmisAy || (buAyMi && simdi.getDate() > gun)
   const uyarilar: { text: string; type: 'alert' | 'warn' | 'info'; link?: string }[] = []
+  // Ayın ilk 10 günü aidat henüz "beklenen"dir, "geciken" değil
+  const aidatErken = buAyMi && simdi.getDate() <= 10
+  // Geçen ayla karşılaştırma, ay yeterince ilerlemeden yanıltıcıdır (ayın 5'inde "−%100")
+  const trendAnlamli = gunGecti(20)
 
   if (denetimOzet?.durum === 'iade') uyarilar.push({ text: `Denetim dosyası iade edildi${denetimOzet.not ? `: ${denetimOzet.not}` : '.'}`, type: 'alert', link: '/evrak-dosyasi' })
   if (banka && banka.bakiye < 0) uyarilar.push({ text: `Bankada kalan eksiye düştü (${tlTam(banka.bakiye)}); işletme defterini kontrol edin.`, type: 'alert', link: '/kulup/isletme-defteri' })
@@ -390,8 +394,7 @@ export default function DashboardPage() {
   }
   if (bordroDurumu === 0 && gunGecti(20)) uyarilar.push({ text: `${AYLAR[ay]} bordrosu tahakkuk edilmedi.`, type: 'alert', link: '/bordro' })
   if (borcluSayisi > 0) {
-    const erken = buAyMi && simdi.getDate() <= 10
-    uyarilar.push({ text: `${borcluSayisi} öğrencinin ${AYLAR[ay]} aidatı ${erken ? 'bekleniyor' : 'gecikmiş'} (toplam ${tlTam(toplamBorc)}).`, type: erken ? 'info' : 'warn', link: '/odeme' })
+    uyarilar.push({ text: `${borcluSayisi} öğrencinin ${AYLAR[ay]} aidatı ${aidatErken ? 'bekleniyor' : 'gecikmiş'} (toplam ${tlTam(toplamBorc)}).`, type: aidatErken ? 'info' : 'warn', link: '/odeme' })
   }
   if (prevToplamTahsilat > 0 && tahsilatTrendi <= -20 && gunGecti(20)) uyarilar.push({ text: `Tahsilat geçen aya göre %${Math.abs(tahsilatTrendi)} düşük.`, type: 'warn', link: '/odeme' })
   // Yalnızca saatle ücret alanlar (öğretmen, usta öğretici); başkan, muhasebe, temizlik ve denetim dağıtım payı alır, puantajı olmaz
@@ -410,7 +413,7 @@ export default function DashboardPage() {
   const kpis = [
     {
       label: 'Tahsilat verimi', value: `%${tahsilatYuzdesi}`,
-      chip: `${tahsilatTrendi >= 0 ? '+' : '−'}%${Math.abs(tahsilatTrendi)}`, chipOk: tahsilatTrendi >= 0,
+      chip: trendAnlamli && prevToplamTahsilat > 0 ? `${tahsilatTrendi >= 0 ? '+' : '−'}%${Math.abs(tahsilatTrendi)} geçen aya göre` : '', chipOk: tahsilatTrendi >= 0,
       bar: tahsilatYuzdesi, barColor: 'var(--accent)',
       sub: `${tlTam(toplamTahsilat)} / ${tlTam(toplamBeklenen)}`,
     },
@@ -422,8 +425,8 @@ export default function DashboardPage() {
     },
     {
       label: 'Bordro', value: bordroDurumu ? 'Tahakkuk edildi' : 'Bekleniyor',
-      chip: `${bordrolar.length} kayıt`, chipOk: bordroDurumu > 0 ? true : null,
-      bar: bordroDurumu ? 100 : 8, barColor: bordroDurumu > 0 ? 'var(--success)' : 'var(--warn)',
+      chip: bordrolar.length ? `${bordrolar.length} kayıt` : '', chipOk: bordroDurumu > 0 ? true : null,
+      bar: bordroDurumu ? 100 : 8, barColor: bordroDurumu > 0 ? 'var(--success)' : gunGecti(20) ? 'var(--warn)' : 'var(--border-strong)',
       sub: bordroDurumu > 0 ? `${ayLabel(ay, yil)} dönemi` : 'Veri girişi bekleniyor',
     },
     {
@@ -435,9 +438,9 @@ export default function DashboardPage() {
   ]
 
   const chipStyle = (ok: boolean | null): React.CSSProperties => ({
-    fontSize: 11.5, fontWeight: 600, padding: '2px 7px', borderRadius: 5, whiteSpace: 'nowrap',
+    fontSize: 12.5, fontWeight: 600, padding: '2px 7px', borderRadius: 5, whiteSpace: 'nowrap',
     background: ok === null ? '#eef0f4' : ok ? 'var(--success-light)' : 'var(--danger-light)',
-    color: ok === null ? 'var(--text2)' : ok ? '#0b6b42' : '#a91f26',
+    color: ok === null ? 'var(--text2)' : ok ? 'var(--success-dark)' : 'var(--danger-dark)',
   })
   const panel: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }
   const panelTitle: React.CSSProperties = { fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, letterSpacing: '-0.02em', margin: 0, color: 'var(--text)' }
@@ -452,8 +455,7 @@ export default function DashboardPage() {
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 12.5, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)', animation: 'pulse 2s infinite' }} />
-              {new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                            {new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 600, margin: 0, letterSpacing: '-0.03em', color: 'var(--text)' }}>
               Hoş geldiniz, {profil?.ad?.split(' ')[0] || 'Yönetici'}
@@ -483,7 +485,7 @@ export default function DashboardPage() {
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{item.ad}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text3)' }}>{item.type === 'ogrenci' ? 'Öğrenci' : 'Personel'}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text3)' }}>{item.type === 'ogrenci' ? 'Öğrenci' : 'Personel'}</div>
                         </div>
                       </div>
                     </Link>
@@ -553,7 +555,7 @@ export default function DashboardPage() {
             <div key={k.label} style={{ padding: '16px 20px', borderLeft: i === 0 ? 'none' : '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 12.5, color: 'var(--text3)', fontWeight: 500 }}>{k.label}</span>
-                <span className="tabular" style={chipStyle(k.chipOk)}>{k.chip}</span>
+                {k.chip && <span className="tabular" style={chipStyle(k.chipOk)}>{k.chip}</span>}
               </div>
               <div className="tabular" style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1.1, marginTop: 8, color: 'var(--text)' }}>{k.value}</div>
               {k.bar >= 0 ? (
@@ -575,14 +577,14 @@ export default function DashboardPage() {
                 <div style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 2 }}>Son 6 aylık gelir ve gider</div>
               </div>
               <div style={{ display: 'flex', gap: 22, textAlign: 'right' }}>
-                <div><div style={{ fontSize: 11, color: 'var(--text3)' }}>Gelir</div><div className="tabular" style={{ fontSize: 15, fontWeight: 500, color: 'var(--accent)' }}>{tlTam(buAy.gelir)}</div></div>
-                <div><div style={{ fontSize: 11, color: 'var(--text3)' }}>Gider</div><div className="tabular" style={{ fontSize: 15, fontWeight: 500 }}>{tlTam(buAy.gider)}</div></div>
-                <div><div style={{ fontSize: 11, color: 'var(--text3)' }}>Net</div><div className="tabular" style={{ fontSize: 15, fontWeight: 500, color: buAyNet >= 0 ? 'var(--success)' : 'var(--danger)' }}>{buAyNet >= 0 ? '+' : '−'}{tlTam(Math.abs(buAyNet))}</div></div>
+                <div><div style={{ fontSize: 12, color: 'var(--text3)' }}>Gelir</div><div className="tabular" style={{ fontSize: 15, fontWeight: 500, color: 'var(--accent)' }}>{tlTam(buAy.gelir)}</div></div>
+                <div><div style={{ fontSize: 12, color: 'var(--text3)' }}>Gider</div><div className="tabular" style={{ fontSize: 15, fontWeight: 500 }}>{tlTam(buAy.gider)}</div></div>
+                <div><div style={{ fontSize: 12, color: 'var(--text3)' }}>Net</div><div className="tabular" style={{ fontSize: 15, fontWeight: 500, color: buAyNet >= 0 ? 'var(--success)' : 'var(--danger)' }}>{buAyNet >= 0 ? '+' : '−'}{tlTam(Math.abs(buAyNet))}</div></div>
               </div>
             </div>
 
             <div style={{ display: 'flex', marginTop: 18 }}>
-              <div className="tabular" style={{ width: 46, height: GRAFIK_H, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end', paddingRight: 10, fontSize: 10.5, color: 'var(--text3)' }}>
+              <div className="tabular" style={{ width: 46, height: GRAFIK_H, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end', paddingRight: 10, fontSize: 11.5, color: 'var(--text3)' }}>
                 {[1, 0.75, 0.5, 0.25, 0].map(f => <span key={f}>{f === 0 ? '0' : kisalt(grafikMax * f)}</span>)}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -600,7 +602,7 @@ export default function DashboardPage() {
                     ))}
                   </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 8, fontSize: 11.5, color: 'var(--text3)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 8, fontSize: 12.5, color: 'var(--text3)' }}>
                   {son6.map((d, i) => <span key={`l-${d.ay}-${d.yil}`} style={{ width: 52, textAlign: 'center', fontWeight: i === son6.length - 1 ? 600 : 400, color: i === son6.length - 1 ? 'var(--text)' : undefined }}>{ayLabel(d.ay, d.yil).split(' ')[0].slice(0, 3)}</span>)}
                 </div>
               </div>
@@ -627,7 +629,7 @@ export default function DashboardPage() {
               <div key={i} style={{ display: 'flex', gap: 12, padding: '14px 20px', borderBottom: '1px solid var(--border-light)', alignItems: 'center' }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: tone(u.type), flexShrink: 0 }} />
                 <div style={{ flex: 1, fontWeight: 500, lineHeight: 1.4 }}>{u.text}</div>
-                {u.link && <Link href={u.link} style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>Yönet →</Link>}
+                {u.link && <Link href={u.link} style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>Yönet</Link>}
               </div>
             ))}
           </section>
@@ -638,10 +640,10 @@ export default function DashboardPage() {
           <section style={{ ...panel, gridColumn: 'span 2', overflow: 'hidden', minWidth: 0 }}>
             <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', borderBottom: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <h3 style={panelTitle}>Ödemesi geciken öğrenciler</h3>
-                {borcluSayisi > 0 && <span className="tabular" style={chipStyle(false)}>{borcluSayisi} öğrenci · {tlTam(toplamBorc)}</span>}
+                <h3 style={panelTitle}>{aidatErken ? 'Aidatı beklenen öğrenciler' : 'Ödemesi geciken öğrenciler'}</h3>
+                {borcluSayisi > 0 && <span className="tabular" style={chipStyle(aidatErken ? null : false)}>{borcluSayisi} öğrenci, {tlTam(toplamBorc)}</span>}
               </div>
-              <Link href="/odeme" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>Aidat Takibi →</Link>
+              <Link href="/odeme" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>Aidat Takibi</Link>
             </div>
             {borcluSayisi === 0 ? (
               <div style={{ padding: '28px 20px', textAlign: 'center', color: 'var(--text3)' }}>
@@ -651,14 +653,13 @@ export default function DashboardPage() {
               </div>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '32px 2fr 2fr 110px', gap: 12, padding: '8px 20px', background: '#f8f9fb', fontSize: 11, fontWeight: 600, letterSpacing: '0.7px', textTransform: 'uppercase', color: 'var(--text3)' }}>
-                  <span>#</span><span>Öğrenci</span><span>Ödenen / aidat</span><span style={{ textAlign: 'right' }}>Kalan</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 110px', gap: 12, padding: '8px 20px', background: 'var(--surface2)', fontSize: 12.5, fontWeight: 600, color: 'var(--text3)' }}>
+                  <span>Öğrenci</span><span>Ödenen / aidat</span><span style={{ textAlign: 'right' }}>Kalan</span>
                 </div>
-                {borclular.slice(0, 6).map((b, idx) => (
-                  <div key={b.o.id} style={{ display: 'grid', gridTemplateColumns: '32px 2fr 2fr 110px', gap: 12, padding: '10px 20px', borderTop: '1px solid var(--border-light)', alignItems: 'center' }}>
-                    <span className="tabular" style={{ fontSize: 12, color: 'var(--text3)' }}>{String(idx + 1).padStart(2, '0')}</span>
+                {borclular.slice(0, 6).map(b => (
+                  <div key={b.o.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 110px', gap: 12, padding: '10px 20px', borderTop: '1px solid var(--border-light)', alignItems: 'center' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                      <span style={{ width: 30, height: 30, borderRadius: '50%', background: '#eef0f4', color: 'var(--text2)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span style={{ width: 30, height: 30, borderRadius: '50%', background: '#eef0f4', color: 'var(--text2)', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         {[b.o.ad, b.o.soyad].map(w => (w || '').trim()[0]).filter(Boolean).join('').toLocaleUpperCase('tr-TR')}
                       </span>
                       <span style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.o.ad} {b.o.soyad}</span>
@@ -667,14 +668,14 @@ export default function DashboardPage() {
                       <span style={{ display: 'block', height: 6, background: '#eef0f4', borderRadius: 3, overflow: 'hidden' }}>
                         <span style={{ display: 'block', height: '100%', width: `${Math.min((b.odenen / b.gereken) * 100, 100)}%`, background: 'var(--accent)', borderRadius: 3 }} />
                       </span>
-                      <span className="tabular" style={{ display: 'block', marginTop: 4, fontSize: 11.5, color: 'var(--text3)' }}>{tlTam(b.odenen)} / {tlTam(b.gereken)}</span>
+                      <span className="tabular" style={{ display: 'block', marginTop: 4, fontSize: 12.5, color: 'var(--text3)' }}>{tlTam(b.odenen)} / {tlTam(b.gereken)}</span>
                     </span>
-                    <span className="tabular" style={{ textAlign: 'right', fontWeight: 600, color: 'var(--danger)' }}>{tlTam(b.borc)}</span>
+                    <span className="tabular" style={{ textAlign: 'right', fontWeight: 600, color: aidatErken ? 'var(--text)' : 'var(--danger)' }}>{tlTam(b.borc)}</span>
                   </div>
                 ))}
                 {borcluSayisi > 6 && (
                   <Link href="/odeme" style={{ display: 'block', padding: '10px 20px', borderTop: '1px solid var(--border-light)', fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>
-                    +{borcluSayisi - 6} öğrenci daha →
+                    +{borcluSayisi - 6} öğrenci daha
                   </Link>
                 )}
               </>
@@ -714,7 +715,7 @@ export default function DashboardPage() {
                   ))}
                 </>
               )}
-              <Link href="/evrak-dosyasi" style={{ display: 'inline-block', marginTop: 12, fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>Dosyaya git →</Link>
+              <Link href="/evrak-dosyasi" style={{ display: 'inline-block', marginTop: 12, fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>Dosyaya git</Link>
             </section>
 
             <section style={{ ...panel, padding: '16px 18px' }}>
@@ -727,7 +728,7 @@ export default function DashboardPage() {
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderTop: i === 0 ? 'none' : '1px solid var(--border-light)' }}>
                     <div style={{ width: 40, height: 44, border: `1px solid ${t.sonGun ? 'var(--warn)' : 'var(--border)'}`, borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1.1, flexShrink: 0 }}>
                       <span className="tabular" style={{ fontSize: 15, fontWeight: 500 }}>{t.gun}</span>
-                      <span style={{ fontSize: 9.5, letterSpacing: '0.6px', color: 'var(--text3)' }}>{ayKisa}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text3)' }}>{ayKisa}</span>
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.ad}</div>

@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AYLAR } from '@/lib/hesaplama'
-import { DenetimTeslim, TeslimDurum, egitimYiliBaslangic, belgeDonemde, DenetimMadde } from '@/lib/denetimDosyasi'
+import { DenetimTeslim, TeslimDurum, egitimYiliBaslangic, belgeDonemde, DenetimMadde, aktifMaddeleriGetir } from '@/lib/denetimDosyasi'
 import { AlertTriangle, Clock, RefreshCw } from 'lucide-react'
 import { Filtre as SegmentFiltre } from '@/components/yonetim/ortak'
 
@@ -70,15 +70,13 @@ export function useDonemDurumlari(okulIdleri: number[], yil: number, ay: number,
       if (ids.length === 0 || !yil || !ay) { setDurumlar(new Map()); return }
       setYukleniyor(true)
       const bas = egitimYiliBaslangic(yil, ay)
-      await supabase.rpc('denetim_maddeleri_hazirla')
-      const [m, t, b, br] = await Promise.all([
-        supabase.from('denetim_maddeleri').select('*').eq('aktif', true),
+      const [maddeler, t, b, br] = await Promise.all([
+        aktifMaddeleriGetir(false).catch(() => [] as DenetimMadde[]), // eskisi gibi: hata durumunda boş liste
         supabase.from('denetim_teslimleri').select('*').in('okul_id', ids).eq('yil', yil).eq('ay', ay),
         supabase.from('denetim_belgeleri').select('okul_id, madde_id, yil, ay').in('okul_id', ids).in('yil', [bas, bas + 1]),
         supabase.from('bordro').select('okul_id, created_at').in('okul_id', ids).eq('yil', yil).eq('ay', ay),
       ])
       if (iptal) return
-      const maddeler = (m.data || []) as DenetimMadde[]
       const mMap = new Map(maddeler.map(x => [x.id, x]))
       const yeni = new Map<number, OkulDonemDurumu>()
       for (const id of ids) {
@@ -120,7 +118,7 @@ export function DenetimIsKuyrugu({ okullar, ay, durumlar, toplamMadde, yukleniyo
   okullar: { id: number; ad: string }[]
   ay: number
   durumlar: Map<number, OkulDonemDurumu>; toplamMadde: number; yukleniyor: boolean
-  sonHareketler: { id: number; created_at: string; aciklama?: string; okullar?: { ad?: string } }[]
+  sonHareketler: { id: number; islem?: string; created_at: string; aciklama?: string; okullar?: { ad?: string } }[]
   ilceler: { id: number; ad: string }[]; filtreIlceId: number | null; onIlce: (id: number | null) => void
   onIncele: (okulId: number, liste?: number[]) => void; onTumKayitlar: () => void; onYenile: () => void
 }) {
@@ -145,10 +143,12 @@ export function DenetimIsKuyrugu({ okullar, ay, durumlar, toplamMadde, yukleniyo
     ...satirlar.filter(s => s.grup === 'yok').map(s => ({ id: s.id, metin: `${s.ad}: ${AYLAR[ay]} dosyasını göndermedi` })),
   ]
 
+  const isHareketleri = sonHareketler.filter(l => l.islem !== 'login')
   const kart = (baslik: string, deger: number, alt: string, renk: string, f: Filtre) => (
     <button type="button" onClick={() => setFiltre(f)} aria-pressed={filtre === f} className={filtre === f ? 'on' : ''}>
       <div className="ad">{baslik}</div>
-      <div className="deger" style={{ color: renk }}>{deger}</div>
+      {/* Sıfır değer renklendirilmez: dikkat çekecek bir şey yok */}
+      <div className="deger" style={{ color: deger > 0 ? renk : 'var(--text3)' }}>{deger}</div>
       <div className="alt">{alt}</div>
     </button>
   )
@@ -171,7 +171,7 @@ export function DenetimIsKuyrugu({ okullar, ay, durumlar, toplamMadde, yukleniyo
       <section aria-label="Özet" className="yk-kpi">
         {kart('İnceleme bekleyen', say('gonderildi'), enEski !== undefined ? `en eskisi ${enEski <= 0 ? 'bugün' : `${enEski} gündür`} bekliyor` : 'kuyruk boş', 'var(--accent)', 'gonderildi')}
         {kart('Göndermeyen okul', say('yok'), `${okullar.length} okuldan`, 'var(--warn)', 'yok')}
-        {kart('İade edilen', say('iade'), 'okul düzeltmesi bekleniyor', '#8a5200', 'iade')}
+        {kart('İade edilen', say('iade'), 'okul düzeltmesi bekleniyor', 'var(--warn-dark)', 'iade')}
         {kart('Onaylanan', say('onaylandi'), 'bu dönem', 'var(--success)', 'onaylandi')}
       </section>
 
@@ -204,13 +204,13 @@ export function DenetimIsKuyrugu({ okullar, ay, durumlar, toplamMadde, yukleniyo
                     <tr key={s.id}>
                       <td>
                         <div style={{ fontWeight: 600 }}>{s.ad}</div>
-                        {s.bordroDegisti && <div style={{ fontSize: 12, color: '#8a5200', marginTop: 2 }}>Bordro gönderimden sonra değişti</div>}
+                        {s.bordroDegisti && <div style={{ fontSize: 12, color: 'var(--warn-dark)', marginTop: 2 }}>Bordro gönderimden sonra değişti</div>}
                         {s.grup === 'iade' && s.d?.teslim?.denetci_notu && <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>Not: {s.d.teslim.denetci_notu}</div>}
                       </td>
                       <td><EvrakIlerleme dolu={s.d?.doluMadde || 0} toplam={toplamMadde} oran={oran} /></td>
                       <td>
                         {filtre === 'gonderildi'
-                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: bekleme >= 3 ? '#8a5200' : 'var(--text)', fontWeight: bekleme >= 3 ? 600 : 400 }}><Clock size={13} aria-hidden="true" />{beklemeMetni(s.d?.teslim?.gonderim_tarihi)}</span>
+                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: bekleme >= 3 ? 'var(--warn-dark)' : 'var(--text)', fontWeight: bekleme >= 3 ? 600 : 400 }}><Clock size={13} aria-hidden="true" />{beklemeMetni(s.d?.teslim?.gonderim_tarihi)}</span>
                           : <DurumRozeti durum={s.d?.teslim?.durum} />}
                       </td>
                       <td style={{ textAlign: 'right' }}>
@@ -234,7 +234,7 @@ export function DenetimIsKuyrugu({ okullar, ay, durumlar, toplamMadde, yukleniyo
         <aside aria-label="Uyarılar ve hareketler" className="dar">
           <section className="yk-kart" style={{ background: 'var(--warn-light)', borderColor: 'var(--warn-border)' }}>
             <div className="yk-kart-bas">
-              <h2 style={{ color: '#8a5200', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h2 style={{ color: 'var(--warn-dark)', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <AlertTriangle size={16} aria-hidden="true" /> Dikkat gerektirenler
               </h2>
             </div>
@@ -259,17 +259,18 @@ export function DenetimIsKuyrugu({ okullar, ay, durumlar, toplamMadde, yukleniyo
           <section className="yk-kart">
             <div className="yk-kart-bas"><h2>Son hareketler</h2></div>
             <div style={{ display: 'flex', flexDirection: 'column', fontSize: 13 }}>
-              {sonHareketler.length === 0 && <div style={{ color: 'var(--text3)', padding: '0 18px 12px' }}>Kayıt yok.</div>}
-              {sonHareketler.slice(0, 6).map(l => (
+              {/* Oturum açma kayıtları denetçinin işine yaramaz; yalnızca okulların işlemleri gösterilir (tamamı Kayıtlar'da) */}
+              {isHareketleri.length === 0 && <div style={{ color: 'var(--text3)', padding: '0 18px 12px' }}>Kayıt yok.</div>}
+              {isHareketleri.slice(0, 6).map(l => (
                 <div key={l.id} style={{ padding: '10px 18px', borderTop: '1px solid var(--border-light)' }}>
                   <div style={{ fontWeight: 600 }}>{l.okullar?.ad}</div>
-                  <div style={{ color: 'var(--text2)' }}>{l.aciklama} · <span style={{ color: 'var(--text3)' }}>{new Date(l.created_at).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span></div>
+                  <div style={{ color: 'var(--text2)' }}>{l.aciklama} <span style={{ color: 'var(--text3)' }}>{new Date(l.created_at).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span></div>
                 </div>
               ))}
             </div>
             <div style={{ padding: '10px 18px 14px', borderTop: '1px solid var(--border-light)' }}>
               <button type="button" onClick={onTumKayitlar} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
-                Tüm kayıtlar →
+                Tüm kayıtlar
               </button>
             </div>
           </section>

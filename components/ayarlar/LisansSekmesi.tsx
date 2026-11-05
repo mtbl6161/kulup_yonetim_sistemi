@@ -230,7 +230,7 @@ function Aksiyon({ href, ikon, t, s }: { href?: string | null; ikon: React.React
   return (
     <a className="ls-act" href={href} target="_blank" rel="noopener noreferrer">
       <span className="ls-act-i">{ikon}</span>
-      <span><strong>{t}</strong><small>{s} →</small></span>
+      <span><strong>{t}</strong><small>{s}</small></span>
     </a>
   )
 }

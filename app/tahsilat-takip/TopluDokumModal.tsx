@@ -122,7 +122,7 @@ export default function TopluDokumModal({ ogrenciler, baslik, kapat }: { ogrenci
                         <td><button type="button" onClick={() => setSecili(x.o)} title="Ödeme dökümünü aç" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontWeight: 700, fontSize: 'inherit', color: 'var(--accent)', textAlign: 'left' }}>{x.o.ad} {x.o.soyad}</button></td>
                         <td>{x.o.sinif || '—'}</td>
                         <td className="td-num" style={{ whiteSpace: 'nowrap' }}>{fmtTL(x.d.toplamOdenen)}</td>
-                        <td style={{ fontSize: 11.5, whiteSpace: 'normal' }}>
+                        <td style={{ fontSize: 12.5, whiteSpace: 'normal' }}>
                           {x.d.bekleyenler.length
                             ? x.d.bekleyenler.map((b, j) => <div key={j} style={{ color: 'var(--danger)' }}>{bekleyenAdi(b)}{b.tutar != null ? <span style={{ color: 'var(--text3)' }}> · {fmtTL(b.tutar)}</span> : null}</div>)
                             : <span style={{ color: 'var(--text3)' }}>—</span>}
@@ -143,7 +143,7 @@ export default function TopluDokumModal({ ogrenciler, baslik, kapat }: { ogrenci
                 )}
               </table>
             </div>
-            <p style={{ fontSize: 11.5, color: 'var(--text3)', margin: '10px 0 0' }}>&ldquo;Tüm dökümleri yazdır&rdquo; her öğrenci için ayrı sayfa açar; öğrenciye ya da veliye verilecek sayfa oradan ayrılabilir. Ödenmemiş aylık kulüp ücreti, Aidat Takibi&rsquo;ndeki gibi o ayın iş günü × günlük saat × saat ücretiyle hesaplanır.</p>
+            <p style={{ fontSize: 12.5, color: 'var(--text3)', margin: '10px 0 0' }}>&ldquo;Tüm dökümleri yazdır&rdquo; her öğrenci için ayrı sayfa açar; öğrenciye ya da veliye verilecek sayfa oradan ayrılabilir. Ödenmemiş aylık kulüp ücreti, Aidat Takibi&rsquo;ndeki gibi o ayın iş günü × günlük saat × saat ücretiyle hesaplanır.</p>
           </>
         )}
       </div>

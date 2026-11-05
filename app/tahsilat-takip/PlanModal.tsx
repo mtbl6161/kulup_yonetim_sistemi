@@ -51,13 +51,13 @@ export default function PlanModal({ f, setPlanForm, planFormHesapla, seciliKateg
             <input className="form-input" type="date" value={f.ilkVade} onChange={e => setPlanForm(planFormHesapla(f, { ilkVade: e.target.value }))} />
           </div>
         </div>
-        <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 8 }}>Tutar eşit bölünür, vadeler her ay aynı gündür. Aşağıdan tek tek değiştirebilirsiniz.</div>
+        <div style={{ fontSize: 12.5, color: 'var(--text3)', marginBottom: 8 }}>Tutar eşit bölünür, vadeler her ay aynı gündür. Aşağıdan tek tek değiştirebilirsiniz.</div>
         <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
           {f.vadeler.map((v, i) => {
             const odendi = f.odenenNo.includes(i + 1)
             return (
               <div key={i} style={{ display: 'grid', gridTemplateColumns: '70px 1fr 1fr', gap: 10, alignItems: 'center', padding: '8px 12px', borderBottom: i < f.vadeler.length - 1 ? '1px solid var(--border-light)' : 'none', background: odendi ? 'var(--success-light)' : undefined }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>{i + 1}. taksit{odendi && <div style={{ fontSize: 10, color: 'var(--success)', fontWeight: 600 }}>ödendi</div>}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>{i + 1}. taksit{odendi && <div style={{ fontSize: 11.5, color: 'var(--success)', fontWeight: 600 }}>ödendi</div>}</div>
                 <input className="form-input" type="date" value={v} onChange={e => setPlanForm({ ...f, vadeler: f.vadeler.map((x, j) => j === i ? e.target.value : x) })} />
                 <input className="form-input" type="text" inputMode="decimal" value={f.tutarlar[i] ?? ''} onChange={e => setPlanForm({ ...f, tutarlar: f.tutarlar.map((x, j) => j === i ? e.target.value : x) })} />
               </div>

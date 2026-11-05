@@ -11,7 +11,7 @@ import { useYukleme } from '@/lib/useYukleme'
 
 const RENK: Record<KontrolDurum, { bg: string; fg: string; border: string; ad: string }> = {
   ok: { bg: 'var(--success-light)', fg: 'var(--success)', border: 'var(--success-border)', ad: 'Uygun' },
-  uyari: { bg: 'var(--warn-light)', fg: '#8a5200', border: 'var(--warn-border)', ad: 'Uyarı' },
+  uyari: { bg: 'var(--warn-light)', fg: 'var(--warn-dark)', border: 'var(--warn-border)', ad: 'Uyarı' },
   hata: { bg: 'var(--danger-light)', fg: 'var(--danger)', border: 'var(--danger-border)', ad: 'Hata' },
   bilgi: { bg: 'var(--info-light)', fg: 'var(--info)', border: 'var(--info-border)', ad: 'Bilgi' },
 }
@@ -21,7 +21,7 @@ function Rozet({ d }: { d: KontrolDurum }) {
   const r = RENK[d]
   const I = IKON[d]
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 5, fontSize: 11.5, fontWeight: 600, background: r.bg, color: r.fg, whiteSpace: 'nowrap' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 5, fontSize: 12.5, fontWeight: 600, background: r.bg, color: r.fg, whiteSpace: 'nowrap' }}>
       <I size={12} aria-hidden="true" /> {r.ad}
     </span>
   )
@@ -49,18 +49,18 @@ function BulguSatiri({ b }: { b: KontrolBulgu }) {
 
 const kart: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }
 const baslik: React.CSSProperties = { margin: '0 0 10px', fontSize: 15, fontWeight: 800 }
-const th: React.CSSProperties = { fontSize: 10.5, padding: '8px 10px', background: 'var(--surface2)', borderBottom: '1px solid var(--border)', fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap', position: 'sticky', top: 0 }
+const th: React.CSSProperties = { fontSize: 11.5, padding: '8px 10px', background: 'var(--surface2)', borderBottom: '1px solid var(--border)', fontWeight: 800, color: 'var(--text2)', textAlign: 'right', whiteSpace: 'nowrap', position: 'sticky', top: 0 }
 const thL: React.CSSProperties = { ...th, textAlign: 'left' }
 const td: React.CSSProperties = { fontSize: 13, padding: '8px 10px', borderBottom: '1px solid var(--border-light)', textAlign: 'right', whiteSpace: 'nowrap' }
 const tdL: React.CSSProperties = { ...td, textAlign: 'left' }
-const thAlt: React.CSSProperties = { fontSize: 10, fontWeight: 600, color: 'var(--text3)', textTransform: 'none' }
-const altSatir: React.CSSProperties = { fontSize: 11.5, fontWeight: 500, color: 'var(--text3)', marginTop: 2 }
+const thAlt: React.CSSProperties = { fontSize: 11.5, fontWeight: 600, color: 'var(--text3)', textTransform: 'none' }
+const altSatir: React.CSSProperties = { fontSize: 12.5, fontWeight: 500, color: 'var(--text3)', marginTop: 2 }
 
 /** Bir hücrenin bu alana ait bulgusu varsa renklendir */
 function hucre(k: KisiKontrol, basliklar: string[]): React.CSSProperties {
   const b = k.bulgular.filter(x => basliklar.includes(x.baslik))
   if (b.some(x => x.durum === 'hata')) return { ...td, background: 'var(--danger-light)', color: 'var(--danger)', fontWeight: 700 }
-  if (b.some(x => x.durum === 'uyari')) return { ...td, background: 'var(--warn-light)', color: '#8a5200', fontWeight: 700 }
+  if (b.some(x => x.durum === 'uyari')) return { ...td, background: 'var(--warn-light)', color: 'var(--warn-dark)', fontWeight: 700 }
   return td
 }
 
@@ -301,7 +301,7 @@ export default function DenetciHesapKontrol({ veri, okulAd }: { veri: HesapKontr
                           <div style={{ fontWeight: 700 }}>
                             {k.ad}
                             {k.baskaKurum.length > 0 && (
-                              <span title={k.baskaKurum.join(' · ')} style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, padding: '1px 6px', borderRadius: 20, background: 'var(--info-light)', color: 'var(--info)', whiteSpace: 'nowrap' }}>
+                              <span title={k.baskaKurum.join(' · ')} style={{ marginLeft: 6, fontSize: 11.5, fontWeight: 700, padding: '1px 6px', borderRadius: 20, background: 'var(--info-light)', color: 'var(--info)', whiteSpace: 'nowrap' }}>
                                 Başka kurum?
                               </span>
                             )}
@@ -359,12 +359,12 @@ export default function DenetciHesapKontrol({ veri, okulAd }: { veri: HesapKontr
             ['İşsizlik işçi payı', muhtasar.sgkIssizlik], ['SGK işveren payı', muhtasar.sgkIsveren], ['Toplam net', muhtasar.net],
           ] as [string, number][]).map(([ad, v]) => (
             <div key={ad} style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--surface2)' }}>
-              <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase' }}>{ad}</div>
+              <div style={{ fontSize: 12, color: 'var(--text3)', fontWeight: 700 }}>{ad}</div>
               <div style={{ fontSize: 15, fontWeight: 800 }}>{fmt(v)} ₺</div>
             </div>
           ))}
           <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--surface2)' }}>
-            <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase' }}>Çalışan sayısı</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', fontWeight: 700 }}>Çalışan sayısı</div>
             <div style={{ fontSize: 15, fontWeight: 800 }}>{muhtasar.sgkliSayisi} SGK&apos;lı · {muhtasar.kadroluSayisi} kadrolu</div>
           </div>
         </div>

@@ -60,9 +60,9 @@ export default function GenelBakis({ kurumlar, iller, odemeler, talepler, yuklen
             <div role="img" aria-label={`Son 6 ayın tahsilatı: ${aylar.map(a => `${a.ad} ${tl(a.tutar)}`).join(', ')}`} style={{ display: 'flex', alignItems: 'flex-end', gap: 16, height: 190, paddingTop: 8 }}>
               {aylar.map((a, i) => (
                 <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%', justifyContent: 'flex-end' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: i === 5 ? 'var(--text)' : 'var(--text3)', fontWeight: i === 5 ? 600 : 400 }}>{a.tutar ? (a.tutar / 1000).toLocaleString('tr-TR', { maximumFractionDigits: 1 }) + 'B' : '0'}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: i === 5 ? 'var(--text)' : 'var(--text3)', fontWeight: i === 5 ? 600 : 400 }}>{a.tutar ? (a.tutar / 1000).toLocaleString('tr-TR', { maximumFractionDigits: 1 }) + 'B' : '0'}</span>
                   <div style={{ width: '100%', height: `${Math.max(3, (a.tutar / enBuyuk) * 140)}px`, background: i === 5 ? 'var(--accent)' : '#d7defa', borderRadius: '5px 5px 0 0' }} />
-                  <span style={{ fontSize: 11.5, color: i === 5 ? 'var(--text)' : 'var(--text3)', fontWeight: i === 5 ? 600 : 400 }}>{a.ad}</span>
+                  <span style={{ fontSize: 12.5, color: i === 5 ? 'var(--text)' : 'var(--text3)', fontWeight: i === 5 ? 600 : 400 }}>{a.ad}</span>
                 </div>
               ))}
             </div>
@@ -97,7 +97,7 @@ export default function GenelBakis({ kurumlar, iller, odemeler, talepler, yuklen
             <div className="yk-kart-bas"><h2>Dikkat isteyenler</h2></div>
             {bekleyen.length > 0 && (
               <button type="button" className="yk-satir-link" onClick={() => git('talepler')}>
-                <span className="yk-ikon" style={{ background: '#fff4e0', color: '#8a5200' }}><UserCheck size={16} aria-hidden="true" /></span>
+                <span className="yk-ikon" style={{ background: '#fff4e0', color: 'var(--warn-dark)' }}><UserCheck size={16} aria-hidden="true" /></span>
                 <span style={{ flex: 1, minWidth: 0 }}><strong style={{ display: 'block', fontSize: 13 }}>{bekleyen.length} denetçi başvurusu bekliyor</strong><span style={{ fontSize: 12, color: 'var(--text3)' }}>En eskisi {enEskiTalep} gün önce</span></span>
                 <ChevronRight size={15} aria-hidden="true" color="var(--text3)" />
               </button>
@@ -118,7 +118,7 @@ export default function GenelBakis({ kurumlar, iller, odemeler, talepler, yuklen
             )}
             {!yukleniyor && !bekleyen.length && !durum.yakinda && !durum.doldu && (
               <div className="yk-satir-link" style={{ cursor: 'default' }}>
-                <span className="yk-ikon" style={{ background: 'var(--success-light)', color: '#0b6b42' }}><ShieldCheck size={16} aria-hidden="true" /></span>
+                <span className="yk-ikon" style={{ background: 'var(--success-light)', color: 'var(--success-dark)' }}><ShieldCheck size={16} aria-hidden="true" /></span>
                 <span style={{ fontSize: 13 }}>Bekleyen bir iş yok.</span>
               </div>
             )}

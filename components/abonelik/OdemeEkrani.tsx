@@ -81,7 +81,6 @@ export default function OdemeEkrani({ mod }: { mod: 'baslat' | 'yenile' }) {
           </div>
         )}
 
-        <span className="oe-step">Plan seçimi</span>
         <h1 className="oe-h">{yenile ? 'Yenileme planınızı seçin' : 'Size uygun planı seçin'}</h1>
 
         <PlanSecici donem={donem} setDonem={setDonem} />
@@ -113,7 +112,7 @@ const CSS = `
 .oe-side{background:linear-gradient(160deg,var(--accent-dark),#14287f);color:#fff;padding:48px 48px 32px;display:flex;flex-direction:column;gap:28px;position:relative;overflow:hidden}
 .oe-side::after{content:"";position:absolute;right:-120px;bottom:-120px;width:340px;height:340px;border-radius:50%;border:56px solid rgba(255,255,255,.05);pointer-events:none}
 .oe-kurum{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:16px 18px}
-.oe-kurum small{font-size:12px;color:rgba(255,255,255,.62);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.oe-kurum small{font-size:13px;color:rgba(255,255,255,.66);font-weight:500}
 .oe-kurum div{font-weight:700;font-size:16px;margin-top:4px}
 .oe-side h2{font-family:var(--font-display);font-size:30px;line-height:1.15;letter-spacing:-.02em;margin:0;font-weight:800;max-width:380px}
 .oe-feats{list-style:none;margin:0;padding:0;display:grid;gap:12px}
@@ -123,8 +122,7 @@ const CSS = `
 .oe-side-foot span{display:inline-flex;align-items:center;gap:6px}
 .oe-main{padding:48px clamp(20px,5vw,72px);display:flex;flex-direction:column;justify-content:center;width:100%;max-width:640px}
 .oe-alert{margin-bottom:22px;font-size:14px}
-.oe-step{font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em}
-.oe-h{font-family:var(--font-display);font-size:26px;font-weight:800;margin:6px 0 20px;letter-spacing:-.015em}
+.oe-h{font-family:var(--font-display);font-size:26px;font-weight:700;margin:0 0 20px;letter-spacing:-.015em}
 .oe-cta{width:100%;min-height:54px;border-radius:12px;border:0;background:var(--accent);color:#fff;font:inherit;font-size:15.5px;font-weight:700;
   display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;box-shadow:0 8px 20px -8px rgba(35,71,217,.6);transition:background .15s}
 .oe-cta:hover:not(:disabled){background:var(--accent-dark)}

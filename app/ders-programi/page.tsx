@@ -768,7 +768,7 @@ Dersler her durumda aktarılır. Tavanı aşan koordinatörlük saatleri de yaz�
               return (
                 <button key={s.id} role="tab" aria-selected={seciliSinif === s.id} onClick={() => setSeciliSinif(s.id)} style={segmentDugme(seciliSinif === s.id)}>
                   {s.ad}
-                  <span style={{ fontSize: 11, fontWeight: 600, padding: '0 6px', borderRadius: 99, background: bos ? '#FFF1D6' : 'var(--success-light)', color: bos ? '#8A5200' : '#0B6B42' }}>{bos ? `${bos} boş` : 'tam'}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, padding: '0 6px', borderRadius: 99, background: bos ? '#FFF1D6' : 'var(--success-light)', color: bos ? 'var(--warn-dark)' : 'var(--success-dark)' }}>{bos ? `${bos} boş` : 'tam'}</span>
                 </button>
               )
             })}
@@ -880,7 +880,7 @@ Dersler her durumda aktarılır. Tavanı aşan koordinatörlük saatleri de yaz�
                       return (
                         <button key={y.id} type="button" className="yuk-satir" aria-pressed={aktif} onClick={() => setVurgu(aktif ? null : y.id)} title={aktif ? 'Vurguyu kaldır' : 'Bu öğretmenin derslerini vurgula'} style={aktif ? { background: 'var(--accent-lighter)', borderColor: '#C9D4FA' } : undefined}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                            <span className="dp-avatar" style={{ width: 22, height: 22, fontSize: 9.5, background: aktif ? 'var(--accent)' : '#EEF0F4', color: aktif ? '#fff' : 'var(--text2)' }}>{basHarf(y.ad)}</span>
+                            <span className="dp-avatar" style={{ width: 22, height: 22, fontSize: 11, background: aktif ? 'var(--accent)' : '#EEF0F4', color: aktif ? '#fff' : 'var(--text2)' }}>{basHarf(y.ad)}</span>
                             <span style={{ flex: 1, fontWeight: aktif ? 600 : 500, color: aktif ? 'var(--accent-dark)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{y.ad}</span>
                             <span className="tabular" style={{ fontSize: 12 }}>{y.saat} sa</span>
                           </span>
@@ -898,12 +898,12 @@ Dersler her durumda aktarılır. Tavanı aşan koordinatörlük saatleri de yaz�
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
                   {[
                     { l: 'Atanan', v: ayAtanan, c: 'var(--text)' },
-                    { l: 'Boş saat', v: bosSaatler.length, c: bosSaatler.length ? '#8A5200' : 'var(--text)' },
+                    { l: 'Boş saat', v: bosSaatler.length, c: bosSaatler.length ? 'var(--warn-dark)' : 'var(--text)' },
                     { l: 'İş günü', v: ayIsGunu, c: 'var(--text)' },
                     { l: 'Tatil', v: ayTatil, c: ayTatil ? 'var(--danger-hover)' : 'var(--text)' },
                   ].map(k => (
                     <div key={k.l} style={{ padding: 10, border: '1px solid var(--border-light)', borderRadius: 8 }}>
-                      <div style={{ fontSize: 11.5, color: 'var(--text3)' }}>{k.l}</div>
+                      <div style={{ fontSize: 12.5, color: 'var(--text3)' }}>{k.l}</div>
                       <div className="tabular" style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, color: k.c }}>{k.v}</div>
                     </div>
                   ))}
@@ -951,7 +951,7 @@ Dersler her durumda aktarılır. Tavanı aşan koordinatörlük saatleri de yaz�
                 width: 300, background: 'var(--surface)', borderRadius: 12, boxShadow: 'var(--shadow-float)', padding: 10, border: '1px solid var(--border)',
               }}
             >
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', padding: '2px 4px 8px', color: 'var(--text3)', textTransform: 'uppercase' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', padding: '2px 4px 8px', color: 'var(--text3)' }}>
                 {picker.gunAdi} {picker.day} {AYLAR[picker.month]} · {picker.dersNo}. ders · {sinifAd}
               </div>
               <input
@@ -983,10 +983,10 @@ Dersler her durumda aktarılır. Tavanı aşan koordinatörlük saatleri de yaz�
                       onClick={() => directKaydet(p.id, picker)}
                       style={{ background: seciliMi ? 'var(--accent-lighter)' : undefined, opacity: cakisma ? 0.55 : 1, cursor: cakisma ? 'not-allowed' : 'pointer' }}
                     >
-                      <span className="dp-avatar" style={{ width: 26, height: 26, fontSize: 10.5, background: r.tint, color: r.renk }}>{basHarf(p.ad)}</span>
+                      <span className="dp-avatar" style={{ width: 26, height: 26, fontSize: 11.5, background: r.tint, color: r.renk }}>{basHarf(p.ad)}</span>
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>{p.ad}{seciliMi && <Check size={13} color="var(--success)" />}</span>
-                        <span style={{ display: 'block', fontSize: 11.5, color: cakisma ? 'var(--danger)' : 'var(--text3)' }}>
+                        <span style={{ display: 'block', fontSize: 12.5, color: cakisma ? 'var(--danger)' : 'var(--text3)' }}>
                           {cakisma ? `Bu saatte ${cakisma.kulup_adi} sınıfında` : `${p.gorev || 'Öğretmen'} · bu hafta ${haftaYuk.get(p.id) || 0} ders`}
                         </span>
                       </span>
@@ -1028,14 +1028,14 @@ Dersler her durumda aktarılır. Tavanı aşan koordinatörlük saatleri de yaz�
         .dp-dolu:hover { border-color: #C9D4FA; background: #FBFCFF; }
         .dp-dolu:focus-visible, .dp-bos:focus-visible { outline: none; box-shadow: var(--ring); border-color: var(--accent); }
         .dp-ad { display: block; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .dp-alt { display: block; font-size: 11.5px; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dp-alt { display: block; font-size: 12.5px; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .dp-bos { width: 100%; height: 100%; border-radius: 9px; border: 1px dashed var(--border-strong); background: transparent; color: var(--text3); font: inherit; font-size: 12.5px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; transition: all .15s; }
         .dp-bos:hover { border-color: var(--accent); color: var(--accent-dark); background: var(--accent-lighter); border-style: solid; }
         .dp-sil { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 1px solid var(--danger-border); background: var(--danger-light); color: var(--danger); display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity .15s; }
         .dp-hucre:hover .dp-sil, .dp-sil:focus-visible { opacity: 1; }
         .dp-sil:hover { background: var(--danger); color: #fff; }
         @media (hover: none) { .dp-sil { opacity: 1; } }
-        :global(.dp-avatar) { width: 28px; height: 28px; flex: none; border-radius: 50%; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+        :global(.dp-avatar) { width: 28px; height: 28px; flex: none; border-radius: 50%; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
         .picker-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: none; background: none; font: inherit; color: var(--text); padding: 8px; border-radius: 8px; font-size: 13px; }
         .picker-item:not(:disabled):hover { background: var(--accent-lighter); }
         .yuk-satir { display: block; width: calc(100% + 16px); margin: 0 -8px; text-align: left; border: 1px solid transparent; background: none; border-radius: 8px; padding: 6px 8px; font: inherit; color: inherit; cursor: pointer; transition: background .12s; }

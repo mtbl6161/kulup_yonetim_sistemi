@@ -72,7 +72,7 @@ export function dokumSayfasi(pdf: Pdf, autoTable: AutoTable, p: { kurumAdi: stri
   let y = pdfBaslik(pdf, { kurum: p.kurumAdi, baslik: 'Öğrenci Ödeme Dökümü', alt: `${egitimYili}-${egitimYili + 1} Eğitim Öğretim Yılı · Düzenlenme: ${tarihFmt(p.bugun)}` })
   autoTable(pdf, pdfTablo({
     startY: y, theme: 'plain', body: dokumBilgileri(p.ogrenci, egitimYili),
-    styles: { fontSize: 8.5, cellPadding: 0.9 }, columnStyles: { 0: { cellWidth: 32, fontStyle: 'bold' } },
+    styles: { fontSize: 11, cellPadding: 0.9 }, columnStyles: { 0: { cellWidth: 32, fontStyle: 'bold' } },
   }))
   y = pdfSonY(pdf) + 4
   const baslikYaz = (t: string) => { pdf.setFont('NotoSans', 'bold'); pdf.setFontSize(9); pdf.setTextColor(...PDF_RENK.metin); pdf.text(t, PDF_KENAR, y); y += 2 }

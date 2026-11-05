@@ -124,7 +124,7 @@ export default function MuhasebePage() {
       head: [['Sıra', 'Adı Soyadı', 'T.C. Kimlik No', 'IBAN', 'Net Ödenecek (₺)']],
       body: liste.map((b, i) => [String(i + 1), (b.personel?.ad || '').toLocaleUpperCase('tr-TR'), b.personel?.tc || '', ibanBicim(b.personel?.iban) || '— IBAN eksik —', fmtTL(b.net)]),
       foot: [[{ content: 'TOPLAM', colSpan: 4, styles: { halign: 'right' } }, { content: fmtTL(toplam), styles: { halign: 'right' } }]],
-      styles: { fontSize: 8.5, cellPadding: 1.8 },
+      styles: { fontSize: 11, cellPadding: 1.8 },
       columnStyles: { 0: { halign: 'center', cellWidth: 12 }, 2: { halign: 'center', cellWidth: 28 }, 3: { cellWidth: 64 }, 4: { halign: 'right', cellWidth: 32 } },
     }))
     pdfImza(pdf, settings, pdfSonY(pdf))
@@ -185,7 +185,7 @@ export default function MuhasebePage() {
                 <button className="btn btn-secondary" onClick={generateBankList} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Download size={18} /> Banka Listesi (PDF)
                 </button>
-                <button className="btn btn-primary" onClick={generateXML} style={{ background: '#16a34a', borderColor: '#16a34a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button className="btn btn-primary" onClick={generateXML} style={{ background: 'var(--success)', borderColor: 'var(--success)', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <FileDown size={18} /> MUHSGK XML (Muhtasar + SGK)
                 </button>
               </div>
@@ -197,7 +197,7 @@ export default function MuhasebePage() {
             {bilgiler.vd_kodu
               ? <span>Beyanname bilgileri Ayarlar&apos;da: vergi dairesi {bilgiler.vd_kodu}{bilgiler.duzenleyen_vkn ? ` · düzenleyen ${[bilgiler.duzenleyen_ad, bilgiler.duzenleyen_soyad].filter(Boolean).join(' ') || bilgiler.duzenleyen_vkn}` : ' · kurum kendisi verir'}</span>
               : <span>Vergi dairesi kodu girilmemiş; MUHSGK XML oluşturulamaz.</span>}
-            <Link href="/ayarlar#beyanname" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>{bilgiler.vd_kodu ? 'Düzenle →' : 'Ayarlar’dan girin →'}</Link>
+            <Link href="/ayarlar#beyanname" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>{bilgiler.vd_kodu ? 'Düzenle' : 'Ayarlar’dan girin'}</Link>
           </div>
         </div>
 
@@ -260,12 +260,12 @@ export default function MuhasebePage() {
                   ))}
                 </tbody>
               </table>
-              <p style={{ margin: '10px 0 0', fontSize: 11.5, color: 'var(--text3)' }}>Denetim payı kuruma ödendiği için beyannameye girmez. Asgari ücret istisnası: GV ₺{ozet.gvIstisna.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} · DV ₺{ozet.dvIstisna.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+              <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--text3)' }}>Denetim payı kuruma ödendiği için beyannameye girmez. Asgari ücret istisnası: GV ₺{ozet.gvIstisna.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} · DV ₺{ozet.dvIstisna.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
             </div>
           </div>
 
-          <div className="card" style={{ padding: 0, border: '1px solid #d97706' }}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #d97706', background: '#d97706', color: '#fff' }}>
+          <div className="card" style={{ padding: 0, border: '1px solid var(--warn)' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--warn)', background: 'var(--warn)', color: '#fff' }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>SGK Bildirimi (MUHSGK içinde)</h3>
             </div>
             {eksikler === null ? (

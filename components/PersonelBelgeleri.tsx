@@ -88,7 +88,7 @@ export default function PersonelBelgeleri({ personelId, okulId, saltOkunur = fal
               <FileText size={16} color="var(--danger)" style={{ flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.ad}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--text3)' }}>{new Date(b.created_at).toLocaleDateString('tr-TR')}{b.boyut ? ` · ${boyutFmt(b.boyut)}` : ''}</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text3)' }}>{new Date(b.created_at).toLocaleDateString('tr-TR')}{b.boyut ? ` · ${boyutFmt(b.boyut)}` : ''}</div>
               </div>
               <button type="button" className="btn btn-secondary btn-icon" onClick={() => ac(b)} aria-label={`${b.ad} belgesini aç`} title="Aç"><ExternalLink size={14} /></button>
               {!saltOkunur && <button type="button" className="btn btn-outline-danger btn-icon" onClick={() => sil(b)} aria-label={`${b.ad} belgesini sil`} title="Sil"><Trash2 size={14} /></button>}

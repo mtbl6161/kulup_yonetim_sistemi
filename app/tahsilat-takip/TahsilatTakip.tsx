@@ -748,14 +748,14 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
                             {rPlanVar && <>
                               <td style={{ textAlign: 'center', fontWeight: 600, fontSize: 12 }}>
                                 {x.sekil}
-                                {x.sonrakiVade && <div style={{ fontSize: 10.5, fontWeight: 500, color: 'var(--text3)' }}>Sonraki: {fmtVade(x.sonrakiVade)}</div>}
+                                {x.sonrakiVade && <div style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--text3)' }}>Sonraki: {fmtVade(x.sonrakiVade)}</div>}
                               </td>
                               <td style={{ textAlign: 'right' }}>{fmtTL(x.odenenTutar)}</td>
                               <td style={{ textAlign: 'right', fontWeight: 600, color: x.kalan ? 'var(--danger)' : 'var(--text3)' }}>{x.kalan != null ? fmtTL(x.kalan) : '-'}</td>
                             </>}
                             <td style={{ textAlign: 'center' }}>
                               <span className={`badge ${x.durum === 'odedi' ? 'badge-green' : x.durum === 'kismi' ? 'badge-orange' : 'badge-red'}`}>{x.durum === 'odedi' ? 'Ödedi' : x.durum === 'kismi' ? 'Kısmi' : 'Ödemedi'}</span>
-                              {x.geciken > 0 && <div style={{ fontSize: 10.5, color: 'var(--danger)', marginTop: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}><AlertTriangle size={10} /> {x.geciken} taksit gecikti</div>}
+                              {x.geciken > 0 && <div style={{ fontSize: 11.5, color: 'var(--danger)', marginTop: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}><AlertTriangle size={10} /> {x.geciken} taksit gecikti</div>}
                             </td>
                           </tr>
                         ))}
@@ -771,7 +771,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
           <>
             {/* Kategori seçici */}
             <div className="card" style={{ padding: '14px 18px', marginBottom: 16 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text3)', marginBottom: 11, textTransform: 'uppercase', letterSpacing: 0.7 }}>Kategori</div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text3)', marginBottom: 11, letterSpacing: 0.7 }}>Kategori</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 {kategoriler.map(k => (
                   <button key={k.id} onClick={() => setSeciliKategoriId(k.id)} className={`tk-chip ${seciliKategoriId === k.id ? 'on' : ''}`}>
@@ -787,7 +787,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
                 )}
                 {seciliKategori && seciliKategori.tip !== 'tek_seferlik' && (
                   <div style={{ marginLeft: saltOkunur ? 'auto' : 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 11.5, color: 'var(--text3)', fontWeight: 600 }}>Eğitim Yılı</span>
+                    <span style={{ fontSize: 12.5, color: 'var(--text3)', fontWeight: 600 }}>Eğitim Yılı</span>
                     <select className="form-select" style={{ width: 130 }} value={egitimYili} onChange={e => setEgitimYili(Number(e.target.value))}>
                       {[varsayilanEgitimYili - 1, varsayilanEgitimYili, varsayilanEgitimYili + 1].map(y => (
                         <option key={y} value={y}>{y}-{y + 1}</option>
@@ -867,7 +867,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
                           <tr key={o.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                             <td className="tk-namecell" style={{ ...tdStyle, position: 'sticky', left: 0, zIndex: 4, background: 'var(--surface)', textAlign: 'left', paddingLeft: 16, fontWeight: 600, boxShadow: '2px 0 5px rgba(0,0,0,0.05)', borderRight: '1px solid var(--border)' }}>
                               {!saltOkunur && <TurRozet okul={!kulupOgrencisi(o)} />} {o.ad} {o.soyad}
-                              <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6 }}>{o.sinif || ''}</span>
+                              <span style={{ fontSize: 11.5, color: 'var(--text3)', marginLeft: 6 }}>{o.sinif || ''}</span>
                             </td>
                             {donemler.map(d => {
                               const kayit = kayitBul(o.id, d.key)
@@ -876,7 +876,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
                                 <td key={d.key} style={{ ...tdStyle, padding: 3 }}>
                                   {saltOkunur ? (
                                     kayit
-                                      ? <div className="tk-cell paid ro" title={kayit.tarih || ''}><Check size={13} />{kayit.tutar != null && <span style={{ fontSize: 10 }}>{fmtTL(Number(kayit.tutar))}</span>}</div>
+                                      ? <div className="tk-cell paid ro" title={kayit.tarih || ''}><Check size={13} />{kayit.tutar != null && <span style={{ fontSize: 11.5 }}>{fmtTL(Number(kayit.tutar))}</span>}</div>
                                       : <div className="tk-cell roempty">—</div>
                                   ) : plan ? (() => {
                                     const pd = planDurum(plan)
@@ -886,13 +886,13 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
                                         className={`tk-cell ${tamam ? 'paid' : 'partial'}${pd.geciken ? ' late' : ''}`}
                                         title={`${pd.adet} taksit · ${pd.odenenAdet} ödendi${pd.geciken ? ` · ${pd.geciken} vadesi geçti` : pd.sonrakiVade ? ` · sonraki vade ${fmtVade(pd.sonrakiVade)}` : ''}`}>
                                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>{pd.geciken ? <AlertTriangle size={12} /> : tamam ? <Check size={12} /> : <Layers size={12} />}{pd.odenenAdet}/{pd.adet}</span>
-                                        <span style={{ fontSize: 10 }}>{fmtTL(pd.odenenTutar)}</span>
+                                        <span style={{ fontSize: 11.5 }}>{fmtTL(pd.odenenTutar)}</span>
                                       </button>
                                     )
                                   })() : kayit ? (
                                     <button onClick={(e) => popoverAc(e, o.id, d.key, kayit)} className="tk-cell paid" title={kayit.tarih || ''}>
                                       <Check size={13} />
-                                      {kayit.tutar != null && <span style={{ fontSize: 10 }}>{fmtTL(Number(kayit.tutar))}</span>}
+                                      {kayit.tutar != null && <span style={{ fontSize: 11.5 }}>{fmtTL(Number(kayit.tutar))}</span>}
                                     </button>
                                   ) : (
                                     <div className="tk-cellwrap">
@@ -935,7 +935,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
             style={{ ...popKonum(popover.rect, 234, 340), background:'var(--surface)', borderRadius: 12, boxShadow: '0 16px 44px rgba(0,0,0,0.22)', padding: 16, width: 234, border: '1px solid var(--border)' }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>Ödeme Bilgisi</div>
+            <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text3)', marginBottom: 10, letterSpacing: 0.6 }}>Ödeme Bilgisi</div>
             <label className="form-label">Tutar (₺)</label>
             <input className="form-input" type="text" inputMode="decimal" value={pTutar} onChange={e => setPTutar(e.target.value)} style={{ marginBottom: 8 }} />
             <label className="form-label">Tarih</label>
@@ -964,7 +964,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                 <div>
-                  <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Taksit Planı · {taksitPop.d.label}</div>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text3)', letterSpacing: 0.6 }}>Taksit Planı · {taksitPop.d.label}</div>
                   <div style={{ fontWeight: 700, fontSize: 14, marginTop: 2 }}>{taksitPop.o.ad} {taksitPop.o.soyad}</div>
                 </div>
                 <button onClick={() => setTaksitPop(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)' }}><X size={16} /></button>
@@ -975,13 +975,13 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
                     <div style={{ width: 22, fontWeight: 700, fontSize: 12, color: 'var(--text2)' }}>{t.no}.</div>
                     <div style={{ flex: 1, fontSize: 12 }}>
                       <div style={{ fontWeight: 600 }}>{fmtTL(t.tutar)}</div>
-                      <div style={{ fontSize: 10.5, color: t.gecikti ? 'var(--danger)' : 'var(--text3)' }}>
+                      <div style={{ fontSize: 11.5, color: t.gecikti ? 'var(--danger)' : 'var(--text3)' }}>
                         Vade {fmtVade(t.vade)}{t.kayit ? ` · Ödendi ${fmtVade(t.kayit.tarih)}` : t.gecikti ? ' · Gecikti' : ''}
                       </div>
                     </div>
                     {t.kayit
-                      ? <button className="btn btn-secondary btn-sm" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => taksitGeriAl(t.kayit!)}>Geri al</button>
-                      : <button className="btn btn-primary btn-sm" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => taksitOde(plan, t.no)}><Check size={12} /> Ödendi</button>}
+                      ? <button className="btn btn-secondary btn-sm" style={{ fontSize: 12, padding: '3px 8px' }} onClick={() => taksitGeriAl(t.kayit!)}>Geri al</button>
+                      : <button className="btn btn-primary btn-sm" style={{ fontSize: 12, padding: '3px 8px' }} onClick={() => taksitOde(plan, t.no)}><Check size={12} /> Ödendi</button>}
                   </div>
                 ))}
               </div>
@@ -1057,7 +1057,7 @@ export default function TahsilatTakip({ birim }: { birim: Birim }) {
         .tk-cell.roempty { background: transparent; color: #cfc8ba; cursor: default; }
 
         /* Legend */
-        .tk-legend { display: flex; gap: 18px; align-items: center; padding: 10px 16px; font-size: 11.5px; color: var(--text3); border-top: 1px solid var(--border-light); }
+        .tk-legend { display: flex; gap: 18px; align-items: center; padding: 10px 16px; font-size: 12.5px; color: var(--text3); border-top: 1px solid var(--border-light); }
         .tk-legend .dot { width: 12px; height: 12px; border-radius: 4px; display: inline-block; margin-right: 6px; vertical-align: -2px; }
       `}</style>
     </div>

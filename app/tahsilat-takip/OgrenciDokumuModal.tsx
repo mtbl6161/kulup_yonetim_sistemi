@@ -109,7 +109,7 @@ export default function OgrenciDokumuModal({ ogrenci: o, kapat }: { ogrenci: Ogr
               <div>
                 <label className="form-label" htmlFor="dk-eposta">Veli e-posta adresi</label>
                 <input id="dk-eposta" type="email" className="form-input" placeholder="ornek@gmail.com" value={mailAdres} onChange={e => setMailAdres(e.target.value)} autoComplete="email" />
-                <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 4 }}>
+                <div style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 4 }}>
                   {kayitliAdres ? 'Öğrenci kaydındaki veli e-postası. Değiştirirseniz kayıt da güncellenir.' : 'Öğrenci kaydında veli e-postası yok. Buraya yazdığınız adres gönderimde kayda da eklenir; öğrenci formundaki "Veli E-posta" alanından da girebilirsiniz.'}
                 </div>
               </div>
@@ -118,7 +118,7 @@ export default function OgrenciDokumuModal({ ogrenci: o, kapat }: { ogrenci: Ogr
                 <textarea id="dk-not" className="form-input" rows={2} maxLength={1000} placeholder="Örn. Kasım ayı kulüp ücretinin ödenmesini rica ederiz." value={mailNot} onChange={e => setMailNot(e.target.value)} style={{ resize: 'vertical', minHeight: 56, paddingTop: 8 }} />
               </div>
             </div>
-            <div style={{ fontSize: 11.5, color: 'var(--text3)', margin: '8px 0 10px' }}>
+            <div style={{ fontSize: 12.5, color: 'var(--text3)', margin: '8px 0 10px' }}>
               E-postada öğrencinin adı, toplam ödenen ({fmtTL(dokum.toplamOdenen)}) ve bekleyen ({fmtTL(dokum.toplamBekleyen)}) tutar yazar; ayrıntılı döküm PDF olarak eklenir. Veli yanıtlarsa e-posta okulun ayarlardaki adresine gelir.
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -143,7 +143,7 @@ export default function OgrenciDokumuModal({ ogrenci: o, kapat }: { ogrenci: Ogr
                         <td>{x.kalem}</td>
                         <td style={{ whiteSpace: 'nowrap' }}>{x.donem}</td>
                         <td className="td-num" style={{ whiteSpace: 'nowrap' }}>{x.tutar != null ? fmtTL(x.tutar) : '—'}</td>
-                        <td style={{ fontSize: 11.5, color: 'var(--text2)', whiteSpace: 'normal', overflowWrap: 'anywhere', maxWidth: 260 }}>{x.aciklama || ''}</td>
+                        <td style={{ fontSize: 12.5, color: 'var(--text2)', whiteSpace: 'normal', overflowWrap: 'anywhere', maxWidth: 260 }}>{x.aciklama || ''}</td>
                       </tr>
                     ))}
                 </tbody>
@@ -184,7 +184,7 @@ export default function OgrenciDokumuModal({ ogrenci: o, kapat }: { ogrenci: Ogr
                 )}
               </table>
             </div>
-            <p style={{ fontSize: 11.5, color: 'var(--text3)', margin: '10px 0 0' }}>Okul, okul aile birliği ve kulübe yapılan tüm ödemeler birlikte listelenir. Kulübün aylık ücreti Aidat Takibi&apos;ndeki tutardır; ödenmemiş ayın tutarı Aidat Takibi&apos;ndeki gibi o ayın iş günü × günlük saat × saat ücretiyle hesaplanır.</p>
+            <p style={{ fontSize: 12.5, color: 'var(--text3)', margin: '10px 0 0' }}>Okul, okul aile birliği ve kulübe yapılan tüm ödemeler birlikte listelenir. Kulübün aylık ücreti Aidat Takibi&apos;ndeki tutardır; ödenmemiş ayın tutarı Aidat Takibi&apos;ndeki gibi o ayın iş günü × günlük saat × saat ücretiyle hesaplanır.</p>
           </>
         )}
       </div>

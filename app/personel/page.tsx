@@ -167,7 +167,7 @@ function PersonelIc() {
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
-              <thead style={{ fontSize: 11 }}>
+              <thead style={{ fontSize: 12 }}>
                 <tr>
                   <th style={{ width: 40 }}>#</th>
                   <th>Personel Bilgisi</th>
@@ -189,18 +189,18 @@ function PersonelIc() {
                 ) : (
                   sorted.map((p, i) => (
                     <tr key={p.id} style={{ fontSize: 12 }}>
-                      <td style={{ color: 'var(--text3)', fontSize: 11 }}>{i + 1}</td>
+                      <td style={{ color: 'var(--text3)', fontSize: 12 }}>{i + 1}</td>
                       <td>
                         <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text1)' }}>{p.ad}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
                           {p.tc || 'TC Yok'} • {p.email || 'E-posta Yok'}
                         </div>
                       </td>
                       <td>
                         <div style={{ marginBottom: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          <span className="badge badge-blue" style={{ fontSize: 10 }}>{p.gorev}</span>
+                          <span className="badge badge-blue" style={{ fontSize: 11.5 }}>{p.gorev}</span>
                           {(ekGorevler.get(p.id) || []).map(e => (
-                            <span key={e.id} className="badge badge-gray" style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            <span key={e.id} className="badge badge-gray" style={{ fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                               title="Aynı kişinin ek görev kaydı — bordroda yalnız ücreti yüksek görev ödenir">
                               <button type="button" onClick={() => duzenle(e)} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: 'inherit', font: 'inherit' }}>+ {e.gorev}</button>
                               {listeTuru === 'aktif' && (
@@ -214,7 +214,7 @@ function PersonelIc() {
                             </span>
                           ))}
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>
+                        <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
                           Kod: {p.meslek_kodu || '-'}
                         </div>
                       </td>
@@ -238,7 +238,7 @@ function PersonelIc() {
                         <div style={{ fontWeight: 600, fontSize: 12 }}>
                           {p.yillik_matrah ? `₺${Number(p.yillik_matrah).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}` : '-'}
                         </div>
-                        <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.iban || ''}>
+                        <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 2, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.iban || ''}>
                           {p.iban || 'IBAN Yok'}
                         </div>
                       </td>

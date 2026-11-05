@@ -240,7 +240,7 @@ export default function DenetimPage() {
         .select('*, okullar(ad)')
         .in('okul_id', okullarData?.map(o => o.id) || [])
         .order('created_at', { ascending: false })
-        .limit(6)
+        .limit(30)
       setSonHareketler(logs || [])
       
       // 3. Detay verilerini de tetikle
@@ -273,27 +273,22 @@ export default function DenetimPage() {
       setBilVeri(null)
       return
     }
+    // Okul verileri yalnızca o sekme açıkken yüklenir; evrak ya da hesap kontrolü açılırken istek yarıştırmaz
+    if (!aktifVeri) return
 
     async function veriYukle() {
       setYukleniyor(true)
       const [yil, ay] = secilenAyKey!.split('-').map(Number)
 
-      // 1. Önce Ayarları Çek (Saat ücretini bilmek için şart)
-      const { data: ayr } = await supabase.from('ayarlar')
-        .select('*')
-        .eq('okul_id', secilenOkulId).eq('ay', ay).eq('yil', yil)
-        .maybeSingle()
-
-      if (ayr) {
-        setBilVeri({ ayarlar: ayr, toplamGelir: 0, ogrenciSayisi: 0, subeSayisi: 0, toplamDersSaati: 0, tatiller: [] })
-      } else {
-        setBilVeri(null)
-      }
-
       if (aktifVeri === 'bordro') {
-        const { data } = await supabase.from('bordro')
-          .select('*, personel(ad, gorev, tc, sgk_li)')
-          .eq('okul_id', secilenOkulId).eq('ay', ay).eq('yil', yil)
+        // Ayarlar (saat ücreti) ve bordro aynı turda
+        const [{ data: ayr }, { data }] = await Promise.all([
+          supabase.from('ayarlar').select('*').eq('okul_id', secilenOkulId).eq('ay', ay).eq('yil', yil).maybeSingle(),
+          supabase.from('bordro')
+            .select('*, personel(ad, gorev, tc, sgk_li)')
+            .eq('okul_id', secilenOkulId).eq('ay', ay).eq('yil', yil),
+        ])
+        setBilVeri(ayr ? { ayarlar: ayr, toplamGelir: 0, ogrenciSayisi: 0, subeSayisi: 0, toplamDersSaati: 0, tatiller: [] } : null)
         
         const gorevSirasi: Record<string, number> = {
           'Başkan': 1,

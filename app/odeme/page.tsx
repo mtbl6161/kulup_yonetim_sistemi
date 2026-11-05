@@ -84,6 +84,9 @@ export default function OdemePage() {
   })
 
   const isGunu = isGunuSayisi(yil, ay, tatiller)
+  // Ayın ilk 10 günü aidat henüz "beklenen"dir; kırmızı ve "borçlu" ifadesi gecikmeye bırakılır
+  const bugun = new Date()
+  const aidatErken = ay === bugun.getMonth() + 1 && yil === bugun.getFullYear() && bugun.getDate() <= 10
 
   async function tahakkukGuncelle() {
     try {
@@ -458,19 +461,20 @@ export default function OdemePage() {
         {/* Özet istatistikler */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 20 }}>
           <div className="stat-card">
-            <div className="stat-label">Toplam Gereken</div>
+            <div className="stat-label">Toplam gereken</div>
             <div className="stat-value">{fmtTL(toplamGereken)}</div>
-            <div className="stat-sub">{ayLabel(ay, yil)} — {isGunu} iş günü</div>
+            <div className="stat-sub">{ayLabel(ay, yil)}, {isGunu} iş günü</div>
           </div>
-          <div className="stat-card orange">
-            <div className="stat-label">Toplam Ödenen</div>
+          <div className={`stat-card${toplamOdenen > 0 ? ' teal' : ''}`}>
+            <div className="stat-label">Toplam ödenen</div>
             <div className="stat-value">{fmtTL(toplamOdenen)}</div>
             <div className="stat-sub">{tahsilatlar.length} adet tahsilat</div>
           </div>
-          <div className="stat-card red">
-            <div className="stat-label">Kalan Borç</div>
+          {/* Ayın ilk 10 günü kalan tutar "borç" sayılmaz; kırmızı yalnızca gecikmede */}
+          <div className={`stat-card${toplamKalan > 0 && !aidatErken ? ' red' : ''}`}>
+            <div className="stat-label">{aidatErken ? 'Beklenen' : 'Kalan borç'}</div>
             <div className="stat-value">{fmtTL(toplamKalan)}</div>
-            <div className="stat-sub">{ozet.filter(r => r.kalan > 0).length} öğrenci borçlu</div>
+            <div className="stat-sub">{ozet.filter(r => r.kalan > 0).length} öğrenci {aidatErken ? 'henüz ödemedi' : 'borçlu'}</div>
           </div>
         </div>
 
@@ -642,9 +646,9 @@ export default function OdemePage() {
                     </td>
                     <td>
                       <strong>{r.ogrenci.ad} {r.ogrenci.soyad}</strong>
-                      {r.ogrenci.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 10, marginLeft: 6 }}> (Ayrıldı)</span>}
+                      {r.ogrenci.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 11.5, marginLeft: 6 }}> (Ayrıldı)</span>}
                       {r.ogrenci.gunluk_saat && (
-                        <span style={{ fontSize: 9, marginLeft: 8, padding: '1px 4px', background: '#e9ecef', borderRadius: 4, color: '#495057', border: '1px solid #dee2e6' }}>
+                        <span style={{ fontSize: 11, marginLeft: 8, padding: '1px 4px', background: '#e9ecef', borderRadius: 4, color: '#495057', border: '1px solid #dee2e6' }}>
                           {r.ogrenci.gunluk_saat} Saat
                         </span>
                       )}
@@ -652,7 +656,7 @@ export default function OdemePage() {
                     <td>{r.ogrenci.sinif || '-'}</td>
                     <td className="td-num">{fmtTL(r.gereken)}</td>
                     <td className="td-num">{fmtTL(r.odenen)}</td>
-                    <td className="td-num fw-600" style={{ color: r.kalan > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                    <td className="td-num fw-600" style={{ color: r.kalan > 0 ? (aidatErken ? 'var(--text)' : 'var(--danger)') : r.gereken > 0 ? 'var(--success)' : 'var(--text3)' }}>
                       {r.kalan > 0 ? fmtTL(r.kalan) : fmtTL(0)}
                     </td>
                     <td>
@@ -660,11 +664,11 @@ export default function OdemePage() {
                         {r.ogrenci.ucretsiz_mi ? (
                           <Badge variant="blue">Ücretsiz</Badge>
                         ) : r.durum === 'tam' ? (
-                          <Badge variant="green">✅ Ödendi</Badge>
+                          <Badge variant="green">Ödendi</Badge>
                         ) : r.durum === 'kismi' ? (
-                          <Badge variant="orange">⏳ Kısmi</Badge>
+                          <Badge variant="orange">Kısmi</Badge>
                         ) : (
-                          <Badge variant="red">❌ Ödenmedi</Badge>
+                          <Badge variant={aidatErken ? 'gray' : 'red'}>{aidatErken ? 'Bekleniyor' : 'Ödenmedi'}</Badge>
                         )}
                       </div>
                     </td>
@@ -750,7 +754,7 @@ export default function OdemePage() {
                           <td>{tarihFmt(t.tarih)}</td>
                           <td>
                             {o ? o.ad + ' ' + o.soyad : '?'}
-                            {o?.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 10, marginLeft: 6 }}> (Ayrıldı)</span>}
+                            {o?.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 11.5, marginLeft: 6 }}> (Ayrıldı)</span>}
                           </td>
                           <td>{t.aciklama || '-'}</td>
                           <td style={{ fontSize: 12 }}>{t.dekont_no || '-'}</td>

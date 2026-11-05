@@ -411,7 +411,7 @@ export default function AyarlarPage() {
             <span style={{ fontWeight: 600 }}>Kurulum {kurulumTamam}/{kurulum.length}</span>
             <span>Eksik bilgiler:</span>
             {kurulum.filter(k => !k.ok).map(k => (
-              <button key={k.label} onClick={() => setActiveTab(k.tab as typeof activeTab)} style={{ border: '1px solid #c9d4fa', background: '#fff', color: 'var(--accent-dark)', borderRadius: 99, padding: '2px 10px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>{k.label} →</button>
+              <button key={k.label} onClick={() => setActiveTab(k.tab as typeof activeTab)} style={{ border: '1px solid #c9d4fa', background: '#fff', color: 'var(--accent-dark)', borderRadius: 99, padding: '2px 10px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>{k.label}</button>
             ))}
           </div>
         )}
@@ -533,7 +533,7 @@ export default function AyarlarPage() {
                         <input id="ay-sgk-belge-turu" className="form-input" maxLength={2} value={form.sgk_belge_turu || ''} onChange={e => setF('sgk_belge_turu', e.target.value)} placeholder="01" />
                       </div>
                     </div>
-                    <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10, marginBottom: 0 }}>* SGK işyeri bilgileri; MUHSGK dosyasının SGK bildirimi bölümünde kullanılır.</p>
+                    <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 10, marginBottom: 0 }}>* SGK işyeri bilgileri; MUHSGK dosyasının SGK bildirimi bölümünde kullanılır.</p>
 
                     {MUHSGK_ALANLARI.map(g => (
                       <div key={g.grup} style={{ marginTop: 16 }}>
@@ -550,13 +550,13 @@ export default function AyarlarPage() {
                         </div>
                       </div>
                     ))}
-                    <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10, marginBottom: 0 }}>* Beyanname bilgileri Personel ve maaş › Beyanname ve SGK sayfasındaki MUHSGK XML dosyasına yazılır. Değişiklikler sayfanın Kaydet düğmesiyle kaydedilir.</p>
+                    <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 10, marginBottom: 0 }}>* Beyanname bilgileri Personel ve maaş › Beyanname ve SGK sayfasındaki MUHSGK XML dosyasına yazılır. Değişiklikler sayfanın Kaydet düğmesiyle kaydedilir.</p>
                   </details>
 
                   <div style={{ gridColumn: 'span 2' }}>
                     <label htmlFor="ay-imza-url" className="form-label">Dijital İmza / Kaşe Görsel URL</label>
                     <input id="ay-imza-url" className="form-input" value={form.imza_url || ''} onChange={e => setF('imza_url', e.target.value)} placeholder="https://..." />
-                    <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>* Bordro zarfı ve resmi evraklarda bu görsel kullanılır.</p>
+                    <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6 }}>* Bordro zarfı ve resmi evraklarda bu görsel kullanılır.</p>
                   </div>
                 </div>
               </div>
@@ -596,17 +596,17 @@ export default function AyarlarPage() {
                       <label htmlFor="ay-ogrenci-ucret" className="form-label">Manuel Saat Ücreti (₺)</label>
                       {/* Aidat hesabı (Ödeme Takibi, Genel Bakış, Bilanço) ayarlar.saat_ucreti'ni kullanır */}
                       <SayiInput id="ay-ogrenci-ucret" className="form-input" value={form.saat_ucreti} onChange={v => setF('saat_ucreti', v)} />
-                      <p style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>
+                      <p style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 4 }}>
                         * Öğrenci aidatı ve gelir havuzu bu ücret üzerinden hesaplanır.
                         {form.saat_ucreti != null && Number(form.saat_ucreti).toFixed(2) !== sUcret && (
-                          <> Formüle göre hesaplanan: ₺{sUcret} — <button type="button" onClick={() => setF('saat_ucreti', parseFloat(sUcret))} style={{ border: 'none', background: 'none', padding: 0, color: 'var(--accent)', fontWeight: 700, cursor: 'pointer', fontSize: 10, textDecoration: 'underline' }}>bunu kullan</button></>
+                          <> Formüle göre hesaplanan: ₺{sUcret} — <button type="button" onClick={() => setF('saat_ucreti', parseFloat(sUcret))} style={{ border: 'none', background: 'none', padding: 0, color: 'var(--accent)', fontWeight: 700, cursor: 'pointer', fontSize: 11.5, textDecoration: 'underline' }}>bunu kullan</button></>
                         )}
                       </p>
                     </div>
                     <div>
                       <label htmlFor="ay-ogretmen-manuel-ucret" className="form-label">Öğretmen Manuel Saat Ücreti (₺)</label>
                       <SayiInput id="ay-ogretmen-manuel-ucret" className="form-input" value={form.ogretmen_saat_ucreti} onChange={v => setF('ogretmen_saat_ucreti', v)} />
-                      <p style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>* Boş bırakılırsa havuz paylaşımı (dinamik) uygulanır.</p>
+                      <p style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 4 }}>* Boş bırakılırsa havuz paylaşımı (dinamik) uygulanır.</p>
                     </div>
                   </div>
                 </div>
@@ -627,7 +627,7 @@ export default function AyarlarPage() {
                     <div>
                       <label htmlFor="ay-gv-istisna" className="form-label">Asgari Ücret GV İstisnası (₺/ay)</label>
                       <SayiInput id="ay-gv-istisna" className="form-input" placeholder="Boş: otomatik" value={form.gv_istisna_sabiti || null} onChange={v => setF('gv_istisna_sabiti', v ?? 0)} />
-                      <p style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>* Ay ay değişir; boş bırakılırsa asgari ücretten hesaplanır.</p>
+                      <p style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 4 }}>* Ay ay değişir; boş bırakılırsa asgari ücretten hesaplanır.</p>
                     </div>
                     <div>
                       <label htmlFor="ay-dv-istisna" className="form-label">Asgari Ücret DV İstisnası (₺/ay)</label>
@@ -754,11 +754,11 @@ export default function AyarlarPage() {
               <div className="card" style={{ background: 'var(--accent-lighter)', color: 'var(--text)', border: '1px solid #c9d4fa' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, opacity: 0.9 }}>
                   <Calculator size={20} />
-                  <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Hesaplama Özeti</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>Hesaplama Özeti</span>
                 </div>
                 
                 <div style={{ marginBottom: 24 }}>
-                  <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 4 }}>Hesaplanan Saat Ücreti</div>
+                  <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Hesaplanan Saat Ücreti</div>
                   <div style={{ fontSize: 32, fontWeight: 800, fontFamily: 'var(--font-display)' }}>₺{sUcret}</div>
                   <div style={{ fontSize: 12, opacity: 0.85, marginTop: 6 }}>
                     Aidatta uygulanan: <strong>₺{form.saat_ucreti != null ? Number(form.saat_ucreti).toFixed(2) : '—'}</strong>
@@ -780,7 +780,7 @@ export default function AyarlarPage() {
                   </div>
                 </div>
 
-                <div style={{ marginTop: 24, padding: '12px', background: 'rgba(35,71,217,0.14)', borderRadius: 8, fontSize: 11, lineHeight: 1.5 }}>
+                <div style={{ marginTop: 24, padding: '12px', background: 'rgba(35,71,217,0.14)', borderRadius: 8, fontSize: 12, lineHeight: 1.5 }}>
                   <Info size={14} style={{ marginBottom: 6 }} />
                   Katsayı veya gösterge değerlerini değiştirdiğinizde bu alan anlık olarak güncellenir.
                 </div>

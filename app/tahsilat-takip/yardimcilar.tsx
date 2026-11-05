@@ -127,7 +127,7 @@ export function hesaplaDonemler(kat: TahsilatKategori | null, ey: number): Donem
   })
 }
 
-export const badge: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)', letterSpacing: 0.2 }
+export const badge: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)', letterSpacing: 0.2 }
 // Hücreye bağlı popover konumu: altta yer yoksa hücrenin üstünde açılır, ekrana sığmazsa kaydırılır
 export function popKonum(rect: DOMRect, genislik: number, tahminiYukseklik: number): React.CSSProperties {
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800
@@ -144,10 +144,10 @@ export function popKonum(rect: DOMRect, genislik: number, tahminiYukseklik: numb
 export const overlay: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(26,26,20,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }
 export const modalCard: React.CSSProperties = { width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', padding: '24px 26px', marginBottom: 0, boxShadow: '0 24px 60px rgba(0,0,0,0.28)' }
 export const emptyBox: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 24px', textAlign: 'center', background: 'var(--surface)', borderRadius: 14, border: '1.5px dashed var(--border)', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }
-export const thStyle: React.CSSProperties = { background: 'var(--th-bg)', color: 'var(--th-fg)', border: '1px solid var(--th-border)', fontSize: 10.5, fontWeight: 600, padding: '11px 6px', textAlign: 'center', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: 0.4 }
+export const thStyle: React.CSSProperties = { background: 'var(--th-bg)', color: 'var(--th-fg)', border: '1px solid var(--th-border)', fontSize: 11.5, fontWeight: 600, padding: '11px 6px', textAlign: 'center', whiteSpace: 'nowrap', letterSpacing: 0.4 }
 export const tdStyle: React.CSSProperties = { padding: '6px', textAlign: 'center', borderRight: '1px solid var(--border-light)' }
 export const statBox: React.CSSProperties = { padding: '16px 18px', position: 'relative', overflow: 'hidden' }
-export const statLabel: React.CSSProperties = { fontSize: 10.5, color: 'var(--text3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 6 }
+export const statLabel: React.CSSProperties = { fontSize: 11.5, color: 'var(--text3)', fontWeight: 600, letterSpacing: 0.7, marginBottom: 6 }
 export const statVal: React.CSSProperties = { fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }
 
 export const statAlt: React.CSSProperties = { marginTop: 8, fontSize: 12, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }
@@ -160,7 +160,7 @@ export function TurRozet({ okul, uzun }: { okul: boolean; uzun?: boolean }) {
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         minWidth: 18, height: 18, padding: uzun ? '0 8px' : '0 4px', borderRadius: 5,
-        fontSize: 10, fontWeight: 700, letterSpacing: 0.3, verticalAlign: 1,
+        fontSize: 11.5, fontWeight: 700, letterSpacing: 0.3, verticalAlign: 1,
         background: okul ? 'var(--info-light)' : 'var(--accent-lighter)',
         color: okul ? '#1a5b8a' : 'var(--accent)',
         border: `1px solid ${okul ? 'var(--info-border)' : 'var(--accent-light)'}`,

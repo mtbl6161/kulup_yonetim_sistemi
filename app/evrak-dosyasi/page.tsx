@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { AYLAR } from '@/lib/hesaplama'
 import {
   DenetimMadde, DenetimBelge, DenetimTeslim, DENETIM_BUCKET, MAKS_DOSYA_BOYUTU, KABUL_EDILEN, TESLIM_DURUM_ETIKET,
-  belgeDonemde, donemBelgeleriniGetir, depoYolu, boyutFmt, otomatikBelgeUret, kontrolListesiUret, belgeAc, belgeIndir, blobKaydet, dosyayiZiple,
+  belgeDonemde, donemBelgeleriniGetir, aktifMaddeleriGetir, depoYolu, boyutFmt, otomatikBelgeUret, kontrolListesiUret, belgeAc, belgeIndir, blobKaydet, dosyayiZiple,
 } from '@/lib/denetimDosyasi'
 import { FolderCheck, Upload, Eye, Download, Trash2, Send, FileArchive, ListChecks, AlertTriangle, RefreshCw, Plus } from 'lucide-react'
 import MaddeEtiketleri from '@/components/MaddeEtiketleri'
@@ -45,18 +45,17 @@ export default function DenetimDosyasiPage() {
     if (!okulId) return
     setYukleniyor(true)
     try {
-      await supabase.rpc('denetim_maddeleri_hazirla')
-      const [m, t, b] = await Promise.all([
-        supabase.from('denetim_maddeleri').select('*').eq('aktif', true).order('sira_no'),
+      // Dört sorgu tek turda (madde listesi yalnızca ilk kullanımda oluşturulur)
+      const [m, t, b, br] = await Promise.all([
+        aktifMaddeleriGetir(),
         supabase.from('denetim_teslimleri').select('*').eq('okul_id', okulId).eq('yil', yil).eq('ay', ay).maybeSingle(),
         donemBelgeleriniGetir(okulId, yil, ay),
+        supabase.from('bordro').select('id', { count: 'exact', head: true }).eq('okul_id', okulId).eq('yil', yil).eq('ay', ay),
       ])
-      if (m.error) throw m.error
-      setMaddeler((m.data || []) as DenetimMadde[])
+      setMaddeler(m)
       setTeslim((t.data as DenetimTeslim) || null)
       setBelgeler(b)
-      const { count } = await supabase.from('bordro').select('id', { count: 'exact', head: true }).eq('okul_id', okulId).eq('yil', yil).eq('ay', ay)
-      setBordroVar(!!count)
+      setBordroVar(!!br.count)
     } catch (e) {
       setMsg({ tip: 'hata', text: 'Denetim dosyası yüklenemedi: ' + (e as Error).message + ' (Veritabanı kurulumu yapıldı mı? migration_denetim_dosyasi.sql)' })
     } finally {
@@ -363,7 +362,7 @@ export default function DenetimDosyasiPage() {
             {maddeler.length === 0 && <div style={{ padding: 24, color: 'var(--text3)' }}>İl denetim evrak listesi henüz tanımlanmamış.</div>}
           </div>
         )}
-        <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 12 }}>
+        <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 12 }}>
           PDF, Excel, Word, fotoğraf veya ZIP yükleyebilirsiniz (dosya başına en fazla 10 MB). Bir maddeye birden fazla dosya eklenebilir.
         </p>
       </div>
@@ -385,7 +384,7 @@ const ED_CSS = `
 .ed-satir:first-child { border-top: none; }
 .ed-satir:hover { background: var(--surface2); }
 .ed-ad { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ed-meta { font-size: 11.5px; color: var(--text3); margin-top: 1px; }
+.ed-meta { font-size: 12.5px; color: var(--text3); margin-top: 1px; }
 .ed-rozetler { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .ed-aksiyon { display: flex; gap: 2px; align-items: center; }
 .ed-degistir { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 9px; margin-right: 4px; border-radius: 7px;

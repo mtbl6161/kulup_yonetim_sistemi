@@ -15,7 +15,7 @@ const GUIDES = [
           Öğrenci kulüp aidatları, kulübün yapıldığı aydaki <strong>iş günü sayısı</strong> üzerinden hesaplanır. Hafta sonları ve resmi tatiller hesaba katılmaz.
         </p>
         <div style={{ background: 'var(--surface2)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '10px' }}>
-          <strong style={{ display: 'block', fontSize: '11px', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '4px' }}>Formül:</strong>
+          <strong style={{ display: 'block', fontSize: '11px', color: 'var(--text3)', marginBottom: '4px' }}>Formül:</strong>
           <code style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--accent)' }}>Aylık Aidat = İş Günü Sayısı × Günlük Saat × Saat Ücreti</code>
         </div>
         <p style={{ margin: 0, lineHeight: '1.5' }}>
@@ -351,7 +351,7 @@ export default function EgitimPage() {
                           gap: '6px'
                         }}
                       >
-                        <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: isSelected ? 'var(--accent)' : 'var(--text3)' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 800, color: isSelected ? 'var(--accent)' : 'var(--text3)' }}>
                           {s.desc}
                         </div>
                         <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>
@@ -484,7 +484,7 @@ export default function EgitimPage() {
             {/* Öğretmen ve Saat Girdileri */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '6px' }}>Öğretmen Sayısı</label>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: 'var(--text3)', marginBottom: '6px' }}>Öğretmen Sayısı</label>
                 <input
                   type="number"
                   min="1"
@@ -505,7 +505,7 @@ export default function EgitimPage() {
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '6px' }}>Toplam Ders Saati</label>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: 'var(--text3)', marginBottom: '6px' }}>Toplam Ders Saati</label>
                 <input
                   type="number"
                   min="1"
@@ -571,7 +571,7 @@ export default function EgitimPage() {
                   { key: 'denetim', label: 'Denetim' }
                 ].map(o => (
                   <div key={o.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ fontSize: '9px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: 700 }}>{o.label}</span>
+                    <span style={{ fontSize: '9px', color: 'var(--text3)', fontWeight: 700 }}>{o.label}</span>
                     <input
                       type="number"
                       value={oranlar[o.key as keyof typeof oranlar]}
@@ -597,7 +597,7 @@ export default function EgitimPage() {
           {/* DERS SAATİ ÜCRETİ GÖSTERGELERİ */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={{ background: 'var(--surface2)', padding: '16px', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '10px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: 700 }}>Yasal Resmi Saat Ücreti</span>
+              <span style={{ fontSize: '10px', color: 'var(--text3)', fontWeight: 700 }}>Yasal Resmi Saat Ücreti</span>
               <strong style={{ fontSize: '20px', color: 'var(--text)' }}>
                 {simSonuclar.yasalSaatUcreti.toLocaleString('tr-TR')} ₺
               </strong>
@@ -613,7 +613,7 @@ export default function EgitimPage() {
               flexDirection: 'column',
               gap: '4px'
             }}>
-              <span style={{ fontSize: '10px', color: 'var(--text3)', textTransform: 'uppercase', fontWeight: 700 }}>Dağıtılan Dinamik Saat Ücreti</span>
+              <span style={{ fontSize: '10px', color: 'var(--text3)', fontWeight: 700 }}>Dağıtılan Dinamik Saat Ücreti</span>
               <strong style={{ fontSize: '20px', color: 'var(--text)' }}>
                 {simSonuclar.dinamikSaatUcreti.toLocaleString('tr-TR')} ₺
               </strong>

@@ -487,7 +487,7 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
                     const zorunlu = isKolonZorunlu(tip, k, okulOgr);
                     return (
                       <span key={k} style={{
-                        fontSize: 11, padding: '2px 8px', borderRadius: 6,
+                        fontSize: 12, padding: '2px 8px', borderRadius: 6,
                         background: zorunlu ? '#dbeafe' : '#f3f4f6',
                         color: zorunlu ? '#1d4ed8' : '#6b7280',
                         fontWeight: zorunlu ? 600 : 400,
@@ -498,7 +498,7 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
                     );
                   })}
                 </div>
-                <p style={{ fontSize: 11, color: '#6b7280', marginTop: 8 }}>Mavi olanlar zorunlu alanlardır. Başlıkları kopyalayıp Excel sayfanızın ilk satırına yapıştırabilirsiniz.</p>
+                <p style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>Mavi olanlar zorunlu alanlardır. Başlıkları kopyalayıp Excel sayfanızın ilk satırına yapıştırabilirsiniz.</p>
               </div>
             </div>
           )}
@@ -509,11 +509,11 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
               {/* Özet */}
               <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
                 <div style={{ flex: 1, background: '#f0fdf4', borderRadius: 10, padding: 12, textAlign: 'center' }}>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: '#16a34a' }}>{gecerliSayisi}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--success)' }}>{gecerliSayisi}</div>
                   <div style={{ fontSize: 12, color: '#15803d' }}>Eklenecek</div>
                 </div>
                 <div style={{ flex: 1, background: '#fffbeb', borderRadius: 10, padding: 12, textAlign: 'center' }}>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: '#d97706' }}>{muskSayisi}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--warn)' }}>{muskSayisi}</div>
                   <div style={{ fontSize: 12, color: '#b45309' }}>Mükerrer (atlanacak)</div>
                 </div>
                 <div style={{ flex: 1, background: '#fff5f5', borderRadius: 10, padding: 12, textAlign: 'center' }}>
@@ -545,9 +545,9 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
                         <td style={tdStyle}>{s.index}</td>
                         <td style={tdStyle}>
                           <span style={{
-                            fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+                            fontSize: 11.5, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
                             background: s.durum === 'gecerli' ? '#dcfce7' : s.durum === 'muskerrer' ? '#fef9c3' : '#fee2e2',
-                            color: s.durum === 'gecerli' ? '#16a34a' : s.durum === 'muskerrer' ? '#92400e' : '#dc2626'
+                            color: s.durum === 'gecerli' ? 'var(--success)' : s.durum === 'muskerrer' ? 'var(--warn-dark)' : 'var(--danger)'
                           }}>
                             {s.durum === 'gecerli' ? 'Eklenecek' : s.durum === 'muskerrer' ? 'Mükerrer' : 'Hatalı'}
                           </span>
@@ -566,7 +566,7 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
                             <td style={tdStyle}>{s.ham['Görevi'] || '-'}</td>
                           </>
                         )}
-                        <td style={{ ...tdStyle, color: s.durum === 'gecerli' ? '#16a34a' : '#dc2626', maxWidth: 180 }}>
+                        <td style={{ ...tdStyle, color: s.durum === 'gecerli' ? 'var(--success)' : 'var(--danger)', maxWidth: 180 }}>
                           {s.hatalar.join(', ') || '—'}
                         </td>
                       </tr>
@@ -583,25 +583,25 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
               <div style={{
                 width: 64, height: 64, background: '#f0fdf4', borderRadius: 16,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 20px', color: '#16a34a'
+                margin: '0 auto 20px', color: 'var(--success)'
               }}>
                 <CheckCircle size={32} />
               </div>
               <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>İçe Aktarma Tamamlandı</h2>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 20 }}>
                 <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '12px 20px', minWidth: 100 }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: '#16a34a' }}>{sonuc.eklenen}</div>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--success)' }}>{sonuc.eklenen}</div>
                   <div style={{ fontSize: 12, color: '#15803d' }}>Eklendi</div>
                 </div>
                 {sonuc.atlanan > 0 && (
                   <div style={{ background: '#fffbeb', borderRadius: 10, padding: '12px 20px', minWidth: 100 }}>
-                    <div style={{ fontSize: 24, fontWeight: 700, color: '#d97706' }}>{sonuc.atlanan}</div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--warn)' }}>{sonuc.atlanan}</div>
                     <div style={{ fontSize: 12, color: '#b45309' }}>Atlandı</div>
                   </div>
                 )}
                 {sonuc.hatali > 0 && (
                   <div style={{ background: '#fff5f5', borderRadius: 10, padding: '12px 20px', minWidth: 100 }}>
-                    <div style={{ fontSize: 24, fontWeight: 700, color: '#dc2626' }}>{sonuc.hatali}</div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--danger)' }}>{sonuc.hatali}</div>
                     <div style={{ fontSize: 12, color: '#b91c1c' }}>Hatalı</div>
                   </div>
                 )}
@@ -625,7 +625,7 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
                   {yukleniyor ? 'Kaydediliyor...' : `${gecerliSayisi} Kayıt Ekle`}
                 </button>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#dc2626' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--danger)' }}>
                   <AlertTriangle size={16} />
                   Eklenecek geçerli satır yok
                 </div>
@@ -642,7 +642,7 @@ export default function ImportModal({ tip, ogrenciTuru = 'kulup', mevcutOgrencil
 }
 
 const thStyle: React.CSSProperties = {
-  padding: '8px 10px', textAlign: 'left', fontSize: 11,
+  padding: '8px 10px', textAlign: 'left', fontSize: 12,
   fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap',
 }
 const tdStyle: React.CSSProperties = {

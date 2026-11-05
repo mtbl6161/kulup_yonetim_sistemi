@@ -58,7 +58,7 @@ export default function TatilSekmesi({ tatiller, kbMevcut, kbYil, setKbYil, kbTa
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <Calendar size={16} color="var(--accent)" />
             <span style={{ fontWeight: 700, fontSize: 13 }}>Resmi &amp; İdari Tatiller</span>
-            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', background: 'var(--surface2)', padding: '2px 7px', borderRadius: 20, whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text3)', background: 'var(--surface2)', padding: '2px 7px', borderRadius: 20, whiteSpace: 'nowrap' }}>
               Yönetimden
             </span>
           </div>
@@ -72,12 +72,12 @@ export default function TatilSekmesi({ tatiller, kbMevcut, kbYil, setKbYil, kbTa
                 <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-light)' }}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{t.ad}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
                       {new Date(t.baslangic_tarihi).toLocaleDateString('tr-TR')}
                       {t.baslangic_tarihi !== t.bitis_tarihi && ` – ${new Date(t.bitis_tarihi).toLocaleDateString('tr-TR')}`}
                     </div>
                   </div>
-                  <span className={`badge ${t.tip === 'resmi' ? 'badge-blue' : 'badge-orange'}`} style={{ fontSize: 10, whiteSpace: 'nowrap' }}>
+                  <span className={`badge ${t.tip === 'resmi' ? 'badge-blue' : 'badge-orange'}`} style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}>
                     {t.tip === 'resmi' ? 'Resmi' : 'İdari'}
                   </span>
                 </div>
@@ -107,13 +107,13 @@ export default function TatilSekmesi({ tatiller, kbMevcut, kbYil, setKbYil, kbTa
                 <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-light)' }}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{t.ad}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
                       {new Date(t.baslangic_tarihi).toLocaleDateString('tr-TR')}
                       {t.baslangic_tarihi !== t.bitis_tarihi && ` – ${new Date(t.bitis_tarihi).toLocaleDateString('tr-TR')}`}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    <span className={`badge ${t.tip === 'idari' ? 'badge-orange' : 'badge-green'}`} style={{ fontSize: 10 }}>
+                    <span className={`badge ${t.tip === 'idari' ? 'badge-orange' : 'badge-green'}`} style={{ fontSize: 11.5 }}>
                       {t.tip === 'idari' ? 'İdari' : 'Özel'}
                     </span>
                     <button className="btn btn-outline-danger btn-icon" title="Sil" style={{ width: 28, height: 28, minHeight: 28 }} onClick={() => tatilSil(t.id)}><Trash2 size={11} /></button>

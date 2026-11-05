@@ -118,7 +118,7 @@ export default function DenetimRaporu({ okulId, yil, ay, hesap, denetciAd }: { o
     else { setMsg({ tip: 'ok', text: 'Rapor okula teslim edildi olarak işaretlendi.' }); await yukle() }
   }
 
-  const kaynakIpucu = (s: Soru) => s.kaynak && !kilitli ? <span style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 500 }}> · {KAYNAK_ETIKET[s.kaynak]}</span> : null
+  const kaynakIpucu = (s: Soru) => s.kaynak && !kilitli ? <span style={{ fontSize: 12, color: 'var(--text3)', fontWeight: 500 }}> · {KAYNAK_ETIKET[s.kaynak]}</span> : null
   const alan = (s: Soru) => {
     const v = form.cevaplar[s.anahtar]
     if (s.tur === 'evethayir') return <EvetHayir etiket={s.etiket} deger={v} kilitli={kilitli} onDegis={x => cevapDegis(s.anahtar, x)} />

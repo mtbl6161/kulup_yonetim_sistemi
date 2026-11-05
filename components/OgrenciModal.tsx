@@ -122,13 +122,13 @@ export default function OgrenciModal({ editItem, ayarlar, profilOkulId, siniflar
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                Ad <span style={{ color: '#dc2626' }}>*</span>
+                Ad <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <input className="form-input" style={{ width: '100%' }} required value={form.ad || ''} onChange={e => setF('ad', e.target.value)} placeholder="Öğrenci Adı" />
             </div>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                Soyad <span style={{ color: '#dc2626' }}>*</span>
+                Soyad <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <input className="form-input" style={{ width: '100%' }} required value={form.soyad || ''} onChange={e => setF('soyad', e.target.value)} placeholder="Öğrenci Soyadı" />
             </div>
@@ -141,7 +141,7 @@ export default function OgrenciModal({ editItem, ayarlar, profilOkulId, siniflar
             </div>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                Sınıf <span style={{ color: '#dc2626' }}>*</span>
+                Sınıf <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <select className="form-select" style={{ width: '100%' }} value={form.sinif || ''} onChange={e => setF('sinif', e.target.value)}>
                 <option value="">— Seçilmedi —</option>
@@ -160,7 +160,7 @@ export default function OgrenciModal({ editItem, ayarlar, profilOkulId, siniflar
             </div>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                Kardeş İndirimi <span style={{ color: '#dc2626' }}>*</span>
+                Kardeş İndirimi <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <select 
                 className="form-select" 
@@ -193,7 +193,7 @@ export default function OgrenciModal({ editItem, ayarlar, profilOkulId, siniflar
             <label htmlFor="ogr-veli-eposta" className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Veli E-posta</label>
             <input id="ogr-veli-eposta" type="email" className="form-input" style={{ width: '100%' }} placeholder="ornek@gmail.com" autoComplete="off"
               value={form.veli_eposta || ''} onChange={e => setF('veli_eposta', e.target.value)} />
-            <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 4 }}>Ödeme dökümü bu adrese gönderilir.</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 4 }}>Ödeme dökümü bu adrese gönderilir.</div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>

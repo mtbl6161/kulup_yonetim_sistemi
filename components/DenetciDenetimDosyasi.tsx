@@ -5,7 +5,7 @@ import { perdeKapat } from '@/lib/perdeKapat'
 import { AYLAR } from '@/lib/hesaplama'
 import {
   DenetimMadde, DenetimBelge, DenetimTeslim, TESLIM_DURUM_ETIKET, DENETIM_BUCKET,
-  belgeDonemde, donemBelgeleriniGetir, boyutFmt, belgeIndir, blobKaydet, kontrolListesiUret, dosyayiZiple, otomatikBelgeUret,
+  belgeDonemde, donemBelgeleriniGetir, aktifMaddeleriGetir, boyutFmt, belgeIndir, blobKaydet, kontrolListesiUret, dosyayiZiple, otomatikBelgeUret,
 } from '@/lib/denetimDosyasi'
 import { Download, FileArchive, ListChecks, CheckCircle2, Undo2, X, ExternalLink, FileSearch, FileText, FileSpreadsheet, FileImage, File, Eye, ChevronRight } from 'lucide-react'
 import MaddeEtiketleri from '@/components/MaddeEtiketleri'
@@ -15,16 +15,16 @@ const RENK: Record<string, { bg: string; fg: string }> = {
   taslak: { bg: 'var(--surface2)', fg: 'var(--text2)' },
   gonderildi: { bg: 'var(--info-light)', fg: 'var(--info)' },
   onaylandi: { bg: 'var(--success-light)', fg: 'var(--success)' },
-  iade: { bg: '#fff1d6', fg: '#8a5200' },
+  iade: { bg: '#fff1d6', fg: 'var(--warn-dark)' },
   bekliyor: { bg: 'var(--surface2)', fg: 'var(--text2)' },
 }
 const rozet = (d: string, metin: string) => (
-  <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 5, fontSize: 11.5, fontWeight: 600, background: RENK[d]?.bg, color: RENK[d]?.fg, whiteSpace: 'nowrap' }}>{metin}</span>
+  <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 5, fontSize: 12.5, fontWeight: 600, background: RENK[d]?.bg, color: RENK[d]?.fg, whiteSpace: 'nowrap' }}>{metin}</span>
 )
 const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
 const ozetCip: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 8, background: 'var(--surface2)', color: 'var(--text)', fontSize: 12.5, whiteSpace: 'nowrap' }
 const btnOnay: React.CSSProperties = { ...btn, background: 'var(--success)', color: '#ffffff', borderColor: '#085c38' }
-const btnIade: React.CSSProperties = { ...btn, color: '#8a5200', borderColor: 'var(--warn-border)' }
+const btnIade: React.CSSProperties = { ...btn, color: 'var(--warn-dark)', borderColor: 'var(--warn-border)' }
 
 /** Önizlemede gösterilen öğe: yüklenmiş/kopyalanmış bir belge ya da güncel veriden üretilmiş sistem belgesi */
 type Onizleme =
@@ -73,14 +73,13 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
 
   const load = useCallback(async () => {
     try {
-      await supabase.rpc('denetim_maddeleri_hazirla')
+      // Üç sorgu tek turda (madde listesi yalnızca ilk kullanımda oluşturulur)
       const [m, t, b] = await Promise.all([
-        supabase.from('denetim_maddeleri').select('*').eq('aktif', true).order('sira_no'),
+        aktifMaddeleriGetir(),
         supabase.from('denetim_teslimleri').select('*').eq('okul_id', okulId).eq('yil', yil).eq('ay', ay).maybeSingle(),
         donemBelgeleriniGetir(okulId, yil, ay),
       ])
-      if (m.error) throw m.error
-      setMaddeler((m.data || []) as DenetimMadde[])
+      setMaddeler(m)
       setTeslim((t.data as DenetimTeslim) || null)
       setBelgeler(b)
       return b
@@ -201,7 +200,7 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
             </span>
             {kararVerilebilir && (
               bekleyenBelge > 0
-                ? <span style={{ ...ozetCip, background: 'var(--warn-light)', color: '#8a5200' }}><b>{bekleyenBelge}</b> belge karar bekliyor</span>
+                ? <span style={{ ...ozetCip, background: 'var(--warn-light)', color: 'var(--warn-dark)' }}><b>{bekleyenBelge}</b> belge karar bekliyor</span>
                 : <span style={{ ...ozetCip, background: 'var(--success-light)', color: 'var(--success)' }}><CheckCircle2 size={13} aria-hidden="true" /> Tüm belgelere karar verildi</span>
             )}
             {teslim?.gonderim_tarihi && (
@@ -260,7 +259,7 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
                         <I size={18} aria-hidden="true" style={{ color: renk, flexShrink: 0 }} />
                         <span style={{ flex: 1, minWidth: 0 }}>
                           <span className="dd-ad" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--accent)' }}>{b.dosya_adi}</span>
-                          <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text3)', marginTop: 1 }}>
+                          <span style={{ display: 'block', fontSize: 12.5, color: 'var(--text3)', marginTop: 1 }}>
                             {b.kaynak === 'otomatik' ? 'Gönderim anındaki kopya · ' : 'Okulun yüklediği belge · '}{boyutFmt(b.boyut)}{m.yillik && (b.yil !== yil || b.ay !== ay) ? ` · ${AYLAR[b.ay]} ${b.yil}` : ''}
                           </span>
                         </span>
@@ -279,7 +278,7 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
                       {mb.some(b => b.kaynak === 'otomatik') ? 'Gönderilen hâli okulun şu anki verisiyle yan yana karşılaştır' : 'Gönderim kopyası yok — okulun şu anki verisinden görüntüle'}
                     </button>
                   )}
-                  {mb.filter(b => b.denetci_notu).map(b => <div key={`n${b.id}`} style={{ fontSize: 12, color: '#8a5200', marginTop: 4 }}>Not ({b.dosya_adi}): {b.denetci_notu}</div>)}
+                  {mb.filter(b => b.denetci_notu).map(b => <div key={`n${b.id}`} style={{ fontSize: 12, color: 'var(--warn-dark)', marginTop: 4 }}>Not ({b.dosya_adi}): {b.denetci_notu}</div>)}
                 </div>
               </li>
             )
@@ -327,7 +326,7 @@ export default function DenetciDenetimDosyasi({ okulId, okulAd, yil, ay, onDegis
                 ] as const).map(([baslik, alt, url, bg, fg]) => (
                   <div key={baslik} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                     <div style={{ padding: '6px 12px', background: bg, color: fg, fontSize: 12.5, fontWeight: 700, display: 'flex', gap: 8, alignItems: 'baseline' }}>
-                      {baslik}<span style={{ fontWeight: 500, fontSize: 11.5 }}>{alt}</span>
+                      {baslik}<span style={{ fontWeight: 500, fontSize: 12.5 }}>{alt}</span>
                     </div>
                     <iframe src={url} title={baslik} style={{ flex: 1, border: 'none', width: '100%' }} />
                   </div>

@@ -5,7 +5,7 @@ export const loadingOverlay: React.CSSProperties = { height: '100%', display: 'f
 export const emptyView: React.CSSProperties = { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }
 
 export const thSub: React.CSSProperties = {
-  padding: '8px 3px', fontSize: 10.5, letterSpacing: 0, textTransform: 'uppercase',
+  padding: '8px 3px', fontSize: 11.5, letterSpacing: 0,
   whiteSpace: 'pre-line', lineHeight: 1.2, borderRight: '1px solid var(--border-light)',
   background: 'var(--surface2)', color: 'var(--text2)', fontWeight: 700
 }

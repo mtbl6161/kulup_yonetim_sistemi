@@ -42,7 +42,7 @@ export default function KategoriModal({ birim, editId, form, setForm, otomatikKi
               <button type="button" onClick={() => kaynakDegistir('manuel')} style={secBtn(form.veri_kaynagi === 'manuel')}><Users size={14} /> Manuel işaretleme</button>
               {birim === 'okul' && <button type="button" onClick={() => kaynakDegistir('otomatik_kulup')} style={secBtn(form.veri_kaynagi === 'otomatik_kulup')}><RefreshCw size={14} /> Otomatik (Kulüp)</button>}
             </div>
-            <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
               {otomatikKilit ? 'Kulüp aidatı mevcut Aidat Takibi verisinden salt-okunur gelir. Aylık ve tüm öğrenciler olarak sabitlenir.' : 'Memur her öğrenciyi ödedi / ödenmedi olarak elle işaretler.'}
             </div>
           </div>
@@ -68,7 +68,7 @@ export default function KategoriModal({ birim, editId, form, setForm, otomatikKi
                   <input className="form-input" type="text" inputMode="decimal" value={form.varsayilan_tutar_okul} onChange={e => setForm(f => ({ ...f, varsayilan_tutar_okul: e.target.value }))} placeholder={form.varsayilan_tutar ? `Boşsa ${form.varsayilan_tutar}` : 'Opsiyonel'} />
                 </div>
               </div>
-              <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
                 &quot;Ödedi&quot; işaretlenince öğrencinin türüne göre bu ücret yazılır. Ücret farkı yoksa birini girmeniz yeter: boş bırakılan türe diğer türün ücreti uygulanır.
                 {form.tip !== 'aylik' && ' Taksit isteyen öğrenciye, takip ekranında hücredeki taksit düğmesiyle bu ücret üzerinden plan açılır.'}
               </div>
@@ -88,11 +88,11 @@ export default function KategoriModal({ birim, editId, form, setForm, otomatikKi
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
                 <Search size={14} style={{ color: 'var(--text3)' }} />
                 <input value={ogrenciArama} onChange={e => setOgrenciArama(e.target.value)} placeholder="Öğrenci / sınıf ara..." style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13 }} />
-                <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700 }}>{seciliOgrenci.size} seçili</span>
+                <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 700 }}>{seciliOgrenci.size} seçili</span>
               </div>
               <div style={{ display: 'flex', gap: 8, padding: '6px 10px', borderBottom: '1px solid var(--border)' }}>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSeciliOgrenci(new Set(filtreliOgrenciler.map(o => o.id)))} style={{ fontSize: 11 }}>Görünenleri Seç</button>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSeciliOgrenci(new Set())} style={{ fontSize: 11 }}>Temizle</button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSeciliOgrenci(new Set(filtreliOgrenciler.map(o => o.id)))} style={{ fontSize: 12 }}>Görünenleri Seç</button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSeciliOgrenci(new Set())} style={{ fontSize: 12 }}>Temizle</button>
               </div>
               <div style={{ maxHeight: 220, overflowY: 'auto' }}>
                 {filtreliOgrenciler.length === 0 ? (
@@ -102,7 +102,7 @@ export default function KategoriModal({ birim, editId, form, setForm, otomatikKi
                     <input type="checkbox" checked={seciliOgrenci.has(o.id)} onChange={() => toggleOgrenci(o.id)} />
                     <TurRozet okul={!kulupOgrencisi(o)} />
                     <span style={{ fontSize: 13 }}>{o.ad} {o.soyad}</span>
-                    <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 'auto' }}>{o.sinif || '-'}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text3)', marginLeft: 'auto' }}>{o.sinif || '-'}</span>
                   </label>
                 ))}
               </div>

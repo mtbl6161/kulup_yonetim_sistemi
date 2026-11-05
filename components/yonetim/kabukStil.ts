@@ -4,18 +4,18 @@ export const KABUK_STIL = `
 .yk-menu { width: 244px; flex-shrink: 0; background: #0e1116; color: #c9ced6; display: flex; flex-direction: column; padding: 16px 12px; box-sizing: border-box; gap: 14px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
 .yk-marka { display: flex; align-items: center; gap: 10px; padding: 4px 6px 8px; }
 .yk-marka strong { display: block; font-family: var(--font-display); font-size: 16px; color: #fff; letter-spacing: -0.01em; }
-.yk-marka span { display: block; font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #8b93a1; }
+.yk-marka span { display: block; font-size: 12.5px; font-weight: 500; color: #8b93a1; margin-top: 3px; }
 .yk-kapat { display: none; margin-left: auto; background: none; border: 0; color: #c9ced6; cursor: pointer; }
-.yk-grup { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #8b93a1; padding: 12px 10px 4px; }
+.yk-grup { font-size: 12.5px; font-weight: 600; color: #8b93a1; padding: 12px 10px 4px; }
 .yk-oge { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: #c9ced6; font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; text-align: left; }
 .yk-oge:hover { background: #161b25; color: #fff; }
 .yk-oge.on { background: #1c2230; color: #fff; font-weight: 600; box-shadow: inset 3px 0 0 #6d8bff; }
 .yk-oge:focus-visible, .yk-kisi button:focus-visible { outline: 2px solid #6d8bff; outline-offset: 1px; }
-.yk-oge em { margin-left: auto; font-style: normal; font-family: var(--font-mono); font-size: 11px; color: #8b93a1; }
+.yk-oge em { margin-left: auto; font-style: normal; font-family: var(--font-mono); font-size: 12px; color: #8b93a1; }
 .yk-oge em.vurgu { background: #f0b43c; color: #1d1404; font-family: var(--font-sans); font-weight: 700; border-radius: 10px; padding: 1px 7px; }
 .yk-kisi { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 10px 6px 2px; border-top: 1px solid #222937; }
 .yk-kisi strong { display: block; font-size: 12.5px; color: #fff; }
-.yk-kisi span { display: block; font-size: 11px; color: #8b93a1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yk-kisi span { display: block; font-size: 12px; color: #8b93a1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .yk-kisi button { background: none; border: 0; color: #8b93a1; cursor: pointer; padding: 6px; border-radius: 6px; }
 .yk-kisi button:hover { color: #fff; background: #1c2230; }
 .yk-avatar { width: 30px; height: 30px; border-radius: 50%; background: #2a3242; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
@@ -61,7 +61,7 @@ export const KABUK_STIL = `
 .yk-istat { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--border); }
 .yk-istat > div { padding: 11px 14px; border-right: 1px solid var(--border-light); }
 .yk-istat > div:last-child { border-right: 0; }
-.yk-istat span { display: block; font-size: 11px; color: var(--text3); }
+.yk-istat span { display: block; font-size: 12px; color: var(--text3); }
 .yk-istat strong { font-size: 16px; font-variant-numeric: tabular-nums; }
 .yk-tatil-form { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto; gap: 10px; align-items: end; }
 .yk-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }

@@ -3,7 +3,7 @@ import type { DenetimMadde } from '@/lib/denetimDosyasi'
 
 const temel: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap',
-  fontSize: 11, fontWeight: 600, lineHeight: '18px', letterSpacing: 0.2,
+  fontSize: 12, fontWeight: 600, lineHeight: '18px', letterSpacing: 0.2,
   padding: '0 7px', borderRadius: 4, borderWidth: 1, borderStyle: 'solid',
 }
 

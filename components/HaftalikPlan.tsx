@@ -91,7 +91,7 @@ export function HaftaSecici({ haftalar, secili, onSec, doluluk }: { haftalar: Ha
         <button style={{ ...kucukDugme, opacity: secili === 0 ? 0.4 : 1 }} disabled={secili === 0} onClick={() => onSec(secili - 1)} aria-label="Önceki hafta"><ChevronLeft size={15} /></button>
         <div style={{ minWidth: 118, textAlign: 'center', lineHeight: 1.25 }}>
           <div style={{ fontWeight: 600 }}>{haftaEtiketi(h)}</div>
-          <div style={{ fontSize: 11.5, color: 'var(--text3)' }}>{secili + 1}. hafta</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text3)' }}>{secili + 1}. hafta</div>
         </div>
         <button style={{ ...kucukDugme, opacity: secili === haftalar.length - 1 ? 0.4 : 1 }} disabled={secili === haftalar.length - 1} onClick={() => onSec(secili + 1)} aria-label="Sonraki hafta"><ChevronRight size={15} /></button>
       </div>
@@ -108,7 +108,7 @@ export function HaftaSecici({ haftalar, secili, onSec, doluluk }: { haftalar: Ha
               onClick={() => onSec(i)}
               style={{ width: 60, padding: '5px 0 6px', borderRadius: 8, border: `1px solid ${aktif ? '#C9D4FA' : 'var(--border)'}`, background: aktif ? '#F0F3FE' : 'var(--surface)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}
             >
-              <span style={{ fontSize: 11.5, fontWeight: aktif ? 600 : 500, color: aktif ? 'var(--accent-dark)' : 'var(--text2)' }}>{haftaEtiketi(hf).replace(/ [A-Za-zÇĞİÖŞÜçğıöşü]+$/, '')}</span>
+              <span style={{ fontSize: 12.5, fontWeight: aktif ? 600 : 500, color: aktif ? 'var(--accent-dark)' : 'var(--text2)' }}>{haftaEtiketi(hf).replace(/ [A-Za-zÇĞİÖŞÜçğıöşü]+$/, '')}</span>
               {d !== undefined && d !== null && (
                 <span style={{ width: 38, height: 3, borderRadius: 2, background: 'var(--border)', overflow: 'hidden', display: 'block' }}>
                   <span style={{ display: 'block', height: '100%', width: `${d}%`, background: d >= 100 ? 'var(--success)' : 'var(--warn)' }} />
@@ -127,9 +127,9 @@ export function GunBasligi({ g, tatil, ozet, ozetRenk, yukseklik = 62 }: { g: Ha
   const bugun = bugunMu(g)
   return (
     <div style={{ height: yukseklik, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, borderBottom: '1px solid var(--border-light)' }}>
-      <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', color: bugun ? 'var(--accent-dark)' : 'var(--text3)' }}>{GUN_KISA[g.dow]}{bugun ? ' · BUGÜN' : ''}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', color: bugun ? 'var(--accent-dark)' : 'var(--text3)' }}>{GUN_KISA[g.dow]}{bugun ? ' · BUGÜN' : ''}</span>
       <span style={{ minWidth: 30, height: 30, padding: '0 6px', borderRadius: 99, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 600, background: bugun ? 'var(--accent)' : 'transparent', color: bugun ? '#fff' : tatil ? 'var(--danger)' : 'var(--text)' }}>{g.day}</span>
-      {ozet && <span style={{ fontSize: 11, fontWeight: 600, color: ozetRenk || 'var(--text3)' }}>{ozet}</span>}
+      {ozet && <span style={{ fontSize: 12, fontWeight: 600, color: ozetRenk || 'var(--text3)' }}>{ozet}</span>}
     </div>
   )
 }

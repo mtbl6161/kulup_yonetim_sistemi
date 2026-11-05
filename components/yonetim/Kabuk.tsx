@@ -4,7 +4,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { LayoutDashboard, School, CreditCard, UserCheck, ClipboardCheck, Megaphone, CalendarDays, Settings, LogOut, Menu, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { BrandMark } from '@/components/brand/Logo'
+import { BrandMark, Wordmark } from '@/components/brand/Logo'
 import { useAuth } from '@/lib/AuthContext'
 import { useDegisince } from '@/lib/useDegisince'
 import type { Sekme } from './ortak'
@@ -43,8 +43,8 @@ export default function Kabuk({ sekme, onSekme, sayilar, baslik, alt, eylem, chi
       <style>{KABUK_STIL}</style>
       <aside className={`yk-menu${acik ? ' acik' : ''}`} aria-label="Yönetim menüsü">
         <div className="yk-marka">
-          <BrandMark size={30} tone="light" />
-          <div><strong>Klüp360</strong><span>Yönetim konsolu</span></div>
+          <BrandMark size={30} tone="blue" title="" />
+          <div><Wordmark height={22} onDark /><span>Yönetim konsolu</span></div>
           <button type="button" className="yk-kapat" onClick={() => setAcik(false)} aria-label="Menüyü kapat"><X size={18} /></button>
         </div>
         <nav>

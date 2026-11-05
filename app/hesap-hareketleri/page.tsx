@@ -170,7 +170,7 @@ export default function HesapHareketleriPage() {
                     <td style={{ fontSize: 12 }}>{tarihFmt(h.tarih)}</td>
                     <td style={{ maxWidth: 240 }}>{h.aciklama || '-'}</td>
                     <td>
-                      <span className={`badge badge-${h.kaynak === 'tahsilat' ? 'blue' : h.kaynak === 'bordro' ? 'orange' : 'gray'}`} style={{ fontSize: 10 }}>
+                      <span className={`badge badge-${h.kaynak === 'tahsilat' ? 'blue' : h.kaynak === 'bordro' ? 'orange' : 'gray'}`} style={{ fontSize: 11.5 }}>
                         {h.kaynak === 'tahsilat' ? 'Tahsilat' : h.kaynak === 'bordro' ? 'Maaş' : 'Manuel'}
                       </span>
                     </td>

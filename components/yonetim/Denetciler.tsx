@@ -107,7 +107,7 @@ export default function Denetciler({ api, bildir, iller, talepler, yenile }: Ort
                   <dt style={{ color: 'var(--text3)' }}>E-posta</dt><dd style={{ margin: 0, overflowWrap: 'anywhere' }}>{t.email || '—'}</dd>
                   <dt style={{ color: 'var(--text3)' }}>Telefon</dt><dd style={{ margin: 0 }}>{t.telefon || '—'}</dd>
                   <dt style={{ color: 'var(--text3)' }}>İl</dt><dd style={{ margin: 0 }}>{ilAdi(t)}</dd>
-                  <dt style={{ color: 'var(--text3)' }}>Bu ilde denetçi</dt><dd style={{ margin: 0, color: mevcut ? '#8a5200' : undefined, fontWeight: mevcut ? 600 : 400 }}>{mevcut ? `${mevcut} kişi var` : 'yok'}</dd>
+                  <dt style={{ color: 'var(--text3)' }}>Bu ilde denetçi</dt><dd style={{ margin: 0, color: mevcut ? 'var(--warn-dark)' : undefined, fontWeight: mevcut ? 600 : 400 }}>{mevcut ? `${mevcut} kişi var` : 'yok'}</dd>
                 </dl>
                 {t.notlar && <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text2)', background: 'var(--surface2)', padding: '8px 10px', borderRadius: 8 }}>{t.notlar}</p>}
                 {gorunum === 'beklemede' && (

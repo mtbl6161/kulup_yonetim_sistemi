@@ -11,7 +11,7 @@ import {
 import { Personel, SinifDefteri, Ayarlar, Bordro, Tahakkuk, Puantaj, BordroSatir, Sinif, Tatil } from '@/lib/types'
 import { logIslem } from '@/lib/audit'
 import { useAuth } from '@/lib/AuthContext'
-import { Users, Layers, Calendar, Clock, TrendingUp, Wallet, CheckCircle2, FileText, Download, Mail, Info, RotateCw, AlertTriangle, XCircle, X } from 'lucide-react'
+import { CheckCircle2, FileText, Download, Mail, Info, RotateCw, AlertTriangle, X } from 'lucide-react'
 import { useRef } from 'react'
 import BordroZarfi from '@/components/BordroZarfi'
 import ConfirmModal from '@/components/ConfirmModal'
@@ -583,156 +583,82 @@ return (
         <div className="main-content">
           <div className="no-print card" style={{ marginBottom: 24, padding: '24px 30px' }}>
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--danger)', letterSpacing: 0.5 }}>
-                {ayarlar?.kurum_adi || 'KULÜP ADI TANIMLANMAMIŞ'}
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+                {ayarlar?.kurum_adi || 'Kulüp adı tanımlanmamış'}
               </div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginTop: 6, opacity: 0.8 }}>
-                {ayLabel(ay, yil).toUpperCase()} — ÇOCUK KULÜBÜ BİLANÇOSU
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text2)', marginTop: 6 }}>
+                {ayLabel(ay, yil)} çocuk kulübü bilançosu
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+              <div style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 2 }}>
                 01 {AYLAR[ay]} - {sonGun} {AYLAR[ay]} {yil}
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 8 }}>
               <div className="stat-card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: 'rgba(35,71,217,0.1)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Users size={18} />
-                  </div>
-                  <div className="stat-label">Öğrenci Sayısı</div>
-                </div>
+                <div className="stat-label">Ödeme yapan öğrenci</div>
                 <div className="stat-value">{ogrenciSayisi}</div>
-                <div className="stat-sub">Aktif ödeme yapan</div>
+                <div className="stat-sub">Bu ay aidatı tahsil edilen</div>
               </div>
 
               <div className="stat-card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: 'rgba(200,131,42,0.1)', color: 'var(--accent2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Layers size={18} />
-                  </div>
-                  <div className="stat-label">Şube Sayısı</div>
-                </div>
+                <div className="stat-label">Şube sayısı</div>
                 <div className="stat-value">{subeSayisi}</div>
                 <div className="stat-sub">Aktif kulüp sınıfları</div>
               </div>
 
               <div className="stat-card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: 'rgba(138,128,112,0.1)', color: 'var(--text3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Calendar size={18} />
-                  </div>
-                  <div className="stat-label">İş Günü</div>
-                </div>
+                <div className="stat-label">İş günü</div>
                 <div className="stat-value">{isGunu}</div>
-                <div className="stat-sub">Haftasonu ve tatil hariç</div>
+                <div className="stat-sub">Hafta sonu ve tatiller hariç</div>
               </div>
 
               <div className="stat-card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: 'rgba(35,71,217,0.1)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Clock size={18} />
-                  </div>
-                  <div className="stat-label">Günlük Saat</div>
-                </div>
+                <div className="stat-label">Günlük saat</div>
                 <div className="stat-value">{ayarlar?.gunluk_saat ?? 6}</div>
-                <div className="stat-sub">Yönerge standartı</div>
+                <div className="stat-sub">Yönergeye göre</div>
               </div>
 
               <div className="stat-card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: 'rgba(192,57,43,0.1)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <TrendingUp size={18} />
-                  </div>
-                  <div className="stat-label">Toplam Saat</div>
-                </div>
+                <div className="stat-label">Toplam saat</div>
                 <div className="stat-value">{hDisplaySaat}</div>
-                <div className="stat-sub">Ders + Koordinatörlük</div>
+                <div className="stat-sub">Ders ve koordinatörlük</div>
               </div>
 
               <div className="stat-card" style={{ background: 'var(--accent)', color: 'white' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: 'rgba(255,255,255,0.2)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Wallet size={18} />
-                  </div>
-                  <div className="stat-label" style={{ color: 'rgba(255,255,255,0.8)' }}>Gelir Havuzu</div>
-                </div>
+                <div className="stat-label" style={{ color: 'rgba(255,255,255,0.8)' }}>Gelir havuzu</div>
                 <div className="stat-value" style={{ color: 'white' }}>{fmtTL(toplamTahakkuk)}</div>
                 <div className="stat-sub" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                  {toplamTahakkuk > 0 ? <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} /> Otomatik Hesaplandı</span> : 'Tahakkuk Bekleniyor'}
+                  {toplamTahakkuk > 0 ? <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} /> Otomatik hesaplandı</span> : 'Tahakkuk bekleniyor'}
                 </div>
               </div>
             </div>
           </div>
 
-          {!hesaplandi && !loading && (
-            <div
-              className="no-print"
-              style={{
-                marginBottom: 16,
-                padding: '14px 18px',
-                borderRadius: 12,
-                background: toplamTahakkuk > 0
-                  ? 'linear-gradient(135deg, #fffbea 0%, #fef3c7 100%)'
-                  : 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
-                border: `1.5px solid ${toplamTahakkuk > 0 ? '#f59e0b' : '#f87171'}`,
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 14,
-                boxShadow: toplamTahakkuk > 0
-                  ? '0 2px 8px rgba(245,158,11,0.15)'
-                  : '0 2px 8px rgba(248,113,113,0.15)',
-              }}
-            >
-              <span style={{ lineHeight: 1, marginTop: 1, display: 'flex', alignItems: 'center' }}>
-                {toplamTahakkuk > 0 ? <AlertTriangle size={24} style={{ color: '#d97706' }} /> : <XCircle size={24} style={{ color: '#dc2626' }} />}
-              </span>
+          {!hesaplandi && !loading && (toplamTahakkuk > 0 ? (
+            <div className="no-print alert alert-warn" style={{ marginBottom: 16 }}>
+              <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: 2 }} />
               <div style={{ flex: 1 }}>
-                {toplamTahakkuk > 0 ? (
-                  <>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: '#92400e', marginBottom: 4 }}>
-                      {AYLAR[ay]} {yil} Bordrousu Henüz Hesaplanmadı
-                    </div>
-                    <div style={{ fontSize: 12.5, color: '#78350f', lineHeight: 1.7 }}>
-                      Personel <strong>Yıllık Vergi Matrahı</strong> dahil tüm güncel veriler bordro
-                      hesaplamasına <em>ancak aşağıdaki buton ile</em> yansıtılır.
-                      Personel sayfasında yaptığınız değişiklikler (matrah, SGK durumu vb.)
-                      otomatik uygulanmaz — hesaplama başlatılmalıdır.
-                    </div>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={hesapla}
-                      disabled={loading || mailing}
-                      style={{
-                        marginTop: 10,
-                        background: '#d97706',
-                        borderColor: '#b45309',
-                        fontSize: 12,
-                        padding: '6px 16px',
-                        borderRadius: 8,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                    >
-                      <RotateCw size={14} className={loading ? 'animate-spin' : ''} />
-                      <span>Hesapla &amp; Kaydet</span>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: '#991b1b', marginBottom: 4 }}>
-                      Bu Ay İçin Tahakkuk Kaydı Bulunamadı
-                    </div>
-                    <div style={{ fontSize: 12.5, color: '#7f1d1d', lineHeight: 1.7 }}>
-                      Bordro hesaplanabilmesi için önce <strong>Tahsilat</strong> girişi yapılmış olmalıdır.
-                      Tahsilatlar tamamlandığında bordro otomatik hesaplanabilir hale gelecektir.
-                    </div>
-                  </>
-                )}
+                <strong>{AYLAR[ay]} {yil} bordrosu henüz hesaplanmadı.</strong>{' '}
+                Personel sayfasında yaptığınız değişiklikler (yıllık vergi matrahı, SGK durumu vb.) bordroya ancak
+                hesaplama başlatıldığında yansır.
+                <div style={{ marginTop: 10 }}>
+                  <button className="btn btn-warn btn-sm" onClick={hesapla} disabled={loading || mailing}>
+                    <RotateCw size={14} className={loading ? 'animate-spin' : ''} /> Hesapla ve kaydet
+                  </button>
+                </div>
               </div>
             </div>
-          )}
+          ) : (
+            <div className="no-print alert alert-info" style={{ marginBottom: 16 }}>
+              <Info size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+              <div>
+                <strong>{AYLAR[ay]} için henüz tahsilat girilmedi.</strong>{' '}
+                Bordro, ayın tahsilatlarından oluşan gelir havuzuna göre hesaplanır. Aidat takibinden ödemeleri girdiğinizde
+                bordroyu hesaplayabilirsiniz.
+              </div>
+            </div>
+          ))}
 
           {/* Yıllık vergi matrahı değişim uyarısı */}
           {matrahDegistiPersonel.length > 0 && !loading && (
@@ -751,10 +677,10 @@ return (
               }}
             >
               <span style={{ lineHeight: 1, marginTop: 1, display: 'flex', alignItems: 'center' }}>
-                <AlertTriangle size={24} style={{ color: '#d97706' }} />
+                <AlertTriangle size={24} style={{ color: 'var(--warn)' }} />
               </span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: '#92400e', marginBottom: 4 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--warn-dark)', marginBottom: 4 }}>
                   Yıllık Vergi Matrahı Değişti — Bordroyu Yeniden Hesaplayın!
                 </div>
                 <div style={{ fontSize: 12.5, color: '#78350f', lineHeight: 1.6 }}>
@@ -762,7 +688,7 @@ return (
                   bordro henüz yeniden hesaplanmadı. Gösterilen gelir vergisi tutarları
                   eski değerlere göre hesaplanmıştır:
                 </div>
-                <ul style={{ margin: '6px 0 10px 18px', padding: 0, fontSize: 12.5, color: '#92400e' }}>
+                <ul style={{ margin: '6px 0 10px 18px', padding: 0, fontSize: 12.5, color: 'var(--warn-dark)' }}>
                   {matrahDegistiPersonel.map(ad => (
                     <li key={ad} style={{ fontWeight: 600 }}>{ad}</li>
                   ))}
@@ -772,7 +698,7 @@ return (
                   onClick={hesapla}
                   disabled={loading || mailing}
                   style={{
-                    background: '#d97706',
+                    background: 'var(--warn)',
                     borderColor: '#b45309',
                     fontSize: 12,
                     padding: '6px 16px',

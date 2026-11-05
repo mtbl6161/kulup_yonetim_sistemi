@@ -276,7 +276,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
             startY: y0,
             margin: { left: M, right: M, top: 14, bottom: 14 },
             tableWidth: usable,
-            styles: { fontSize: 8, cellPadding: 1.6, minCellHeight: 7 },
+            styles: { fontSize: 11, cellPadding: 1.6, minCellHeight: 7 },
             columnStyles: colStyles,
           }))
         }
@@ -733,17 +733,17 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 20 }}>
           <div className="stat-card">
             <div className="stat-label"><TrendingUp size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Gelir</div>
-            <div className="stat-value" style={{ color: 'var(--success)' }}>{fmtTL(ozet.gelir)}</div>
+            <div className="stat-value" style={{ color: ozet.gelir > 0 ? 'var(--success)' : undefined }}>{fmtTL(ozet.gelir)}</div>
             <div className="stat-sub">{kapsam === 'ay' ? ayLabel(ay, yil) : `${yil} yılı`}</div>
           </div>
-          <div className="stat-card red">
+          <div className={`stat-card${ozet.gider > 0 ? ' red' : ''}`}>
             <div className="stat-label"><TrendingDown size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Gider</div>
             <div className="stat-value">{fmtTL(ozet.gider)}</div>
             <div className="stat-sub">{kapsam === 'ay' ? ayLabel(ay, yil) : `${yil} yılı`}</div>
           </div>
-          <div className="stat-card teal">
-            <div className="stat-label"><Scale size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Net (Gelir − Gider)</div>
-            <div className="stat-value" style={{ color: ozet.net >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmtTL(ozet.net)}</div>
+          <div className="stat-card">
+            <div className="stat-label"><Scale size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Net (gelir − gider)</div>
+            <div className="stat-value" style={{ color: ozet.net > 0 ? 'var(--success)' : ozet.net < 0 ? 'var(--danger)' : undefined }}>{fmtTL(ozet.net)}</div>
             <div className="stat-sub">{ozet.adet} hareket</div>
           </div>
         </div>
@@ -845,7 +845,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
                     <td style={{ fontSize: 12, color: 'var(--text2)' }}>{h.belge_no || '-'}</td>
                     <td>
                       {h.aciklama || <span style={{ color: 'var(--text3)' }}>—</span>}
-                      {h.otomatikKaynak && <span className="badge badge-gray" style={{ marginLeft: 8, fontSize: 10.5 }}>{h.otomatikKaynak}</span>}
+                      {h.otomatikKaynak && <span className="badge badge-gray" style={{ marginLeft: 8, fontSize: 11.5 }}>{h.otomatikKaynak}</span>}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <span className={`badge ${h.tur === 'gelir' ? 'badge-green' : 'badge-red'}`}>{h.tur === 'gelir' ? 'Gelir' : 'Gider'}</span>
@@ -857,7 +857,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
                       {fmtTL(bakiyeMap.get(h.id) ?? 0)}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      {h.kaynak === 'otomatik' ? <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>Otomatik</span> : (
+                      {h.kaynak === 'otomatik' ? <span style={{ fontSize: 12.5, color: 'var(--text3)' }}>Otomatik</span> : (
                       <div style={{ display: 'inline-flex', gap: 6 }}>
                         <button className="btn btn-secondary btn-icon" title="Düzenle" onClick={() => duzenle(h)}><Pencil size={13} /></button>
                         <button className="btn btn-outline-danger btn-icon" title="Sil" onClick={() => setConf({ id: h.id, aciklama: h.aciklama || tarihFmt(h.tarih) })}><Trash2 size={13} /></button>
@@ -912,10 +912,10 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
               onClick={e => e.stopPropagation()}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-                <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Tahsilat Takip Eşleştirme</div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text3)', letterSpacing: 0.6 }}>Tahsilat Takip Eşleştirme</div>
                 <div style={{ fontSize: 12.5, fontWeight: 700 }}>{fmtTL(r.tutar)} · {tarihFmt(r.tarih)}</div>
               </div>
-              {r.uyari && <div className="alert alert-warn" style={{ fontSize: 11.5, padding: '6px 9px', marginBottom: 10 }}>{r.uyari}</div>}
+              {r.uyari && <div className="alert alert-warn" style={{ fontSize: 12.5, padding: '6px 9px', marginBottom: 10 }}>{r.uyari}</div>}
 
               {parcalar.map((p, i) => {
                 const ogr = odemeOgrenciler.find(o => o.id === p.ogrenciId)
@@ -928,8 +928,8 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
                   <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, marginBottom: 8, background: parcalar.length > 1 ? 'var(--surface2)' : undefined }}>
                     {parcalar.length > 1 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text2)' }}>{i + 1}. ödeme</span>
-                        <button type="button" onClick={() => guncelle(parcalar.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 11.5 }} title="Bu parçayı çıkar"><X size={13} /></button>
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text2)' }}>{i + 1}. ödeme</span>
+                        <button type="button" onClick={() => guncelle(parcalar.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 12.5 }} title="Bu parçayı çıkar"><X size={13} /></button>
                       </div>
                     )}
                     <label className="form-label">Öğrenci</label>
@@ -970,7 +970,7 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
                       {ucret != null && Math.abs(ucret - p.tutar) > 0.01 && (
                         <button type="button" className="btn btn-secondary btn-sm" onClick={() => parcaDegistir(i, { tutar: ucret })} title="Kalemin ücretini yaz">Ücret: {fmtTL(ucret)}</button>
                       )}
-                      {ucret != null && p.tutar > 0 && p.tutar < ucret - 0.01 && <span style={{ fontSize: 11, color: '#8a5200', paddingBottom: 8 }}>kısmi → taksit</span>}
+                      {ucret != null && p.tutar > 0 && p.tutar < ucret - 0.01 && <span style={{ fontSize: 12, color: 'var(--warn-dark)', paddingBottom: 8 }}>kısmi → taksit</span>}
                     </div>
                   </div>
                 )
@@ -978,14 +978,14 @@ export default function IsletmeDefteri({ birim }: { birim: Birim }) {
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
                 <button type="button" className="btn btn-success btn-sm" onClick={parcaEkle} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Plus size={13} /> Ödeme ekle</button>
-                <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>Birden fazla kalem (personel + kırtasiye) ya da kardeşler için</span>
+                <span style={{ fontSize: 12.5, color: 'var(--text3)' }}>Birden fazla kalem (personel + kırtasiye) ya da kardeşler için</span>
               </div>
               {parcalar.length > 1 && (
                 <div style={{ fontSize: 12, marginBottom: 10, color: Math.abs(fark) > 0.01 ? 'var(--danger)' : 'var(--success)', fontWeight: 600 }}>
                   Parçalar toplamı {fmtTL(toplam)}{Math.abs(fark) > 0.01 ? ` · ${fark > 0 ? 'eksik' : 'fazla'} ${fmtTL(Math.abs(fark))}` : ' · satır tutarına eşit'}
                 </div>
               )}
-              <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 10 }}>Ödeme tarihi ekstredeki tarihtir. Ücretin altındaki ödeme taksit sayılır; kalan için taksit açılır.</div>
+              <div style={{ fontSize: 12.5, color: 'var(--text3)', marginBottom: 10 }}>Ödeme tarihi ekstredeki tarihtir. Ücretin altındaki ödeme taksit sayılır; kalan için taksit açılır.</div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text2)', marginBottom: 14, opacity: eksik ? 0.5 : 1 }} title={eksik || undefined}>
                 <input type="checkbox" checked={r.isaretle && !eksik} disabled={!!eksik} onChange={e => onizlemeGuncelle(idx, { isaretle: e.target.checked })} />
                 Ödendi olarak işaretle{eksik ? ` — ${eksik}` : ''}

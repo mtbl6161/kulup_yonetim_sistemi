@@ -62,8 +62,8 @@ export default function GuvenlikSekmesi({ passForm, setPassForm, passSaving, sif
       </form>
 
       <div style={{ marginTop: 24, padding: 16, background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 12, display: 'flex', gap: 12 }}>
-        <Info size={18} color="#d97706" style={{ flexShrink: 0 }} />
-        <p style={{ fontSize: 12, color: '#92400e', margin: 0 }}>
+        <Info size={18} color="var(--warn)" style={{ flexShrink: 0 }} />
+        <p style={{ fontSize: 12, color: 'var(--warn-dark)', margin: 0 }}>
           <b>Dikkat:</b> Şifrenizi değiştirdikten sonra tüm cihazlarınızda oturumunuz açık kalmaya devam edebilir ancak bir sonraki girişte yeni şifreniz istenecektir.
         </p>
       </div>

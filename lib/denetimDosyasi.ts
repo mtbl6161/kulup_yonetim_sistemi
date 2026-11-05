@@ -88,6 +88,25 @@ export function belgeDonemde(b: { yil: number; ay: number }, madde: DenetimMadde
 }
 
 /** Bir okulun ilgili dönem belgelerini (yıllık maddeler için tüm eğitim yılı) çeker */
+/**
+ * İlin aktif denetim maddeleri. Liste doğrudan okunur; ilin listesi henüz hiç yoksa (ilk kullanım)
+ * varsayılan maddeler oluşturulup yeniden okunur. Eskiden her açılışta önce oluşturma işlemi
+ * bekleniyordu: her istek ~0,5 sn sürdüğü için ekran açılışına fazladan bir tur ekliyordu.
+ */
+export async function aktifMaddeleriGetir(sirali = true): Promise<DenetimMadde[]> {
+  const oku = () => {
+    const q = supabase.from('denetim_maddeleri').select('*').eq('aktif', true)
+    return sirali ? q.order('sira_no') : q
+  }
+  let r = await oku()
+  if (!r.error && (r.data || []).length === 0) {
+    await supabase.rpc('denetim_maddeleri_hazirla')
+    r = await oku()
+  }
+  if (r.error) throw r.error
+  return (r.data || []) as DenetimMadde[]
+}
+
 export async function donemBelgeleriniGetir(okulId: number, yil: number, ay: number): Promise<DenetimBelge[]> {
   const bas = egitimYiliBaslangic(yil, ay)
   const { data, error } = await supabase

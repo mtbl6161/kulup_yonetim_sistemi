@@ -353,7 +353,7 @@ export default function PuantajPage() {
                       <th key={d} style={{ 
                         width: 28, 
                         minWidth: 28, 
-                        fontSize: 10,
+                        fontSize: 11.5,
                         background: isWeekend ? 'var(--th-off-bg)' : 'var(--surface)',
                         color: isWeekend ? 'var(--th-off-fg)' : undefined
                       }}>
@@ -404,9 +404,9 @@ export default function PuantajPage() {
                           <td style={{ textAlign: 'center' }}>{idx + 1}</td>
                           <td style={{ fontWeight: 600, fontSize: 12 }}>
                             {p.ad}
-                            {p.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 10, marginLeft: 6 }} className="no-print"> (Ayrıldı)</span>}
+                            {p.aktif === false && <span style={{ color: 'var(--danger)', fontSize: 11.5, marginLeft: 6 }} className="no-print"> (Ayrıldı)</span>}
                           </td>
-                          <td style={{ fontSize: 11 }}>{gorevEtiketi(p)}</td>
+                          <td style={{ fontSize: 12 }}>{gorevEtiketi(p)}</td>
                           {daysArray.map(d => {
                             const val = getPuantajValue(p.id, d)
                             const isWeekend = !haftaIciMi(yil, ay, d)
@@ -537,7 +537,7 @@ export default function PuantajPage() {
         }
         .excel-table th {
           background: var(--surface2);
-          font-size: 11px;
+          font-size: 12px;
           font-weight: 800;
         }
         .excel-input {
@@ -545,7 +545,7 @@ export default function PuantajPage() {
           height: 32px;
           border: none;
           text-align: center;
-          font-size: 11px;
+          font-size: 12px;
           font-weight: 700;
           background: transparent;
         }

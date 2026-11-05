@@ -17,7 +17,7 @@ const SABIT = [
   ['15 Temmuz Demokrasi ve Millî Birlik Günü', '07-15', '07-15'], ['30 Ağustos Zafer Bayramı', '08-30', '08-30'],
   ['29 Ekim Cumhuriyet Bayramı', '10-28', '10-29'],
 ] as const
-const RENK = { resmi: { zemin: 'var(--accent-lighter)', yazi: 'var(--accent-dark)' }, idari: { zemin: '#fff1d6', yazi: '#8a5200' } }
+const RENK = { resmi: { zemin: 'var(--accent-lighter)', yazi: 'var(--accent-dark)' }, idari: { zemin: '#fff1d6', yazi: 'var(--warn-dark)' } }
 
 export default function TatilTakvimi({ bildir }: Ortak) {
   const [tatiller, setTatiller] = useState<Tatil[]>([])
@@ -101,14 +101,14 @@ export default function TatilTakvimi({ bildir }: Ortak) {
               <div key={ay} style={{ border: '1px solid var(--border-light)', borderRadius: 10, padding: 10 }}>
                 <div style={{ fontWeight: 600, fontSize: 12.5, textAlign: 'center', marginBottom: 6 }}>{ayAd}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
-                  {GUNLER.map(g => <div key={g} style={{ textAlign: 'center', fontSize: 9.5, fontWeight: 600, color: 'var(--text3)', paddingBottom: 3 }}>{g}</div>)}
+                  {GUNLER.map(g => <div key={g} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'var(--text3)', paddingBottom: 3 }}>{g}</div>)}
                   {Array.from({ length: bosluk }, (_, i) => <div key={`b${i}`} />)}
                   {Array.from({ length: gunSayisi }, (_, i) => {
                     const gun = i + 1
                     const t = tatilBul(ay, gun)
                     const hs = [0, 6].includes(new Date(yil, ay, gun).getDay())
                     const r = t ? RENK[(t.tip === 'idari' ? 'idari' : 'resmi')] : null
-                    return <div key={gun} title={t?.ad} style={{ textAlign: 'center', fontSize: 10.5, padding: '3px 0', borderRadius: 4, background: r?.zemin, color: r ? r.yazi : hs ? 'var(--text3)' : 'var(--text)', fontWeight: t ? 700 : 400 }}>{gun}</div>
+                    return <div key={gun} title={t?.ad} style={{ textAlign: 'center', fontSize: 11.5, padding: '3px 0', borderRadius: 4, background: r?.zemin, color: r ? r.yazi : hs ? 'var(--text3)' : 'var(--text)', fontWeight: t ? 700 : 400 }}>{gun}</div>
                   })}
                 </div>
               </div>

@@ -6,7 +6,7 @@ import { Plus, Save } from 'lucide-react'
 import { useYukleme } from '@/lib/useYukleme'
 
 const kutu: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }
-const th: React.CSSProperties = { padding: '10px 12px', fontSize: 11, fontWeight: 800, color: 'var(--text3)', textAlign: 'left', textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }
+const th: React.CSSProperties = { padding: '10px 12px', fontSize: 12, fontWeight: 800, color: 'var(--text3)', textAlign: 'left', letterSpacing: 0.5, borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }
 const td: React.CSSProperties = { padding: '8px 12px', fontSize: 13, borderBottom: '1px solid var(--border-light)', verticalAlign: 'middle' }
 const inp: React.CSSProperties = { padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, width: '100%', background: 'var(--surface)', color: 'var(--text)' }
 

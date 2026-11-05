@@ -701,7 +701,7 @@ export default function SinifDefteriPage() {
           <HaftaSecici haftalar={haftalar} secili={aktifHafta} onSec={setHaftaSecim} doluluk={doluluk} />
           <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 12.5, color: 'var(--text2)' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="sd-lejant" style={{ background: 'var(--success-light)', borderColor: 'var(--success-border)', color: '#0B6B42' }}><Check size={10} strokeWidth={3.5} /></span>Geldi</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="sd-lejant" style={{ background: 'var(--success-light)', borderColor: 'var(--success-border)', color: 'var(--success-dark)' }}><Check size={10} strokeWidth={3.5} /></span>Geldi</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="sd-lejant" style={{ background: 'var(--danger-light)', borderColor: 'var(--danger-border)', color: 'var(--danger-hover)' }}><X size={10} strokeWidth={3.5} /></span>Gelmedi</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span className="sd-lejant" style={{ borderStyle: 'dashed' }} />İleri tarih</span>
           </div>
@@ -761,7 +761,7 @@ export default function SinifDefteriPage() {
                                 {defterTuru === 'koord' && <button className="sd-sil no-print" onClick={(e) => fastSil(e, ders.id)} aria-label="Koordinatör atamasını sil"><X size={12} /></button>}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
                                   <span style={{ fontWeight: 600, fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: gelmedi ? 'var(--danger-hover)' : isle ? 'var(--text)' : 'var(--text3)', textDecoration: gelmedi ? 'line-through' : 'none' }}>{og?.ad || 'Bilinmiyor'}</span>
-                                  {og?.aktif === false && <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--danger)' }}>Ayrıldı</span>}
+                                  {og?.aktif === false && <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--danger)' }}>Ayrıldı</span>}
                                 </div>
                                 {isle ? (
                                   <div role="radiogroup" aria-label={`${g.day} ${AYLAR[g.month]}, ${og?.ad || ''} yoklama`} style={{ display: 'flex', gap: 4 }}>
@@ -769,7 +769,7 @@ export default function SinifDefteriPage() {
                                     <button role="radio" aria-checked={gelmedi} aria-label="Gelmedi" title="Gelmedi" className={`sd-durum ${gelmedi ? 'gelmedi' : ''}`} onClick={() => durumAyarla(ders, 'gelmedi')}><X size={11} strokeWidth={3.2} /><span className="sd-durum-metin">Gelmedi</span></button>
                                   </div>
                                 ) : (
-                                  <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>Planlandı</span>
+                                  <span style={{ fontSize: 12.5, color: 'var(--text3)' }}>Planlandı</span>
                                 )}
                               </div>
                             )
@@ -798,14 +798,14 @@ export default function SinifDefteriPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 12 }}>
                       {ozetListe.slice(0, 12).map(o => (
                         <button key={o.id} type="button" className="yuk-satir" aria-pressed={vurgu === o.id} onClick={() => setVurgu(vurgu === o.id ? null : o.id)} title={vurgu === o.id ? 'Vurguyu kaldır' : 'Bu öğretmenin derslerini vurgula'} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, ...(vurgu === o.id ? { background: 'var(--accent-lighter)', borderColor: '#C9D4FA' } : {}) }}>
-                          <span style={{ width: 22, height: 22, flex: 'none', borderRadius: '50%', fontSize: 9.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', background: vurgu === o.id ? 'var(--accent)' : '#EEF0F4', color: vurgu === o.id ? '#fff' : 'var(--text2)' }}>{basHarf(o.ad)}</span>
+                          <span style={{ width: 22, height: 22, flex: 'none', borderRadius: '50%', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', background: vurgu === o.id ? 'var(--accent)' : '#EEF0F4', color: vurgu === o.id ? '#fff' : 'var(--text2)' }}>{basHarf(o.ad)}</span>
                           <span style={{ flex: 1, fontWeight: vurgu === o.id ? 600 : 500, color: vurgu === o.id ? 'var(--accent-dark)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.ad}</span>
-                          <span className="tabular" style={{ fontSize: 12, color: '#0B6B42' }} title="Geldi">{o.geldi}</span>
+                          <span className="tabular" style={{ fontSize: 12, color: 'var(--success-dark)' }} title="Geldi">{o.geldi}</span>
                           <span className="tabular" style={{ fontSize: 12, width: 26, textAlign: 'right', color: o.gelmedi ? 'var(--danger-hover)' : 'var(--text3)' }} title="Gelmedi">{o.gelmedi}</span>
                         </button>
                       ))}
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, fontSize: 11, color: 'var(--text3)', marginTop: 6 }}><span>geldi</span><span>gelmedi</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, fontSize: 12, color: 'var(--text3)', marginTop: 6 }}><span>geldi</span><span>gelmedi</span></div>
                   </>
                 )}
               </section>
@@ -819,7 +819,7 @@ export default function SinifDefteriPage() {
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: i ? '1px solid var(--border-light)' : 'none' }}>
                         <div style={{ width: 38, height: 40, flex: 'none', border: '1px solid var(--border)', borderRadius: 7, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1.1 }}>
                           <span className="tabular" style={{ fontWeight: 500 }}>{k.gun}</span>
-                          <span style={{ fontSize: 9.5, color: 'var(--text3)' }}>{AYLAR[ay].slice(0, 3).toLocaleUpperCase('tr-TR')}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text3)' }}>{AYLAR[ay].slice(0, 3).toLocaleUpperCase('tr-TR')}</span>
                         </div>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.ad}</div>
@@ -863,7 +863,7 @@ export default function SinifDefteriPage() {
                 }
                 return filtered.map(p => (
                   <button key={p.id} className="picker-item" onClick={() => directKaydet(p.id, picker)}>
-                    {p.ad} <span style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 400 }}>{p.gorev}</span>
+                    {p.ad} <span style={{ fontSize: 12, color: 'var(--text3)', fontWeight: 400 }}>{p.gorev}</span>
                   </button>
                 ))
               })()}
@@ -891,11 +891,11 @@ export default function SinifDefteriPage() {
         @keyframes spin { to { transform: rotate(360deg); } }
         :global(.animate-spin) { animation: spin 1s linear infinite; }
         .sd-hucre { container-type: inline-size; position: relative; border-radius: 9px; border-width: 1px; padding: 7px 8px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; }
-        .sd-durum { flex: 1; height: 26px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text3); font: inherit; font-size: 11.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; padding: 0; transition: background .12s, border-color .12s, color .12s; }
+        .sd-durum { flex: 1; height: 26px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text3); font: inherit; font-size: 12.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; padding: 0; transition: background .12s, border-color .12s, color .12s; }
         .sd-durum { min-width: 0; overflow: hidden; white-space: nowrap; }
         @container (max-width: 150px) { .sd-durum-metin { display: none; } }
         .sd-durum:hover { border-color: var(--border-strong); color: var(--text); }
-        .sd-durum.geldi { background: var(--success-light); border-color: var(--success-border); color: #0B6B42; }
+        .sd-durum.geldi { background: var(--success-light); border-color: var(--success-border); color: var(--success-dark); }
         .sd-durum.gelmedi { background: var(--danger-light); border-color: var(--danger-border); color: var(--danger-hover); }
         .sd-durum:focus-visible, .sd-bos:focus-visible { outline: none; box-shadow: var(--ring); }
         .sd-bos { width: 100%; border-radius: 9px; border: 1px dashed var(--border-strong); background: transparent; color: var(--text3); font: inherit; font-size: 12.5px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
@@ -908,7 +908,7 @@ export default function SinifDefteriPage() {
         .sd-lejant { width: 16px; height: 16px; border-radius: 5px; border: 1px solid var(--border-strong); display: inline-flex; align-items: center; justify-content: center; }
 
         .fast-picker { background: var(--surface); border-radius: 12px; box-shadow: var(--shadow-float); border: 1px solid var(--border); overflow: hidden; min-width: 200px; }
-        .picker-header { padding: 10px 14px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); background: var(--surface2); border-bottom: 1px solid var(--border); }
+        .picker-header { padding: 10px 14px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--text3); background: var(--surface2); border-bottom: 1px solid var(--border); }
         .picker-list { max-height: 260px; overflow-y: auto; padding: 4px 0; }
         .picker-item { display: block; width: 100%; padding: 9px 14px; text-align: left; background: none; border: none; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: var(--text); }
         .picker-item:hover { background: var(--accent-lighter); color: var(--accent-dark); }

@@ -58,7 +58,7 @@ export function defterKapagi(pdf: Pdf, autoTable: AutoTable, k: KapakVerisi) {
   pdf.setFontSize(13)
   pdf.text(`${k.yil} Yılı İşletme Hesabı Defteri`, W / 2, bandY + bandH + 13, { align: 'center' })
 
-  const ortak = { margin: { top: 14, bottom: 14, left: M, right: M }, styles: { fontSize: 10, cellPadding: 1.8, minCellHeight: 8, lineColor: PDF_RENK.metin, lineWidth: 0.2 } }
+  const ortak = { margin: { top: 14, bottom: 14, left: M, right: M }, styles: { fontSize: 11.5, cellPadding: 1.8, minCellHeight: 8, lineColor: PDF_RENK.metin, lineWidth: 0.2 } }
 
   autoTable(pdf, pdfTablo({
     ...ortak,
@@ -91,7 +91,7 @@ export function defterKapagi(pdf: Pdf, autoTable: AutoTable, k: KapakVerisi) {
     body,
     foot: [[{ content: 'TOPLAM', colSpan: 2, styles: { halign: 'right' } }, fmtTL(toplam('gelir')), fmtTL(toplam('gider')), '']],
     columnStyles: {
-      0: { cellWidth: 9, halign: 'center', fontSize: 9 },
+      0: { cellWidth: 9, halign: 'center', fontSize: 11 },
       1: { cellWidth: 32 },
       2: { cellWidth: 42, halign: 'right' },
       3: { cellWidth: 42, halign: 'right' },

@@ -352,7 +352,7 @@ export default function Sidebar({ collapsed, setCollapsed, mobilAcik = false, on
             {collapsed ? (
               <div aria-hidden style={{ height: 1, background: 'var(--border-light)', margin: '8px 18px' }} />
             ) : (
-              <div style={{ padding: i === 0 && isSuperAdmin ? '4px 20px 4px' : '14px 20px 4px', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text3)' }}>
+              <div style={{ padding: i === 0 && isSuperAdmin ? '4px 20px 4px' : '14px 20px 4px', fontSize: 11.5, fontWeight: 600, letterSpacing: '0.1em', color: 'var(--text3)' }}>
                 {section.baslik}
               </div>
             )}
@@ -373,7 +373,7 @@ export default function Sidebar({ collapsed, setCollapsed, mobilAcik = false, on
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{kullaniciAdi}</div>
-              <div title={ROL_ADI[profil?.rol as string] || profil?.rol || 'Kullanıcı'} style={{ fontSize: 11.5, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{okul?.ad || ROL_ADI[profil?.rol as string] || 'Kullanıcı'}</div>
+              <div title={ROL_ADI[profil?.rol as string] || profil?.rol || 'Kullanıcı'} style={{ fontSize: 12.5, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{okul?.ad || ROL_ADI[profil?.rol as string] || 'Kullanıcı'}</div>
             </div>
           </div>
         )}

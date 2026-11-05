@@ -243,13 +243,13 @@ Yine de bağlansın mı?`,
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                Adı Soyadı <span style={{ color: '#dc2626' }}>*</span>
+                Adı Soyadı <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <input className="form-input" style={{ width: '100%' }} required value={form.ad || ''} onChange={e => setF('ad', e.target.value)} placeholder="Örn: AHMET YILMAZ" />
             </div>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                T.C. Kimlik No <span style={{ color: '#dc2626' }}>*</span>
+                T.C. Kimlik No <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <input className="form-input" style={{ width: '100%' }} maxLength={11} value={form.tc || ''} onChange={e => setF('tc', e.target.value)} placeholder="11 hane" />
             </div>
@@ -258,7 +258,7 @@ Yine de bağlansın mı?`,
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                Görevi <span style={{ color: '#dc2626' }}>*</span>
+                Görevi <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <select className="form-select" style={{ width: '100%' }} value={form.gorev || 'Öğretmen'} onChange={e => setF('gorev', e.target.value)}>
                 {GOREVLER.map(g => <option key={g} value={g}>{g}</option>)}
@@ -266,7 +266,7 @@ Yine de bağlansın mı?`,
             </div>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                Meslek Kodu <span style={{ color: '#dc2626' }}>*</span>
+                Meslek Kodu <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <input className="form-input" style={{ width: '100%' }} value={form.meslek_kodu || ''} onChange={e => setF('meslek_kodu', e.target.value)} placeholder="SGK Meslek Kodu" />
             </div>
@@ -275,13 +275,13 @@ Yine de bağlansın mı?`,
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                E-posta Adresi <span style={{ color: '#dc2626' }}>*</span>
+                E-posta Adresi <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <input className="form-input" style={{ width: '100%' }} type="email" value={form.email || ''} onChange={e => setF('email', e.target.value)} placeholder="ornek@mail.com" />
             </div>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                IBAN Numarası <span style={{ color: '#dc2626' }}>*</span>
+                IBAN Numarası <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <input className="form-input" style={{ width: '100%' }} value={form.iban || ''} onChange={e => setF('iban', e.target.value)} placeholder="TR..." />
             </div>
@@ -290,7 +290,7 @@ Yine de bağlansın mı?`,
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                Personel Türü <span style={{ color: '#dc2626' }}>*</span>
+                Personel Türü <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <select className="form-select" style={{ width: '100%' }} value={form.personel_turu || 'kadrolu'} onChange={e => setF('personel_turu', e.target.value)}>
                 <option value="kadrolu">Kadrolu</option>
@@ -299,7 +299,7 @@ Yine de bağlansın mı?`,
             </div>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                SGK’lı mı? <span style={{ color: '#dc2626' }}>*</span>
+                SGK’lı mı? <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <select className="form-select" style={{ width: '100%' }} value={form.sgk_li ? 'evet' : 'hayir'} onChange={e => setF('sgk_li', e.target.value === 'evet')}>
                 <option value="hayir">Hayır</option>
@@ -308,7 +308,7 @@ Yine de bağlansın mı?`,
             </div>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                Emekli mi? <span style={{ color: '#dc2626' }}>*</span>
+                Emekli mi? <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <select className="form-select" style={{ width: '100%' }} value={form.is_retired ? 'evet' : 'hayir'} onChange={e => setF('is_retired', e.target.value === 'evet')}>
                 <option value="hayir">Hayır</option>
@@ -320,7 +320,7 @@ Yine de bağlansın mı?`,
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                Vergi İstisnası <span style={{ color: '#dc2626' }}>*</span>
+                Vergi İstisnası <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <select className="form-select" style={{ width: '100%' }} value={form.vergi_istisnasi ? 'evet' : 'hayir'} onChange={e => setF('vergi_istisnasi', e.target.value === 'evet')}>
                 <option value="hayir">Hayır</option>
@@ -336,16 +336,16 @@ Yine de bağlansın mı?`,
                   {form.vergi_istisna_tipi === 'tutar' && (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
                       <div>
-                        <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Gelir V. (₺/ay)</label>
+                        <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Gelir V. (₺/ay)</label>
                         <SayiInput className="form-input" style={{ width: '100%' }}
                           value={form.istisna_gv_tutari || null} onChange={v => setF('istisna_gv_tutari', v ?? 0)} placeholder="Örn: 400" />
                       </div>
                       <div>
-                        <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Damga V. (₺/ay)</label>
+                        <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Damga V. (₺/ay)</label>
                         <SayiInput className="form-input" style={{ width: '100%' }}
                           value={form.istisna_dv_tutari || null} onChange={v => setF('istisna_dv_tutari', v ?? 0)} placeholder="0" />
                       </div>
-                      <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#666', fontStyle: 'italic', lineHeight: 1.3 }}>
+                      <div style={{ gridColumn: '1 / -1', fontSize: 11.5, color: '#666', fontStyle: 'italic', lineHeight: 1.3 }}>
                         * Girilen tutar her ay bordroda hesaplanan vergiden düşülür (hesaplanan vergiyi aşamaz).
                       </div>
                     </div>
@@ -355,7 +355,7 @@ Yine de bağlansın mı?`,
             </div>
             <div>
               <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 4 }}>Devreden Vergi Matrahı (₺)</label>
-              <div style={{ fontSize: 10, color: '#666', marginBottom: 4, fontStyle: 'italic', lineHeight: 1.2 }}>
+              <div style={{ fontSize: 11.5, color: '#666', marginBottom: 4, fontStyle: 'italic', lineHeight: 1.2 }}>
                 * İçinde bulunulan ay <b>hariç</b>, yıl başından beri biriken toplamı giriniz.
               </div>
               {/* Türkçe yazım: 290.660 → 290660, 133.633,97 → 133633.97 */}

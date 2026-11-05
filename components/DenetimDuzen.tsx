@@ -2,7 +2,7 @@
 // Denetim paneli düzeni: kabuk (yan menü + üst başlık), Okullar sayfası ve okul inceleme başlığı (karar + özet + sekmeler).
 // Okul açıkken ekranda tek sütun vardır; dosya kararı her sekmede başlıkta durur, tablolar başlığın hemen altından başlar.
 import { useMemo, useState } from 'react'
-import { BrandMark } from '@/components/brand/Logo'
+import { BrandMark, Wordmark } from '@/components/brand/Logo'
 import { KABUK_STIL } from '@/components/yonetim/kabukStil'
 import { Filtre } from '@/components/yonetim/ortak'
 import { useDegisince } from '@/lib/useDegisince'
@@ -59,8 +59,8 @@ export function DenetimKabuk({ bolum, onBolum, donem, onDonem, bekleyen, ilAd, k
       <style>{KABUK_STIL + DENETIM_STIL}</style>
       <aside className={`yk-menu${acik ? ' acik' : ''}`} aria-label="Denetim menüsü">
         <div className="yk-marka">
-          <BrandMark size={30} />
-          <div><strong>Klüp360</strong><span>Denetim paneli</span></div>
+          <BrandMark size={30} title="" />
+          <div><Wordmark height={22} /><span>Denetim paneli</span></div>
           <button type="button" className="yk-kapat" onClick={() => setAcik(false)} aria-label="Menüyü kapat"><X size={18} /></button>
         </div>
         <nav>
@@ -122,7 +122,7 @@ const DENETIM_STIL = `
 .yk-sabit .yk-oge.on { background: #f0f3fe; color: var(--accent-dark); box-shadow: inset 3px 0 0 var(--accent); }
 .yk-sabit .yk-oge.on svg { color: var(--accent); }
 .yk-sabit .yk-oge:focus-visible, .yk-sabit .yk-kisi button:focus-visible { outline-color: var(--accent); }
-.yk-sabit .yk-oge em.vurgu { background: var(--warn-light); color: #8a5200; border: 1px solid var(--warn-border); }
+.yk-sabit .yk-oge em.vurgu { background: var(--warn-light); color: var(--warn-dark); border: 1px solid var(--warn-border); }
 .yk-sabit .yk-kisi { border-top-color: var(--border); }
 .yk-sabit .yk-kisi strong { color: var(--text); }
 .yk-sabit .yk-kisi span { color: var(--text3); }
@@ -146,8 +146,8 @@ const DENETIM_STIL = `
 .dn-sekmeler { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 .dn-sekmeler button { display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; font: inherit; font-size: 13.5px; font-weight: 500; color: var(--text2); cursor: pointer; white-space: nowrap; }
 .dn-sekmeler button.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
-.dn-sekmeler em { font-style: normal; background: var(--danger); color: #fff; border-radius: 10px; padding: 0 7px; font-size: 11px; font-weight: 700; }
-.dn-iade { color: #8a5200; border-color: var(--warn-border); }
+.dn-sekmeler em { font-style: normal; background: var(--danger); color: #fff; border-radius: 10px; padding: 0 7px; font-size: 12px; font-weight: 700; }
+.dn-iade { color: var(--warn-dark); border-color: var(--warn-border); }
 .dn-iade:hover { background: var(--warn-light); border-color: #e0bf7a; }
 .dn-alt-arac { flex-shrink: 0; padding: 12px 28px; border-bottom: 1px solid var(--border-light); background: var(--surface); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
@@ -155,7 +155,7 @@ const DENETIM_STIL = `
 .dn-sekme-satir .dn-sekmeler { flex: 1 0 auto; }
 .dn-sekme-satir > .dn-sekme-sag { flex-shrink: 0; padding-bottom: 6px; }
 .dn-sekmeler em.ok { background: var(--success-light); color: var(--success); }
-.dn-sekmeler em.uyari { background: var(--warn-light); color: #8a5200; }
+.dn-sekmeler em.uyari { background: var(--warn-light); color: var(--warn-dark); }
 .dn-sekmeler em.notr { background: var(--surface2); color: var(--text2); }
 
 /* Aylık ızgara (ders programı / sınıf defteri): ekranın kalan yüksekliğine sığar, kendi içinde kayar */
@@ -168,12 +168,12 @@ const DENETIM_STIL = `
 .dn-lejant i.gelmedi { background: var(--danger-light); border-color: var(--danger-border); }
 .dn-lejant i.plan { background: var(--accent-lighter); border-color: var(--accent-light); }
 .dn-lejant i.kapali { background: var(--th-off-bg); }
-.dn-sayac-hata { font-style: normal; background: var(--danger); color: #fff; border-radius: 10px; padding: 0 6px; font-size: 11px; font-weight: 700; }
+.dn-sayac-hata { font-style: normal; background: var(--danger); color: #fff; border-radius: 10px; padding: 0 6px; font-size: 12px; font-weight: 700; }
 .dn-izgara-bos { padding: 40px 20px; text-align: center; color: var(--text2); background: var(--surface); border: 1px dashed var(--border-strong); border-radius: 12px; }
 .dn-izgara-kutu { flex: 0 1 auto; min-height: 0; overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
-.dn-izgara-tablo { border-collapse: separate; border-spacing: 0; font-size: 11px; width: 100%; }
+.dn-izgara-tablo { border-collapse: separate; border-spacing: 0; font-size: 12px; width: 100%; }
 .dn-izgara-tablo th, .dn-izgara-tablo td { border-right: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light); }
-.dn-izgara-tablo thead th { position: sticky; top: 0; z-index: 2; background: var(--th-bg); color: var(--th-fg); border-bottom-color: var(--th-border); font-size: 10.5px; font-weight: 600; line-height: 1.2; padding: 6px 2px; text-align: center; min-width: 54px; }
+.dn-izgara-tablo thead th { position: sticky; top: 0; z-index: 2; background: var(--th-bg); color: var(--th-fg); border-bottom-color: var(--th-border); font-size: 11.5px; font-weight: 600; line-height: 1.2; padding: 6px 2px; text-align: center; min-width: 54px; }
 .dn-izgara-tablo thead th b { display: block; font-size: 13px; font-weight: 700; }
 .dn-izgara-tablo thead th.kapali { background: var(--th-off-bg); color: var(--th-off-fg); min-width: 24px; width: 24px; font-weight: 500; }
 .dn-izgara-tablo .sol { position: sticky; left: 0; z-index: 1; background: var(--surface); color: var(--text); text-align: left; padding: 0 12px; min-width: 76px; font-weight: 600; white-space: nowrap; box-shadow: inset -1px 0 0 var(--border); }
@@ -185,7 +185,7 @@ const DENETIM_STIL = `
 .dn-izgara-tablo td.gelmedi { background: var(--danger-light); color: var(--danger); font-weight: 700; }
 .dn-izgara-tablo td.plan { background: var(--accent-lighter); color: var(--accent); font-weight: 600; }
 .dn-izgara-tablo tbody tr:hover td:not(.kapali) { box-shadow: inset 0 0 0 999px rgba(14,17,22,.035); }
-.dn-izgara-tablo tr.grup th { background: var(--surface2); color: var(--text2); text-align: left; padding: 5px 0; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.dn-izgara-tablo tr.grup th { background: var(--surface2); color: var(--text2); text-align: left; padding: 5px 0; font-size: 12px; font-weight: 700; }
 .dn-izgara-tablo tr.grup.koord th { background: var(--info-light); color: var(--info); }
 .dn-izgara-tablo tr.grup th span { position: sticky; left: 12px; }
 @media (max-width: 900px) {
@@ -384,7 +384,7 @@ export function OkulIncelemeBasligi({ okulId, yil, ay, durum, toplamMadde, hesap
         {t === 'gonderildi' && teslim?.gonderim_tarihi && (
           <span title={new Date(teslim.gonderim_tarihi).toLocaleString('tr-TR')}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 6, fontSize: 12.5,
-              background: bekleme >= 3 ? 'var(--warn-light)' : 'var(--surface2)', color: bekleme >= 3 ? '#8a5200' : 'var(--text)' }}>
+              background: bekleme >= 3 ? 'var(--warn-light)' : 'var(--surface2)', color: bekleme >= 3 ? 'var(--warn-dark)' : 'var(--text)' }}>
             <Clock size={14} aria-hidden="true" />
             <span>
               <b>{bekleme <= 0 ? 'Bugün' : bekleme === 1 ? 'Dün' : `${bekleme} gün önce`}</b> gönderildi
@@ -422,7 +422,7 @@ export function OkulIncelemeBasligi({ okulId, yil, ay, durum, toplamMadde, hesap
 
       {iadeNot !== null && (
         <div style={{ padding: 14, borderRadius: 10, border: '1px solid var(--warn-border)', background: 'var(--warn-light)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <label htmlFor="dosyaIadeNot" className="form-label" style={{ margin: 0, fontWeight: 600, color: '#8a5200' }}>Okula iade notu (okulun ekranında görünür)</label>
+          <label htmlFor="dosyaIadeNot" className="form-label" style={{ margin: 0, fontWeight: 600, color: 'var(--warn-dark)' }}>Okula iade notu (okulun ekranında görünür)</label>
           <textarea id="dosyaIadeNot" className="form-input" autoFocus value={iadeNot} onChange={e => setIadeNot(e.target.value)} rows={4} style={{ resize: 'vertical' }} />
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             {s && (hata > 0 || uyari > 0) && (
