@@ -73,7 +73,7 @@ export default function ButceContent() {
         {Math.abs(toplamPct - 100) > 0.01 ? ' — toplam %100 olmalı' : ' ✓'}
       </div>
 
-      <Link href="/signup" className="bt-cta">Tahakkuk cetvelini otomatik oluşturun →</Link>
+      <Link href="/signup" className="bt-cta">Tahakkuk cetvelini otomatik oluşturun</Link>
     </div>
   )
 }
@@ -85,10 +85,9 @@ const CSS = `
 .bt-gelir input{font:inherit;font-size:17px;font-weight:700;padding:13px 16px;border:1px solid var(--line-2);
   border-radius:12px;background:var(--surf);color:var(--tx);outline:none;text-align:center}
 .bt-gelir input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(35,71,217,.13)}
-.bt-table{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--surf);
-  box-shadow:0 20px 44px -32px rgba(30,66,41,.35)}
+.bt-table{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--surf)}
 .bt-head{display:grid;grid-template-columns:1fr 96px 1fr;gap:12px;padding:12px 18px;background:var(--g);color:#fff;
-  font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+  font-size:12.5px;font-weight:700}
 .bt-head span:last-child{text-align:right}
 .bt-row{display:grid;grid-template-columns:1fr 96px 1fr;gap:12px;align-items:center;padding:12px 18px;border-top:1px solid var(--line)}
 .bt-row:nth-child(even){background:#faf9f4}
@@ -101,8 +100,8 @@ const CSS = `
 .bt-sum{text-align:center;margin-top:16px;font-size:13.5px;color:var(--tx2)}
 .bt-sum.warn{color:#b4522a;font-weight:600}
 .bt-cta{display:block;text-align:center;margin:22px auto 0;max-width:420px;padding:14px;border-radius:12px;
-  background:var(--g);color:#fff!important;font-weight:700;font-size:14.5px;transition:background .2s,transform .2s}
-.bt-cta:hover{background:var(--g-d);transform:translateY(-2px)}
+  background:var(--g);color:#fff!important;font-weight:700;font-size:14.5px;transition:background .2s}
+.bt-cta:hover{background:var(--g-d)}
 @media (max-width:560px){
   .bt-head,.bt-row{grid-template-columns:1fr 80px auto;gap:8px;padding:10px 12px}
 }

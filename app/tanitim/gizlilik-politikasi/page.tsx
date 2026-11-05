@@ -12,8 +12,7 @@ export default function GizlilikPolitikasiPage() {
     <PublicShell>
       <section className="pub-hero">
         <div className="pub-container">
-          <span className="pub-badge"><span className="pub-badge-dot" /> Yasal</span>
-          <h1 className="pub-h1">Gizlilik <span className="pub-grad">Politikası</span></h1>
+          <h1 className="pub-h1">Gizlilik Politikası</h1>
           <p className="pub-lead">Verilerinizi nasıl topladığımız, işlediğimiz ve koruduğumuz hakkında bilmeniz gerekenler.</p>
         </div>
       </section>

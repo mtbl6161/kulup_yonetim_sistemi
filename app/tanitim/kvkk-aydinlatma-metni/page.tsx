@@ -21,8 +21,7 @@ export default function KvkkAydinlatmaPage() {
     <PublicShell>
       <section className="pub-hero">
         <div className="pub-container">
-          <span className="pub-badge"><span className="pub-badge-dot" /> Yasal</span>
-          <h1 className="pub-h1">KVKK <span className="pub-grad">Aydınlatma Metni</span></h1>
+          <h1 className="pub-h1">KVKK Aydınlatma Metni</h1>
           <p className="pub-lead">6698 sayılı Kişisel Verilerin Korunması Kanunu’nun 10. maddesi uyarınca kişisel verilerinizin nasıl işlendiğini açıklıyoruz.</p>
         </div>
       </section>

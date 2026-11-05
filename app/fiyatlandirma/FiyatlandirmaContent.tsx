@@ -1,139 +1,123 @@
-'use client'
-
-import { useState } from 'react'
 import Link from 'next/link'
-import { Check, ArrowRight, CheckCircle } from 'lucide-react'
-import { AYLIK_UCRET as AYLIK, YILLIK_UCRET as YILLIK_TOPLAM, YILLIK_INDIRIM_ETIKETI } from '@/lib/abonelikPlanlari'
-const YILLIK_AYLIK = Math.round(YILLIK_TOPLAM / 12)
+import { AYLIK_UCRET, DENEME_GUN, YILLIK_AYLIK_KARSILIGI, YILLIK_LISTE_UCRETI, YILLIK_TASARRUF, YILLIK_UCRET, tl } from '@/lib/abonelikPlanlari'
 
-const ozellikler = [
-  'Öğrenci yönetimi', 'Personel yönetimi', 'Sınıf tanımları', 'Ders programı',
-  'Sınıf defteri ve devam', 'Puantaj takibi', 'Otomatik bordro hesabı', 'Bordro e-posta gönderimi',
-  'Ödeme ve tahsilat takibi', 'Gelir / gider raporları', 'Bilanço', 'Hesap hareketleri',
-  'Kurumsal ayarlar', 'Akıllı uyarılar', 'MEB mevzuatına tam uyum',
+// Fiyatlandırma: iki ödeme seçeneği yan yana bir cetvelde, pakete dahil olanlar fihrist, sorular açık cevaplı.
+
+const DAHIL = [
+  ['Öğrenci ve sınıflar', 'Kayıt, kontenjan, iş gününe göre otomatik aidat'],
+  ['Personel', 'Görev, SGK durumu, IBAN ve iletişim bilgileri'],
+  ['Ders programı ve sınıf defteri', 'Yoklama, ders saatlerinin puantaja aktarımı'],
+  ['Puantaj ve bordro', 'MEB katsayıları, SGK ve vergi; ücret zarfı ve e-posta'],
+  ['Muhtasar beyannamesi', 'e-Beyanname’ye yüklenecek MUHSGK_22 XML dosyası'],
+  ['Aidat ve tahsilat', 'Banka ekstresi eşleştirme, geciken ödemeler, taksitler'],
+  ['İşletme defteri ve bilanço', 'Gelir-gider, resmî kapak sayfası, ücret dağıtım bilançosu'],
+  ['Denetim dosyası', 'İl evrak listesi, otomatik üretilen belgeler, denetçi onayı'],
+  ['Okul Aile Birliği', 'Bağış ve aidat tahsilatı, birliğin işletme defteri'],
+  ['Hatırlatmalar ve raporlar', 'Eksik puantaj, yaklaşan beyanname günü, PDF raporlar'],
 ]
 
-const sss = [
-  { q: 'İptal edebilir miyim?', a: 'Sistem üzerinden istediğiniz an, kimseyle görüşmeden tek tıkla iptal edebilirsiniz. Uzun sözleşmeler veya cayma bedeli yoktur.' },
-  { q: 'Sınırlar var mı?', a: 'Sınırsız personel, sınırsız sınıf ve sınırsız öğrenci. Fiyatlandırma sadece yönetilen kurum başına sabittir.' },
-  { q: 'Veri güvenliği nasıl?', a: 'Tüm kişisel ve finansal verileriniz 256-bit uçtan uca şifrelemeyle güvenli bulut altyapısında barındırılır.' },
+const SORULAR = [
+  ['Öğrenci ya da personel sayısına göre fiyat değişir mi?', 'Hayır. Öğrenci, personel ve sınıf sayısında sınır yoktur; ücret kurum başına sabittir.'],
+  ['Nasıl iptal ederim?', 'Ayarlar › Abonelik’ten, kimseyle görüşmeden. İptal ettiğinizde ödediğiniz dönemin sonuna kadar kullanmaya devam edersiniz; cayma bedeli yoktur.'],
+  ['Deneme bitince ne olur?', `${DENEME_GUN} günlük deneme için kart bilgisi istenmez. Deneme bitince abone olmazsanız girdiğiniz kayıtlar silinmez; abone olduğunuzda kaldığınız yerden sürer.`],
+  ['Fatura alabilir miyim?', 'Her ödemede faturanız e-posta adresinize gelir. Geçmiş faturalara Ayarlar › Abonelik’ten de ulaşırsınız.'],
+  ['Verilerimiz nerede saklanıyor?', 'Şifrelenmiş olarak bulutta. Her kurumun verisi ayrı tutulur; başka bir okul sizin kayıtlarınızı göremez.'],
 ]
 
 export default function FiyatlandirmaContent() {
-  const [donem, setDonem] = useState<'aylik' | 'yillik'>('aylik')
-
-  const fiyat = donem === 'aylik' ? AYLIK : YILLIK_AYLIK
-  const perLabel = donem === 'aylik' ? '/ ay · kurum başına' : '/ ay · yıllık fatura'
-  const tasarruf = AYLIK * 12 - YILLIK_TOPLAM
-
   return (
     <div className="fp">
       <style>{CSS}</style>
 
-      {/* Dönem seçici */}
-      <div className="fp-toggle">
-        {(['aylik', 'yillik'] as const).map(d => (
-          <button key={d} type="button" className={donem === d ? 'on' : ''} onClick={() => setDonem(d)}>
-            {d === 'aylik' ? 'Aylık Fatura' : 'Yıllık Fatura'}
-            {d === 'yillik' && <span className="fp-save">{YILLIK_INDIRIM_ETIKETI}</span>}
-          </button>
-        ))}
+      {/* Fiyat cetveli */}
+      <table className="fp-cetvel">
+        <caption className="fp-gizli">Aylık ve yıllık ödeme karşılaştırması</caption>
+        <thead>
+          <tr>
+            <th scope="col"><span className="fp-gizli">Kalem</span></th>
+            <th scope="col">Aylık ödeme</th>
+            <th scope="col">Yıllık ödeme</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="fp-ucret">
+            <th scope="row">Ücret</th>
+            <td><strong>₺{tl(AYLIK_UCRET)}</strong><span> / ay</span></td>
+            <td><strong>₺{tl(YILLIK_UCRET)}</strong><span> / yıl</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Aylık karşılığı</th>
+            <td>₺{tl(AYLIK_UCRET)}</td>
+            <td>₺{tl(YILLIK_AYLIK_KARSILIGI)}</td>
+          </tr>
+          <tr>
+            <th scope="row">12 ayda toplam</th>
+            <td>₺{tl(YILLIK_LISTE_UCRETI)}</td>
+            <td>₺{tl(YILLIK_UCRET)}{YILLIK_TASARRUF > 0 && <em>, ₺{tl(YILLIK_TASARRUF)} daha az</em>}</td>
+          </tr>
+          <tr>
+            <th scope="row">Yenileme</th>
+            <td>Her ay, otomatik</td>
+            <td>Her yıl, otomatik</td>
+          </tr>
+          <tr>
+            <th scope="row">İptal</th>
+            <td colSpan={2}>İstediğiniz an; ödediğiniz dönemin sonuna kadar kullanırsınız</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div className="fp-eylem">
+        <Link href="/signup" className="pub-btn pub-btn-primary pub-btn-lg">{DENEME_GUN} gün ücretsiz deneyin</Link>
+        <p>Kart bilgisi istenmez. Ödeme sıklığını deneme bitince seçersiniz.</p>
       </div>
 
-      {/* Plan kartı */}
-      <div className="fp-card">
-        <div className="fp-price">
-          <div className="fp-badge"><CheckCircle size={15} /> Tek plan · tüm modüller</div>
-          <div className="fp-amount">
-            <span className="fp-cur">₺</span>
-            <span className="fp-num">{fiyat.toLocaleString('tr-TR')}</span>
-          </div>
-          <div className="fp-per">{perLabel}</div>
+      {/* Pakete dahil olanlar */}
+      <h2 className="fp-h2">İki seçenekte de pakete dahil olanlar</h2>
+      <dl className="fp-dahil">
+        {DAHIL.map(([ad, ne]) => <div key={ad}><dt>{ad}</dt><dd>{ne}</dd></div>)}
+      </dl>
 
-          {donem === 'yillik' ? (
-            <div className="fp-note">
-              Yılda toplam {YILLIK_TOPLAM.toLocaleString('tr-TR')} ₺
-              <strong>{tasarruf.toLocaleString('tr-TR')} ₺ net tasarruf</strong>
-            </div>
-          ) : <div className="fp-note-sp" />}
-
-          <Link href="/signup" className="fp-cta">15 Gün Ücretsiz Dene <ArrowRight size={19} /></Link>
-          <p className="fp-cta-note">Kredi kartı gerekmez</p>
-        </div>
-
-        <div className="fp-feats">
-          <p className="fp-feats-h">Pakete dahil olan her şey</p>
-          <div className="fp-feats-grid">
-            {ozellikler.map(o => (
-              <div className="fp-feat" key={o}>
-                <span className="fp-check"><Check size={13} strokeWidth={3} /></span>
-                <span>{o}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* SSS */}
-      <div className="fp-faq">
-        {sss.map((item, i) => (
-          <div className="fp-faq-card" key={item.q}>
-            <div className="fp-faq-num">0{i + 1}</div>
-            <p className="fp-faq-q">{item.q}</p>
-            <p className="fp-faq-a">{item.a}</p>
-          </div>
-        ))}
-      </div>
+      {/* Sorular */}
+      <h2 className="fp-h2">Ödemeyle ilgili sorular</h2>
+      <dl className="fp-sorular">
+        {SORULAR.map(([s, c]) => <div key={s}><dt>{s}</dt><dd>{c}</dd></div>)}
+      </dl>
     </div>
   )
 }
 
 const CSS = `
-.fp{max-width:1000px;margin:0 auto}
-.fp-toggle{display:inline-flex;background:var(--surf);border:1px solid var(--line-2);border-radius:999px;padding:6px;gap:4px;
-  box-shadow:0 4px 15px rgba(0,0,0,.03);margin:0 auto 40px;position:relative;left:50%;transform:translateX(-50%)}
-.fp-toggle button{padding:12px 26px;border-radius:999px;font:inherit;font-size:14.5px;font-weight:700;border:none;cursor:pointer;
-  background:transparent;color:var(--tx2);transition:all .25s;display:inline-flex;align-items:center;gap:9px}
-.fp-toggle button.on{background:var(--g);color:#fff;box-shadow:0 8px 20px rgba(35,71,217,.22)}
-.fp-save{background:#EEF2FE;color:var(--g);border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:800}
-.fp-toggle button.on .fp-save{background:rgba(255,255,255,.2);color:#fff}
-
-.fp-card{background:var(--surf);border:1px solid var(--line-2);border-radius:28px;overflow:hidden;
-  display:grid;grid-template-columns:minmax(320px,1fr) 1.5fr;box-shadow:0 40px 80px -50px rgba(35,71,217,.4)}
-.fp-price{background:linear-gradient(150deg,var(--g-d),var(--g-dd));color:#fff;padding:clamp(32px,4vw,48px)}
-.fp-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
-  border-radius:999px;padding:6px 15px;font-size:12.5px;font-weight:700;margin-bottom:28px}
-.fp-badge svg{color:#7ddba0}
-.fp-amount{display:flex;align-items:flex-start;gap:6px}
-.fp-cur{font-size:30px;font-weight:600;color:rgba(255,255,255,.8);margin-top:10px}
-.fp-num{font-family:var(--font-display);font-size:clamp(56px,8vw,72px);font-weight:800;line-height:1}
-.fp-per{font-size:15px;color:rgba(255,255,255,.6);padding-bottom:22px;margin-bottom:22px;border-bottom:1px solid rgba(255,255,255,.12)}
-.fp-note{background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px 18px;
-  font-size:14px;color:rgba(255,255,255,.82);margin-bottom:28px}
-.fp-note strong{display:block;margin-top:6px;color:#7ddba0;font-size:15px}
-.fp-note-sp{height:28px}
-.fp-cta{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:18px 0;border-radius:15px;
-  background:#fff;color:var(--g-dd);font-weight:800;font-size:16.5px;box-shadow:0 10px 26px rgba(0,0,0,.2);transition:transform .2s}
-.fp-cta:hover{transform:translateY(-2px)}
-.fp-cta-note{text-align:center;font-size:13px;color:rgba(255,255,255,.5);margin:14px 0 0}
-
-.fp-feats{padding:clamp(28px,4vw,48px)}
-.fp-feats-h{font-size:13px;font-weight:800;color:var(--tx);text-transform:uppercase;letter-spacing:.05em;
-  margin:0 0 22px;padding-bottom:16px;border-bottom:1px solid var(--line)}
-.fp-feats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:18px 16px}
-.fp-feat{display:flex;align-items:flex-start;gap:11px;font-size:14px;color:#3a3a2e;font-weight:600;line-height:1.4}
-.fp-check{width:23px;height:23px;border-radius:50%;background:#EEF2FE;color:var(--g);flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;margin-top:1px}
-
-.fp-faq{margin-top:64px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
-.fp-faq-card{background:var(--surf);border:1px solid var(--line);border-radius:20px;padding:28px 24px;
-  box-shadow:0 14px 34px -26px rgba(30,66,41,.35)}
-.fp-faq-num{width:42px;height:42px;border-radius:12px;background:#EEF2FE;color:var(--g);font-weight:800;font-size:15px;
-  display:flex;align-items:center;justify-content:center;margin-bottom:18px}
-.fp-faq-q{font-size:16px;font-weight:700;color:var(--tx);margin:0 0 10px}
-.fp-faq-a{font-size:14px;color:var(--tx2);margin:0;line-height:1.65}
-
-@media (max-width:820px){
-  .fp-card{grid-template-columns:1fr}
+.fp{max-width:1120px}
+.fp-gizli{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.fp-cetvel{width:100%;max-width:820px;border-collapse:collapse;font-variant-numeric:tabular-nums;border-top:2px solid var(--tx)}
+.fp-cetvel th,.fp-cetvel td{text-align:left;padding:14px 16px 14px 0;border-bottom:1px solid var(--cizgi);vertical-align:baseline}
+.fp-cetvel thead th{font-family:var(--baslik);font-size:19px;font-weight:700;color:var(--tx);padding-top:18px}
+.fp-cetvel tbody th{font-weight:500;color:var(--tx2);width:30%}
+.fp-cetvel td{color:var(--tx);width:35%}
+.fp-ucret strong{font-family:var(--baslik);font-size:clamp(30px,4vw,40px);font-weight:700;letter-spacing:-.02em}
+.fp-ucret span{color:var(--tx3)}
+.fp-cetvel em{font-style:normal;color:var(--g-d);font-weight:600}
+.fp-eylem{display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;margin-top:28px}
+.fp-eylem p{margin:0;font-size:14.5px;color:var(--tx3);max-width:40ch}
+.fp-h2{font-family:var(--baslik);font-size:clamp(26px,3.2vw,34px);font-weight:700;letter-spacing:-.012em;line-height:1.15;margin:clamp(56px,7vw,88px) 0 24px;max-width:24ch}
+.fp-dahil{display:grid;grid-template-columns:1fr 1fr;gap:0 56px;border-top:2px solid var(--tx);margin:0}
+.fp-dahil>div{display:grid;grid-template-columns:minmax(0,max-content) 1fr;align-items:baseline;gap:0 10px;padding:14px 0;border-bottom:1px solid var(--cizgi)}
+.fp-dahil dt{font-weight:600;display:flex;align-items:baseline;gap:10px;white-space:nowrap}
+.fp-dahil dt::after{content:"";flex:1;min-width:20px;border-bottom:2px dotted var(--cizgi);transform:translateY(-4px)}
+.fp-dahil dd{margin:0;color:var(--tx2);font-size:15.5px}
+.fp-sorular{display:grid;grid-template-columns:1fr 1fr;gap:28px 56px;margin:0}
+.fp-sorular dt{font-family:var(--baslik);font-weight:700;font-size:19px;line-height:1.3}
+.fp-sorular dd{margin:8px 0 0;color:var(--tx2);max-width:56ch}
+@media (max-width:760px){
+  .fp-cetvel tbody th{width:auto;font-size:15px}
+  .fp-cetvel thead th{font-size:16px}
+  .fp-ucret strong{font-size:25px}
+  .fp-ucret span{display:block;font-size:14px}
+  .fp-cetvel th,.fp-cetvel td{padding-right:10px}
+  .fp-dahil,.fp-sorular{grid-template-columns:1fr}
+  .fp-dahil>div{grid-template-columns:1fr}
+  .fp-dahil dt::after{display:none}
+  .fp-dahil dd{margin-top:2px}
 }
 `

@@ -21,8 +21,8 @@ export default function Page() {
     <PublicShell>
       <section className="pub-hero">
         <div className="pub-container">
-          <span className="pub-badge"><span className="pub-badge-dot" /> Rehber</span>
-          <h1 className="pub-h1">Tutulacak <span className="pub-grad">Defterler ve Belgeler</span></h1>
+          <Link href="/rehber" className="pub-ust">Rehber ve araçlar</Link>
+          <h1 className="pub-h1">Tutulacak Defterler ve Belgeler</h1>
           <p className="pub-lead">
             Çocuk kulübünün düzenli ve denetime hazır işlemesi için tutulması gereken temel defter ve
             belgeler.

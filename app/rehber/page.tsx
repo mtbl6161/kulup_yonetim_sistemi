@@ -80,8 +80,7 @@ export default function Page() {
       <style>{CSS}</style>
       <section className="pub-hero">
         <div className="pub-container">
-          <span className="pub-badge"><span className="pub-badge-dot" /> Ücretsiz araçlar ve rehber</span>
-          <h1 className="pub-h1">Çocuk Kulübü <span className="pub-grad">Rehberi ve Araçları</span></h1>
+          <h1 className="pub-h1">Çocuk Kulübü Rehberi ve Araçları</h1>
           <p className="pub-lead">
             MEB çocuk kulüpleri için ihtiyacınız olan tüm ücretsiz hesaplama araçları ve rehber
             içerikleri tek sayfada. Kayıt gerekmez.
@@ -91,32 +90,28 @@ export default function Page() {
 
       <section className="pub-section" style={{ paddingTop: 8 }}>
         <div className="pub-container">
-          <h2 className="hub-title">Hesaplama Araçları</h2>
-          <div className="hub-grid">
+          <h2 className="hub-title">Hesaplama araçları</h2>
+          <ul className="hub-liste">
             {araclar.map(a => (
-              <Link href={a.href} key={a.href} className="hub-card">
-                <span className="hub-card-t">{a.title}</span>
-                <span className="hub-card-d">{a.desc}</span>
-                <span className="hub-card-go">Hesapla →</span>
-              </Link>
+              <li key={a.href}>
+                <Link href={a.href}><span className="hub-t">{a.title}</span><span className="hub-d">{a.desc}</span></Link>
+              </li>
             ))}
-          </div>
+          </ul>
 
-          <h2 className="hub-title" style={{ marginTop: 56 }}>Rehber İçerikleri</h2>
-          <div className="hub-grid">
+          <h2 className="hub-title">Rehber yazıları</h2>
+          <ul className="hub-liste">
             {rehberler.map(a => (
-              <Link href={a.href} key={a.href} className="hub-card">
-                <span className="hub-card-t">{a.title}</span>
-                <span className="hub-card-d">{a.desc}</span>
-                <span className="hub-card-go">Oku →</span>
-              </Link>
+              <li key={a.href}>
+                <Link href={a.href}><span className="hub-t">{a.title}</span><span className="hub-d">{a.desc}</span></Link>
+              </li>
             ))}
-          </div>
+          </ul>
 
-          <div className="hub-cta">
-            <h2>Hepsini tek panelde otomatik yapın</h2>
-            <p>Klüp360; bordro, aidat, puantaj ve tahakkuk cetvelini tüm personel için otomatik üretir.</p>
-            <Link href="/signup" className="pub-btn pub-btn-primary pub-btn-lg">Ücretsiz Başlayın</Link>
+          <div className="hub-kapanis">
+            <h2 className="hub-title">Bu hesapları her ay elle yapmayın</h2>
+            <p>Klüp360 bordroyu, aidatı, puantajı ve tahakkuk cetvelini tüm personel ve öğrenciler için kendiliğinden üretir.</p>
+            <Link href="/signup" className="pub-btn pub-btn-primary pub-btn-lg">15 gün ücretsiz deneyin</Link>
           </div>
         </div>
       </section>
@@ -125,17 +120,15 @@ export default function Page() {
 }
 
 const CSS = `
-.hub-title{font-family:var(--font-display);font-size:24px;font-weight:800;color:var(--tx);margin:0 0 22px;text-align:center}
-.hub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
-.hub-card{display:flex;flex-direction:column;gap:8px;background:var(--surf);border:1px solid var(--line);
-  border-radius:18px;padding:24px;box-shadow:0 16px 36px -28px rgba(30,66,41,.35);
-  transition:transform .2s,box-shadow .2s,border-color .2s}
-.hub-card:hover{transform:translateY(-4px);border-color:var(--g);box-shadow:0 24px 48px -28px rgba(30,66,41,.5)}
-.hub-card-t{font-family:var(--font-display);font-size:19px;font-weight:800;color:var(--tx)}
-.hub-card-d{font-size:14px;color:var(--tx2);line-height:1.55;flex:1}
-.hub-card-go{font-size:14px;font-weight:700;color:var(--g)}
-.hub-cta{margin-top:56px;text-align:center;background:linear-gradient(135deg,var(--g),var(--g-d));border-radius:24px;
-  padding:clamp(36px,5vw,56px);color:#fff}
-.hub-cta h2{font-family:var(--font-display);font-size:clamp(22px,3vw,30px);font-weight:800;margin:0 0 12px}
-.hub-cta p{font-size:16px;color:rgba(255,255,255,.85);margin:0 auto 24px;max-width:480px}
+.hub-title{font-family:var(--baslik);font-size:clamp(24px,3vw,30px);font-weight:700;letter-spacing:-.01em;color:var(--tx);margin:clamp(40px,5vw,56px) 0 16px}
+.pub-section .hub-title:first-child{margin-top:0}
+.hub-liste{list-style:none;margin:0;padding:0;border-top:2px solid var(--tx);display:grid;grid-template-columns:1fr 1fr;column-gap:56px}
+.hub-liste li{border-bottom:1px solid var(--cizgi)}
+.hub-liste a{display:flex;flex-direction:column;gap:3px;padding:16px 0}
+.hub-t{font-weight:600;color:var(--g);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:5px}
+.hub-liste a:hover .hub-t{text-decoration-thickness:2px}
+.hub-d{font-size:15.5px;color:var(--tx2)}
+.hub-kapanis{margin-top:clamp(48px,6vw,72px);padding-top:8px;border-top:2px solid var(--tx);max-width:60ch}
+.hub-kapanis p{color:var(--tx2);margin:0 0 22px}
+@media (max-width:760px){.hub-liste{grid-template-columns:1fr}}
 `

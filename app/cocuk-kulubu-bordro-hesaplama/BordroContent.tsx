@@ -129,7 +129,7 @@ export default function BordroContent() {
             <div className="bd-emp-row bd-emp-total"><span>Toplam işveren maliyeti</span><span>{fmtTL(isverenMaliyet)}</span></div>
           </div>
 
-          <Link href="/signup" className="bd-cta">Tüm personelin bordrosunu otomatik hesaplayın →</Link>
+          <Link href="/signup" className="bd-cta">Tüm personelin bordrosunu otomatik hesaplayın</Link>
         </div>
       </div>
     </div>
@@ -139,8 +139,7 @@ export default function BordroContent() {
 const CSS = `
 .bd{max-width:1000px;margin:0 auto}
 .bd-grid{display:grid;grid-template-columns:1fr 1.1fr;gap:24px;align-items:start}
-.bd-card{background:var(--surf);border:1px solid var(--line);border-radius:20px;padding:26px;
-  box-shadow:0 20px 44px -30px rgba(30,66,41,.35)}
+.bd-card{background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:26px}
 .bd-h2{font-family:var(--font-display);font-size:21px;font-weight:800;margin:0 0 20px;color:var(--tx)}
 .bd-field{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
 .bd-field>span{font-size:13.5px;font-weight:600;color:var(--tx2)}
@@ -153,8 +152,8 @@ const CSS = `
 .bd-check input{width:18px;height:18px;accent-color:var(--g)}
 .bd-disc{margin-top:18px;font-size:11.5px;color:var(--tx3);line-height:1.5;border-top:1px solid var(--line);padding-top:14px}
 
-.bd-card-res{background:linear-gradient(160deg,var(--surf),#f3f7f3)}
-.bd-net{display:flex;flex-direction:column;gap:4px;background:linear-gradient(135deg,var(--g),var(--g-d));
+.bd-card-res{background:var(--zemin)}
+.bd-net{display:flex;flex-direction:column;gap:4px;background:var(--gece);
   color:#fff;border-radius:14px;padding:18px 22px;margin-bottom:20px}
 .bd-net span{font-size:13.5px;color:rgba(255,255,255,.8);font-weight:600}
 .bd-net strong{font-family:var(--font-display);font-size:clamp(28px,4vw,38px);font-weight:800;line-height:1}
@@ -168,8 +167,8 @@ const CSS = `
 .bd-emp-row{display:flex;justify-content:space-between;font-size:13.5px;color:var(--tx2);padding:4px 0}
 .bd-emp-total{font-weight:700;color:var(--tx);border-top:1px dashed var(--line-2);margin-top:4px;padding-top:8px}
 .bd-cta{display:block;text-align:center;margin-top:20px;padding:14px;border-radius:12px;
-  background:var(--g);color:#fff!important;font-weight:700;font-size:14.5px;transition:background .2s,transform .2s}
-.bd-cta:hover{background:var(--g-d);transform:translateY(-2px)}
+  background:var(--g);color:#fff!important;font-weight:700;font-size:14.5px;transition:background .2s}
+.bd-cta:hover{background:var(--g-d)}
 
 @media (max-width:820px){ .bd-grid{grid-template-columns:1fr} }
 `

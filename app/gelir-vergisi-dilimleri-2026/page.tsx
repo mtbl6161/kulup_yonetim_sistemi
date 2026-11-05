@@ -55,8 +55,8 @@ export default function Page() {
       <PublicShell>
         <section className="pub-hero">
           <div className="pub-container">
-            <span className="pub-badge"><span className="pub-badge-dot" /> 2026 güncel</span>
-            <h1 className="pub-h1">2026 <span className="pub-grad">Gelir Vergisi Dilimleri</span></h1>
+            <Link href="/rehber" className="pub-ust">Rehber ve araçlar</Link>
+            <h1 className="pub-h1">2026 Gelir Vergisi Dilimleri</h1>
             <p className="pub-lead">
               Güncel gelir vergisi dilimleri ve yıllık matrahınıza göre vergiyi anında hesaplayın.
               Çocuk kulübü bordroları bu dilimlere göre vergilendirilir.

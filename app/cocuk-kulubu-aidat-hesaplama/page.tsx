@@ -55,8 +55,8 @@ export default function Page() {
       <PublicShell>
         <section className="pub-hero">
           <div className="pub-container">
-            <span className="pub-badge"><span className="pub-badge-dot" /> Ücretsiz · kayıt gerekmez</span>
-            <h1 className="pub-h1">Çocuk Kulübü <span className="pub-grad">Aidat Hesaplama</span></h1>
+            <Link href="/rehber" className="pub-ust">Rehber ve araçlar</Link>
+            <h1 className="pub-h1">Çocuk Kulübü Aidat Hesaplama</h1>
             <p className="pub-lead">
               Veliden toplanacak aylık ücreti; ayın iş günü, günlük ders saati ve saat ücretine göre
               saniyeler içinde hesaplayın. Kardeş indirimi dahil.
@@ -90,7 +90,7 @@ export default function Page() {
               <h2>Tahsilatı otomatik takip edin</h2>
               <p>
                 Klüp360, her öğrencinin aylık aidatını otomatik hesaplar, tahsilat durumunu takip eder ve
-                velilere bildirim gönderir. <Link href="/signup">Ücretsiz deneyin</Link>.
+                ödeme dökümünü veliye e-postayla gönderir. <Link href="/signup">Ücretsiz deneyin</Link>.
               </p>
             </div>
           </div>

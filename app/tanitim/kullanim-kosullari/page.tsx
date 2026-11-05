@@ -12,8 +12,7 @@ export default function KullanimKosullariPage() {
     <PublicShell>
       <section className="pub-hero">
         <div className="pub-container">
-          <span className="pub-badge"><span className="pub-badge-dot" /> Yasal</span>
-          <h1 className="pub-h1">Kullanım <span className="pub-grad">Koşulları</span></h1>
+          <h1 className="pub-h1">Kullanım Koşulları</h1>
           <p className="pub-lead">Klüp360 platformunu kullanırken geçerli olan temel kurallar ve karşılıklı yükümlülükler.</p>
         </div>
       </section>

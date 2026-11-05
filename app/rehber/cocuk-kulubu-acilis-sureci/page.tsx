@@ -21,8 +21,8 @@ export default function Page() {
     <PublicShell>
       <section className="pub-hero">
         <div className="pub-container">
-          <span className="pub-badge"><span className="pub-badge-dot" /> Rehber</span>
-          <h1 className="pub-h1">Çocuk Kulübü <span className="pub-grad">Açılış Süreci</span></h1>
+          <Link href="/rehber" className="pub-ust">Rehber ve araçlar</Link>
+          <h1 className="pub-h1">Çocuk Kulübü Açılış Süreci</h1>
           <p className="pub-lead">
             Çocuk kulübü açmak için izlenecek adımlar ve hazırlanması gereken temel evrakların
             pratik rehberi.

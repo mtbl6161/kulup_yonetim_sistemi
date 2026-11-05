@@ -60,8 +60,8 @@ export default function Page() {
       <PublicShell>
         <section className="pub-hero">
           <div className="pub-container">
-            <span className="pub-badge"><span className="pub-badge-dot" /> Rehber</span>
-            <h1 className="pub-h1">Sıkça <span className="pub-grad">Sorulan Sorular</span></h1>
+            <Link href="/rehber" className="pub-ust">Rehber ve araçlar</Link>
+            <h1 className="pub-h1">Sıkça Sorulan Sorular</h1>
             <p className="pub-lead">
               Çocuk kulübü bordrosu, aidatı, saat ücreti ve açılış süreci hakkında en çok sorulanlar.
             </p>

@@ -12,8 +12,7 @@ export default function IadePolitikasiPage() {
     <PublicShell>
       <section className="pub-hero">
         <div className="pub-container">
-          <span className="pub-badge"><span className="pub-badge-dot" /> Yasal</span>
-          <h1 className="pub-h1">İade <span className="pub-grad">Politikası</span></h1>
+          <h1 className="pub-h1">İade Politikası</h1>
           <p className="pub-lead">Abonelik iptali, cayma hakkı ve iade süreçlerine dair koşullar.</p>
         </div>
       </section>

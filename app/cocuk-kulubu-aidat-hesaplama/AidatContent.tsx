@@ -74,7 +74,7 @@ export default function AidatContent() {
           </div>
           <p className="ad-formula">{num(isGunu, 0)} iş günü × {num(gunlukSaat, 0)} saat × {fmtTL(num(saatUcreti, 0))}{kardes ? ' × 0,75 (kardeş indirimi)' : ''}</p>
           <p className="ad-note">İş günü sayısını okulunuzun tatil takvimine göre düzenleyebilirsiniz.</p>
-          <Link href="/signup" className="ad-cta">Tüm öğrencilerin aidatını otomatik takip edin →</Link>
+          <Link href="/signup" className="ad-cta">Tüm öğrencilerin aidatını otomatik takip edin</Link>
         </div>
       </div>
     </div>
@@ -84,8 +84,7 @@ export default function AidatContent() {
 const CSS = `
 .ad{max-width:1000px;margin:0 auto}
 .ad-grid{display:grid;grid-template-columns:1fr 1.05fr;gap:24px;align-items:start}
-.ad-card{background:var(--surf);border:1px solid var(--line);border-radius:20px;padding:26px;
-  box-shadow:0 20px 44px -30px rgba(30,66,41,.35)}
+.ad-card{background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:26px}
 .ad-h2{font-family:var(--font-display);font-size:21px;font-weight:800;margin:0 0 20px;color:var(--tx)}
 .ad-row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .ad-field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
@@ -97,19 +96,19 @@ const CSS = `
 .ad-field small a{color:var(--g);font-weight:600}
 .ad-check{display:flex;align-items:center;gap:10px;font-size:14.5px;font-weight:600;color:var(--tx);cursor:pointer}
 .ad-check input{width:18px;height:18px;accent-color:var(--g)}
-.ad-res{background:linear-gradient(160deg,var(--surf),#f3f7f3)}
+.ad-res{background:var(--zemin)}
 .ad-mini{display:flex;justify-content:space-between;align-items:center;background:var(--bg);border:1px solid var(--line);
   border-radius:12px;padding:12px 16px;margin-bottom:14px}
 .ad-mini span{font-size:14px;color:var(--tx2);font-weight:600}
 .ad-mini strong{font-size:18px;color:var(--g)}
-.ad-big{background:linear-gradient(135deg,var(--g),var(--g-d));color:#fff;border-radius:14px;padding:20px 22px;
+.ad-big{background:var(--gece);color:#fff;border-radius:14px;padding:20px 22px;
   display:flex;flex-direction:column;gap:5px}
 .ad-big span{font-size:13.5px;color:rgba(255,255,255,.8);font-weight:600}
 .ad-big strong{font-family:var(--font-display);font-size:clamp(30px,4vw,40px);font-weight:800;line-height:1}
 .ad-formula{margin:16px 0 0;font-size:13px;color:var(--tx2);font-weight:600}
 .ad-note{margin:8px 0 0;font-size:12px;color:var(--tx3)}
 .ad-cta{display:block;text-align:center;margin-top:18px;padding:14px;border-radius:12px;
-  background:var(--g);color:#fff!important;font-weight:700;font-size:14.5px;transition:background .2s,transform .2s}
-.ad-cta:hover{background:var(--g-d);transform:translateY(-2px)}
+  background:var(--g);color:#fff!important;font-weight:700;font-size:14.5px;transition:background .2s}
+.ad-cta:hover{background:var(--g-d)}
 @media (max-width:820px){ .ad-grid{grid-template-columns:1fr} }
 `

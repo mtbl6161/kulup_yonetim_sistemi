@@ -64,8 +64,8 @@ export default function Page() {
       <PublicShell>
         <section className="pub-hero">
           <div className="pub-container">
-            <span className="pub-badge"><span className="pub-badge-dot" /> 2026 vergi dilimlerine göre güncel</span>
-            <h1 className="pub-h1">Çocuk Kulübü <span className="pub-grad">Bordro Hesaplama</span></h1>
+            <Link href="/rehber" className="pub-ust">Rehber ve araçlar</Link>
+            <h1 className="pub-h1">Çocuk Kulübü Bordro Hesaplama</h1>
             <p className="pub-lead">
               Brüt ücretten SGK, gelir ve damga vergisi kesintilerini düşerek net maaşı saniyeler içinde,
               yönergeye uygun hesaplayın. Kayıt gerekmez.

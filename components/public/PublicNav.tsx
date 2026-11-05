@@ -1,39 +1,40 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { BrandMark, Wordmark } from '@/components/brand/Logo'
 
+// Tanıtım sayfasıyla aynı menü (app/tanitim/page.tsx)
 const LINKS = [
-  { href: '/rehber', label: 'Rehber ve Araçlar', tool: true },
+  { href: '/tanitim#ay', label: 'Nasıl çalışır' },
+  { href: '/tanitim#muhtasar', label: 'Muhtasar' },
   { href: '/fiyatlandirma', label: 'Fiyatlandırma' },
-  { href: '/tanitim/kullanim-kosullari', label: 'Koşullar' },
+  { href: '/rehber', label: 'Rehber ve araçlar' },
   { href: '/tanitim/iletisim', label: 'İletişim' },
 ]
 
 export default function PublicNav() {
-  const { user } = useAuth()
+  const { user, profil } = useAuth()
   const pathname = usePathname()
+  const [acik, setAcik] = useState(false)
+  const panelUrl = profil?.rol === 'super_admin' ? '/yonetim' : (profil?.rol === 'denetim_yetkilisi' ? '/denetim' : '/')
+  // Rehber altındaki makaleler ve araç sayfaları "Rehber ve araçlar" altında sayılır
+  const etkin = (href: string) => pathname === href || (href === '/rehber' && pathname.startsWith('/rehber/'))
 
   return (
     <nav className="pub-nav">
       <div className="pub-nav-inner">
-        <Link href="/tanitim" className="pub-brand">
-          <BrandMark size={38} title="" />
-          <Wordmark height={30} />
+        <Link href="/tanitim" className="pub-brand" aria-label="Klüp360 ana sayfa">
+          <BrandMark size={36} title="" />
+          <Wordmark height={28} />
         </Link>
 
         <div className="pub-nav-links">
-          <Link href="/tanitim" className="pub-nav-home"><Home size={15} /> Ana Sayfa</Link>
           {LINKS.map(l => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={`${l.tool ? 'pub-nav-tool' : ''} ${pathname === l.href ? 'active' : ''}`.trim()}
-              aria-current={pathname === l.href ? 'page' : undefined}
-            >
+            <Link key={l.href} href={l.href} className={etkin(l.href) ? 'active' : undefined} aria-current={etkin(l.href) ? 'page' : undefined}>
               {l.label}
             </Link>
           ))}
@@ -41,18 +42,24 @@ export default function PublicNav() {
 
         <div className="pub-nav-cta">
           {user ? (
-            <Link href="/" className="pub-userpill">
-              <span className="pub-avatar">{user.email?.[0]?.toUpperCase()}</span>
-              <span>Panele Dön</span>
-            </Link>
+            <Link href={panelUrl} className="pub-btn pub-btn-ghost">Panele dön</Link>
           ) : (
             <>
-              <Link href="/login" className="pub-nav-login">Giriş Yap</Link>
-              <Link href="/signup" className="pub-btn pub-btn-primary">Ücretsiz Başla</Link>
+              <Link href="/login" className="pub-nav-login">Giriş yap</Link>
+              <Link href="/signup" className="pub-btn pub-btn-primary">Ücretsiz deneyin</Link>
             </>
           )}
+          <button type="button" className="pub-menu-btn" onClick={() => setAcik(v => !v)} aria-expanded={acik} aria-controls="pub-mobil-menu" aria-label={acik ? 'Menüyü kapat' : 'Menüyü aç'}>
+            {acik ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
       </div>
+      {acik && (
+        <div id="pub-mobil-menu" className="pub-mobil-menu" onKeyDown={e => { if (e.key === 'Escape') setAcik(false) }}>
+          {LINKS.map(l => <Link key={l.href} href={l.href} onClick={() => setAcik(false)}>{l.label}</Link>)}
+          {!user && <Link href="/login" onClick={() => setAcik(false)} className="pub-mobil-giris">Giriş yap</Link>}
+        </div>
+      )}
     </nav>
   )
 }

@@ -47,8 +47,8 @@ export default function Page() {
       <PublicShell>
         <section className="pub-hero">
           <div className="pub-container">
-            <span className="pub-badge"><span className="pub-badge-dot" /> Yönergeye uygun dağıtım</span>
-            <h1 className="pub-h1">Çocuk Kulübü <span className="pub-grad">Örnek Bütçe Tablosu</span></h1>
+            <Link href="/rehber" className="pub-ust">Rehber ve araçlar</Link>
+            <h1 className="pub-h1">Çocuk Kulübü Örnek Bütçe Tablosu</h1>
             <p className="pub-lead">
               Toplam kulüp gelirinin öğretmen havuzu, temel gider ve görevlilere dağıtımını (tahakkuk
               cetveli) anında hesaplayın. Oranları kendi kulübünüze göre düzenleyin.

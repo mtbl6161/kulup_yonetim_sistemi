@@ -55,8 +55,8 @@ export default function Page() {
       <PublicShell>
         <section className="pub-hero">
           <div className="pub-container">
-            <span className="pub-badge"><span className="pub-badge-dot" /> Ücretsiz · kayıt gerekmez</span>
-            <h1 className="pub-h1">Ek Ders / <span className="pub-grad">Saat Ücreti Hesaplama</span></h1>
+            <Link href="/rehber" className="pub-ust">Rehber ve araçlar</Link>
+            <h1 className="pub-h1">Ek Ders / Saat Ücreti Hesaplama</h1>
             <p className="pub-lead">
               Çocuk kulübü öğretmen saat ücretini gösterge ve memur maaş katsayısına göre saniyeler
               içinde hesaplayın. Azami, asgari ve yemekli bölen seçenekleriyle.

@@ -13,10 +13,9 @@ export default function IletisimPage() {
     <PublicShell>
       <section className="pub-hero">
         <div className="pub-container">
-          <span className="pub-badge"><span className="pub-badge-dot" /> Size yardımcı olalım</span>
-          <h1 className="pub-h1">Bizimle <span className="pub-grad">İletişime Geçin</span></h1>
+          <h1 className="pub-h1">Bize ulaşın</h1>
           <p className="pub-lead">
-            Sorularınız, destek talepleriniz veya işbirliği fırsatları için bir mesaj bırakın; en kısa sürede dönüş yapalım.
+            Kurulum, bordro hesabı ya da abonelikle ilgili sorularınız için yazın.
           </p>
         </div>
       </section>

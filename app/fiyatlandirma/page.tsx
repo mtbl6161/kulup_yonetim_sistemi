@@ -3,11 +3,11 @@ import PublicShell from '@/components/public/PublicShell'
 import FiyatlandirmaContent from './FiyatlandirmaContent'
 
 export const metadata: Metadata = {
-  title: 'Fiyatlandırma | Klüp360 — Tek Plan, Tüm Özellikler',
+  title: 'Fiyatlandırma | Klüp360: tek paket, tüm modüller',
   description: 'Klüp360 fiyatlandırması: tek plan, tüm modüller. Sınırsız öğretmen ve öğrenci, gizli ücret yok. Aylık ₺1.250 veya yıllık ₺12.500. 15 gün ücretsiz deneyin.',
   alternates: { canonical: 'https://www.klup360.com/fiyatlandirma' },
   openGraph: {
-    title: 'Klüp360 Fiyatlandırma — Tek Plan, Tüm Özellikler',
+    title: 'Klüp360 fiyatlandırma: tek paket, tüm modüller',
     description: 'Sınırsız öğretmen ve öğrenci, gizli ücret yok. 15 gün ücretsiz deneyin.',
     url: 'https://www.klup360.com/fiyatlandirma',
     siteName: 'Klüp360',
@@ -22,11 +22,10 @@ export default function FiyatlandirmaPage() {
     <PublicShell>
       <section className="pub-hero">
         <div className="pub-container">
-          <span className="pub-badge"><span className="pub-badge-dot" /> Limit yok, sürpriz yok</span>
-          <h1 className="pub-h1">Sade fiyat, <span className="pub-grad">tam özellik</span></h1>
+          <h1 className="pub-h1">Tek paket, tüm modüller</h1>
           <p className="pub-lead">
-            Tek plan, tüm modüller. Sınırsız öğretmen, sınırsız öğrenci. Kurumunuz kadar ödeyin,
-            gizli ücretlerle asla karşılaşmayın.
+            Kulübünüzün büyüklüğü fiyatı değiştirmez: öğrenci, personel ve sınıf sayısında sınır yoktur.
+            Yalnızca ödeme sıklığını seçersiniz.
           </p>
         </div>
       </section>

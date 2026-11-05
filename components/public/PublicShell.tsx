@@ -1,16 +1,17 @@
 import Link from 'next/link'
 import { BrandMark, Wordmark } from '@/components/brand/Logo'
+import { PUBLIC_FONT_SINIFI } from './fontlar'
 import PublicNav from './PublicNav'
 
 /**
- * Ortak public sayfa kabuğu: ana sayfa (tanıtım) estetiğiyle uyumlu
- * nav + footer + tasarım sistemi. Server component — içindeki PublicNav
- * client sınırıdır (useAuth kullanır).
+ * Herkese açık sayfaların ortak kabuğu (fiyatlandırma, rehber, araçlar, iletişim, yasal metinler).
+ * Tanıtım sayfasıyla aynı tasarım dili: sola hizalı, belge gibi; kart, geçiş rengi ve süs hareketi yok.
+ * Server component — içindeki PublicNav client sınırıdır (useAuth kullanır).
  */
 export default function PublicShell({ children }: { children: React.ReactNode }) {
   const yil = new Date().getFullYear()
   return (
-    <div className="pub">
+    <div className={`pub ${PUBLIC_FONT_SINIFI}`}>
       <style>{PUBLIC_CSS}</style>
       <PublicNav />
       <main className="pub-main">{children}</main>
@@ -20,13 +21,13 @@ export default function PublicShell({ children }: { children: React.ReactNode })
             <BrandMark size={40} tone="blue" title="" />
             <div>
               <Wordmark height={26} onDark />
-              <div className="pub-footer-tag">MEB Çocuk Kulüpleri Yönetim Sistemi</div>
+              <div className="pub-footer-tag">MEB çocuk kulüpleri yönetim sistemi</div>
             </div>
           </div>
           <div className="pub-footer-links">
-            <Link href="/ek-ders-hesaplama">Ek Ders Hesaplama</Link>
+            <Link href="/rehber">Rehber ve araçlar</Link>
             <Link href="/fiyatlandirma">Fiyatlandırma</Link>
-            <Link href="/tanitim/kullanim-kosullari">Kullanım Koşulları</Link>
+            <Link href="/tanitim/kullanim-kosullari">Kullanım koşulları</Link>
             <Link href="/tanitim/gizlilik-politikasi">Gizlilik</Link>
             <Link href="/tanitim/kvkk-aydinlatma-metni">KVKK</Link>
             <Link href="/tanitim/iade-politikasi">İade</Link>
@@ -34,112 +35,106 @@ export default function PublicShell({ children }: { children: React.ReactNode })
             <Link href="/login">Giriş</Link>
           </div>
         </div>
-        <div className="pub-container pub-footer-copy">
-          © {yil} Klüp360 — Tüm hakları saklıdır.
-        </div>
+        <div className="pub-container pub-footer-copy">© {yil} Klüp360. Tüm hakları saklıdır.</div>
       </footer>
     </div>
   )
 }
 
 export const PUBLIC_CSS = `
-.pub {
-  --g:#2347D9; --g-d:#1B38B8; --g-dd:#0E1116;
-  --gold:#8EA3EE; --gold-d:#5D78E8;
-  --bg:#F5F6F8; --surf:#FFFFFF; --line:#E3E6EB; --line-2:#E3E6EB;
-  --tx:#0E1116; --tx2:#3F4753; --tx3:#5F6876;
-  font-family:var(--font-sans); color:var(--tx); background:var(--bg);
+.pub{
+  /* tanıtım sayfasıyla aynı palet; eski adlar sayfa stilleri bozulmasın diye korunur */
+  --kagit:#FFFFFF; --zemin:#F6F8FC; --cizgi:#DCE3F3; --murekkep:#1A2233; --gece:#141C2E;
+  --g:#2347D9; --g-d:#1B38B8; --g-dd:#141C2E; --gold:#8EA3EE; --gold-d:#5D78E8;
+  --bg:#F6F8FC; --surf:#FFFFFF; --line:#DCE3F3; --line-2:#DCE3F3; --soluk:#E6ECFC;
+  --tx:#1A2233; --tx2:#465066; --tx3:#66708A;
+  --baslik:var(--font-tz-baslik), system-ui, sans-serif;
+  --govde:var(--font-tz-govde), system-ui, sans-serif;
+  /* sayfa stillerindeki eski var(--font-display) / var(--font-sans) kullanımları da yeni fontlara geçsin */
+  --font-display:var(--font-tz-baslik), system-ui, sans-serif;
+  --font-sans:var(--font-tz-govde), system-ui, sans-serif;
+  font-family:var(--govde); font-size:17px; line-height:1.6; color:var(--tx); background:var(--kagit);
   min-height:100vh; display:flex; flex-direction:column; -webkit-font-smoothing:antialiased;
 }
 .pub *,.pub *::before,.pub *::after{box-sizing:border-box}
 .pub :where(a){text-decoration:none;color:inherit}
 .pub img{max-width:100%;display:block}
 .pub-main{flex:1}
-.pub-container{width:100%;max-width:1180px;margin:0 auto;padding:0 clamp(20px,5vw,48px)}
-.pub-grad{background:linear-gradient(120deg,var(--g),var(--gold));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.pub-container{width:100%;max-width:1120px;margin:0 auto;padding:0 clamp(16px,4vw,40px)}
+.pub a:focus-visible,.pub button:focus-visible,.pub input:focus-visible,.pub select:focus-visible{outline:3px solid var(--g);outline-offset:3px}
+/* eski başlık vurgusu: tek ifadeyi renklendirmek kaldırıldı, sınıf geriye dönük olarak etkisiz */
+.pub-grad{color:inherit}
 
-/* buttons */
-.pub-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:inherit;
-  font-weight:600;font-size:14px;border-radius:12px;padding:10px 18px;cursor:pointer;border:1px solid transparent;
-  white-space:nowrap;transition:transform .2s,box-shadow .2s,background .2s,border-color .2s}
-.pub-btn-lg{font-size:16px;padding:15px 30px;border-radius:14px}
-.pub-btn-primary{background:var(--g);color:#fff;box-shadow:0 8px 22px rgba(35,71,217,.22)}
-.pub-btn-primary:hover{background:var(--g-d);transform:translateY(-2px);box-shadow:0 14px 30px rgba(35,71,217,.28)}
-.pub-btn-ghost{background:var(--surf);color:var(--tx);border-color:var(--line-2)}
-.pub-btn-ghost:hover{border-color:var(--g);color:var(--g);transform:translateY(-2px)}
-.pub-btn-white{background:#fff;color:var(--g-dd);box-shadow:0 10px 26px rgba(0,0,0,.14)}
-.pub-btn-white:hover{transform:translateY(-2px);box-shadow:0 16px 34px rgba(0,0,0,.2)}
+/* düğmeler */
+.pub-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:10px;
+  font:600 15px/1 var(--govde);border:1px solid transparent;cursor:pointer;white-space:nowrap}
+.pub-btn-lg{min-height:52px;padding:0 24px;font-size:16.5px}
+.pub-btn-primary{background:var(--g);color:#fff}
+.pub-btn-primary:hover{background:var(--g-d)}
+.pub-btn-ghost{background:var(--kagit);color:var(--tx);border-color:var(--cizgi)}
+.pub-btn-ghost:hover{border-color:var(--g)}
+.pub-btn-white{background:#fff;color:var(--gece)}
+.pub-btn-white:hover{background:var(--soluk)}
 
-/* nav */
-.pub-nav{position:sticky;top:0;z-index:100;background:rgba(245,242,236,.82);
-  backdrop-filter:saturate(160%) blur(14px);border-bottom:1px solid var(--line)}
-.pub-nav-inner{max-width:1180px;margin:0 auto;height:68px;padding:0 clamp(20px,5vw,48px);
-  display:flex;align-items:center;justify-content:space-between;gap:20px}
-.pub-brand{display:flex;align-items:center;gap:10px}
-.pub-brand-mark{width:38px;height:38px}
-.pub-brand-name{font-family:var(--font-display);font-weight:800;font-size:22px;color:var(--g-d);letter-spacing:-.01em}
-.pub-brand-360{color:var(--gold)}
-.pub-nav-links{display:flex;align-items:center;gap:28px}
-.pub-nav-links a{font-size:14.5px;font-weight:500;color:var(--tx2);transition:color .15s}
-.pub-nav-links a:hover{color:var(--g)}
-.pub-nav-tool{display:inline-flex;align-items:center;gap:6px;font-weight:600!important;color:var(--g-d)!important}
-.pub-nav-tool::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--gold)}
-.pub-nav-tool:hover{color:var(--gold)!important}
-.pub-nav-home{display:inline-flex;align-items:center;gap:6px;font-weight:600}
-.pub-nav-home svg{color:var(--g)}
-.pub-nav-links a.active{color:var(--g);font-weight:700;text-decoration:underline;text-underline-offset:8px;
-  text-decoration-thickness:2px;text-decoration-color:var(--gold)}
-.pub-nav-cta{display:flex;align-items:center;gap:14px}
-.pub-nav-login{font-size:14.5px;font-weight:600;color:var(--tx)}
-.pub-nav-login:hover{color:var(--g)}
-.pub-userpill{display:flex;align-items:center;gap:10px;padding:6px 16px 6px 6px;border-radius:999px;
-  background:var(--surf);border:1px solid var(--line-2);box-shadow:0 2px 8px rgba(0,0,0,.05);
-  font-size:14px;font-weight:600;transition:transform .2s,border-color .2s}
-.pub-userpill:hover{border-color:var(--g);transform:translateY(-1px)}
-.pub-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--g),var(--g-d));
-  color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+/* menü */
+.pub-nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.94);border-bottom:1px solid var(--cizgi)}
+.pub-nav-inner{max-width:1120px;margin:0 auto;height:68px;padding:0 clamp(16px,4vw,40px);display:flex;align-items:center;gap:28px}
+.pub-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.pub-nav-links{display:flex;gap:24px;margin-right:auto}
+.pub-nav-links a{font-size:15px;color:var(--tx2)}
+.pub-nav-links a:hover{color:var(--tx);text-decoration:underline;text-underline-offset:5px}
+.pub-nav-links a.active{color:var(--tx);font-weight:600;text-decoration:underline;text-underline-offset:6px;text-decoration-thickness:2px;text-decoration-color:var(--g)}
+.pub-nav-cta{display:flex;align-items:center;gap:16px;margin-left:auto}
+.pub-nav-login{font-size:15px;font-weight:600}
+.pub-menu-btn{display:none;width:44px;height:44px;border-radius:10px;border:1px solid var(--cizgi);background:var(--kagit);color:var(--tx);align-items:center;justify-content:center;cursor:pointer}
+.pub-mobil-menu{display:none}
 
-/* page hero (başlık bloğu) */
-.pub-hero{position:relative;overflow:hidden;text-align:center;padding:clamp(52px,8vw,96px) 0 clamp(30px,4vw,48px);
-  background:radial-gradient(120% 70% at 50% -10%,#ecf7f0 0%,var(--bg) 60%)}
-.pub-badge{display:inline-flex;align-items:center;gap:9px;background:var(--surf);border:1px solid var(--line-2);
-  border-radius:999px;padding:8px 18px;font-size:13px;font-weight:600;color:var(--g-d);box-shadow:0 4px 16px rgba(35,71,217,.06);margin-bottom:20px}
-.pub-badge-dot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 4px rgba(200,131,42,.18)}
-.pub-h1{font-family:var(--font-display);font-weight:800;letter-spacing:-.02em;line-height:1.12;
-  font-size:clamp(32px,5vw,52px);margin:0 0 16px}
-.pub-lead{font-size:clamp(15px,1.6vw,18px);color:var(--tx2);line-height:1.6;margin:0 auto;max-width:620px}
+/* sayfa başlığı */
+.pub-hero{padding:clamp(40px,6vw,72px) 0 clamp(28px,4vw,40px)}
+.pub-ust{display:inline-flex;align-items:center;gap:6px;font-size:14.5px;font-weight:600;color:var(--g);margin-bottom:18px;
+  text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:5px}
+.pub-ust:hover{text-decoration-thickness:2px}
+.pub-h1{font-family:var(--baslik);font-weight:700;letter-spacing:-.012em;line-height:1.08;font-size:clamp(34px,5vw,52px);margin:0 0 16px;max-width:22ch;text-wrap:balance}
+.pub-lead{font-size:clamp(17px,1.6vw,19px);color:var(--tx2);line-height:1.6;margin:0;max-width:60ch}
 
-/* prose (politika/metin sayfaları) */
-.pub-section{padding:clamp(40px,6vw,72px) 0}
-.pub-prose{max-width:820px;margin:0 auto;background:var(--surf);border:1px solid var(--line);
-  border-radius:22px;padding:clamp(26px,4vw,44px);box-shadow:0 20px 50px -34px rgba(30,66,41,.3)}
-.pub-prose h2{font-family:var(--font-display);font-size:clamp(19px,2.4vw,23px);font-weight:800;
-  color:var(--tx);margin:32px 0 12px;line-height:1.25}
-.pub-prose h2:first-child{margin-top:0}
-.pub-prose p{color:var(--tx2);line-height:1.8;font-size:15.5px;margin:0 0 18px}
-.pub-prose ul{margin:0 0 18px;padding-left:22px}
-.pub-prose li{color:var(--tx2);line-height:1.75;font-size:15.5px;margin-bottom:8px}
-.pub-prose strong{color:var(--tx)}
-.pub-prose a{color:var(--g);font-weight:600}
-.pub-prose-meta{font-size:13px;color:var(--tx3);margin-bottom:26px;text-align:center}
+/* uzun metin (rehber, yasal) */
+.pub-section{padding:clamp(32px,5vw,56px) 0}
+.pub-prose{max-width:72ch;border-top:2px solid var(--tx);padding-top:8px}
+.pub-prose h2{font-family:var(--baslik);font-size:clamp(21px,2.4vw,26px);font-weight:700;letter-spacing:-.01em;color:var(--tx);margin:40px 0 12px;line-height:1.25}
+.pub-prose h2:first-child{margin-top:24px}
+.pub-prose h3{font-family:var(--baslik);font-size:19px;font-weight:700;margin:28px 0 8px}
+.pub-prose p{color:var(--tx2);line-height:1.75;margin:0 0 16px}
+.pub-prose ul,.pub-prose ol{margin:0 0 16px;padding-left:22px}
+.pub-prose ul{list-style:disc}.pub-prose ol{list-style:decimal}
+.pub-prose li{color:var(--tx2);line-height:1.7;margin-bottom:6px}
+.pub-prose strong{color:var(--tx);font-weight:600}
+.pub-prose a{color:var(--g);font-weight:600;text-decoration:underline;text-underline-offset:4px}
+.pub-prose table{width:100%;border-collapse:collapse;margin:0 0 20px;font-size:15.5px}
+.pub-prose th,.pub-prose td{text-align:left;padding:10px 12px 10px 0;border-bottom:1px solid var(--cizgi);vertical-align:top}
+.pub-prose th{font-weight:600;color:var(--tx)}
+.pub-prose-meta{font-size:14px;color:var(--tx3);margin:16px 0 0}
 
-/* footer */
-.pub-footer{background:var(--g-dd);color:#fff;padding:clamp(40px,6vw,64px) 0 28px;margin-top:40px}
-.pub-footer-inner{display:flex;align-items:flex-start;justify-content:space-between;gap:32px;flex-wrap:wrap;padding-bottom:28px}
+/* altbilgi */
+.pub-footer{background:var(--gece);color:#fff;padding:44px 0 26px;margin-top:clamp(40px,6vw,72px)}
+.pub-footer-inner{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;padding-bottom:24px;border-bottom:1px solid rgba(255,255,255,.12)}
 .pub-footer-brand{display:flex;align-items:center;gap:12px}
-.pub-footer-brand img{width:40px;height:40px}
-.pub-footer-name{font-family:var(--font-display);font-weight:800;font-size:20px}
-.pub-footer-tag{font-size:13px;color:rgba(255,255,255,.6);margin-top:2px}
-.pub-footer-links{display:flex;flex-wrap:wrap;gap:14px 24px;max-width:560px}
-.pub-footer-links a{font-size:14px;color:rgba(255,255,255,.72);transition:color .15s}
-.pub-footer-links a:hover{color:#fff}
-.pub-footer-copy{border-top:1px solid rgba(255,255,255,.12);padding-top:22px;font-size:13px;color:rgba(255,255,255,.5)}
+.pub-footer-tag{font-size:13px;color:rgba(255,255,255,.6);margin-top:4px}
+.pub-footer-links{display:flex;flex-wrap:wrap;gap:8px 22px}
+.pub-footer-links a{font-size:14px;color:rgba(255,255,255,.72)}
+.pub-footer-links a:hover{color:#fff;text-decoration:underline;text-underline-offset:4px}
+.pub-footer-copy{font-size:13px;color:rgba(255,255,255,.62);padding-top:20px}
 
-@media (max-width:860px){
+@media (max-width:960px){
   .pub-nav-links{display:none}
+  .pub-menu-btn{display:inline-flex}
+  .pub-mobil-menu{display:flex;flex-direction:column;padding:4px clamp(16px,4vw,40px) 12px;border-top:1px solid var(--cizgi);background:var(--kagit)}
+  .pub-mobil-menu a{display:flex;align-items:center;min-height:48px;font-weight:600;border-bottom:1px solid var(--cizgi)}
+  .pub-mobil-menu a:last-child{border-bottom:0}
+  .pub-mobil-menu .pub-mobil-giris{color:var(--g)}
 }
-@media (max-width:620px){
+@media (max-width:520px){
   .pub-nav-login{display:none}
-  .pub-footer-inner{flex-direction:column;gap:24px}
+  .pub-nav-cta .pub-btn-primary{padding:0 14px}
+  .pub-brand svg:last-child{display:none !important}
 }
 `

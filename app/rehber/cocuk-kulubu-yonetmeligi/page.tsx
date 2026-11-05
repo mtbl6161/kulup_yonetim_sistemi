@@ -21,8 +21,8 @@ export default function Page() {
     <PublicShell>
       <section className="pub-hero">
         <div className="pub-container">
-          <span className="pub-badge"><span className="pub-badge-dot" /> Rehber</span>
-          <h1 className="pub-h1">Çocuk Kulübü <span className="pub-grad">Yönergesi Rehberi</span></h1>
+          <Link href="/rehber" className="pub-ust">Rehber ve araçlar</Link>
+          <h1 className="pub-h1">Çocuk Kulübü Yönergesi Rehberi</h1>
           <p className="pub-lead">
             MEB Okul Öncesi Eğitim ve İlköğretim Kurumları Çocuk Kulüpleri Yönergesi’nin işletmeyi
             ilgilendiren temel maddelerinin sade bir özeti.
