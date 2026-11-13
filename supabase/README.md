@@ -34,10 +34,18 @@ bir kısmı tek seferlik veri düzeltmesidir.
    → `migration_bordro_istisna_karti.sql` (bordroyla birlikte o ayın istisna ayarını saklar)
    → `migration_denetim_gonderilmeden_gizle.sql` (okul göndermeden denetçi o ayın belgelerini göremez)
    → `migration_denetim_karar_mesajlari.sql` (onay/iade yetki hatalarında nedeni söyler)
+   → `migration_profiller_kolon_yetkisi.sql` (**güvenlik:** kullanıcının kendi profilinde `okul_id`, `rol`,
+   `il_id` değiştirip yetki yükseltmesini engeller; tarayıcıdan yalnızca `ad`, `soyad`, `son_giris` yazılabilir.
+   Önce ve sonra `dogrula_profiller_kolon_yetkisi.sql` ile kontrol edin)
 
 `debug_sinif_defteri.sql` yalnızca inceleme sorgusudur; çalıştırılması gerekmez.
+`dogrula_profiller_kolon_yetkisi.sql` de yalnızca doğrulama içindir (politika/yetki listesi ve JWT testi).
 
 ## Kural
 
 Yeni bir değişiklik eklerken dosyayı `migration_<konu>.sql` adıyla buraya koyun, tekrar çalıştırılabilir yazın
 ve bu listenin sonuna ekleyin.
+
+`profiller` tablosunda `authenticated` rolü yalnızca izin verilen kolonlara yazabilir. Kullanıcının tarayıcıdan
+düzenleyeceği yeni bir kolon eklerseniz `migration_profiller_kolon_yetkisi.sql` içindeki `GRANT UPDATE (...)`
+listesine ve hemen üstündeki `NOT IN (...)` listesine de ekleyin; yetki belirleyen kolonları (`okul_id`, `rol`, `il_id`, `ilce_id`) asla eklemeyin.
