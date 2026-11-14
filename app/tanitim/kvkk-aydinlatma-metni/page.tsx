@@ -7,12 +7,10 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://www.klup360.com/tanitim/kvkk-aydinlatma-metni' },
 }
 
-// Veri sorumlusunun resmî kimlik bilgileri — yayından önce şirketin ticaret unvanı,
-// adresi ve MERSİS numarasıyla doldurulmalı (KVKK md. 10/1-a).
+// Şirket kimlik bilgileri (unvan, adres, MERSİS) şimdilik yayımlanmıyor; eklenince
+// KVKK md. 10/1-a gereği buraya ve 1. bölüme yazılmalı.
 const VERI_SORUMLUSU = {
   unvan: 'Klüp360',
-  adres: '',
-  mersis: '',
   eposta: 'destek@klup360.com',
 }
 
@@ -32,7 +30,7 @@ export default function KvkkAydinlatmaPage() {
             <h2>1. Veri sorumlusu ve veri işleyen</h2>
             <p>
               Klüp360 hesabını açan kurum yetkilisi ile kullanıcıların hesap ve iletişim bilgileri bakımından veri sorumlusu
-              {' '}<strong>{VERI_SORUMLUSU.unvan}</strong>’dur{VERI_SORUMLUSU.adres ? ` (${VERI_SORUMLUSU.adres}${VERI_SORUMLUSU.mersis ? `, MERSİS: ${VERI_SORUMLUSU.mersis}` : ''})` : ''}.
+              {' '}<strong>{VERI_SORUMLUSU.unvan}</strong>’dur.
             </p>
             <p>
               Kurumların sisteme girdiği öğrenci, veli ve personel verileri bakımından veri sorumlusu ilgili okul / çocuk kulübüdür;

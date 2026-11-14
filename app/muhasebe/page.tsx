@@ -7,6 +7,7 @@ import StatCard from '@/components/StatCard'
 import { AYLAR, fmtTL } from '@/lib/hesaplama'
 import { useAy } from '@/lib/AyContext'
 import { uyari } from '@/lib/diyalog'
+import { demoDosyaAdi, tarayicidaDemoMu } from '@/lib/demo/mod'
 import type { Ayarlar } from '@/lib/types'
 import { useYukleme } from '@/lib/useYukleme'
 import { useAuth } from '@/lib/AuthContext'
@@ -163,9 +164,10 @@ export default function MuhasebePage() {
     const son = new Date(activeYear, activeMonth, 0).getDate()
     const donem = `${String(activeMonth).padStart(2, '0')}${activeYear}`
     a.href = url
-    a.download = `${bilgiler.vd_kodu}_${settings.vergi_no}_${MUHSGK_SURUM}_01${donem}_${son}${donem}.xml`
+    a.download = demoDosyaAdi(`${bilgiler.vd_kodu}_${settings.vergi_no}_${MUHSGK_SURUM}_01${donem}_${son}${donem}.xml`)
     a.click()
     URL.revokeObjectURL(url)
+    if (tarayicidaDemoMu()) uyari('Bu dosya kurgusal örnek veriden üretildi. Vergi numarası geçersiz olduğu için GİB’e yüklenemez.', 'Demo: örnek MUHSGK dosyası')
   }
 
   const sgkSatirlari = payrollData.filter(b => muhtasaraGirer(b) && b.personel.sgk_li)
@@ -230,9 +232,9 @@ export default function MuhasebePage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20, marginBottom: 32 }}>
           <StatCard title="Toplam Brüt (Matrah)" value={`₺${totalBrut.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`} icon={<TrendingUp size={20} />} color="var(--accent)" />
-          <StatCard title="Ödenecek Net Maaş" value={`₺${totalNet.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`} icon={<Landmark size={20} />} color="#0284c7" />
-          <StatCard title="Gelir Vergisi" value={`₺${totalGV.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`} icon={<Calculator size={20} />} color="#ef4444" />
-          <StatCard title="Damga Vergisi" value={`₺${totalDV.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`} icon={<FileText size={20} />} color="#10b981" />
+          <StatCard title="Ödenecek Net Maaş" value={`₺${totalNet.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`} icon={<Landmark size={20} />} color="var(--success)" />
+          <StatCard title="Gelir Vergisi" value={`₺${totalGV.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`} icon={<Calculator size={20} />} color="var(--accent2)" />
+          <StatCard title="Damga Vergisi" value={`₺${totalDV.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`} icon={<FileText size={20} />} color="var(--accent)" />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>

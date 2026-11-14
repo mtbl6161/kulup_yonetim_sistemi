@@ -5,7 +5,7 @@ import { useAy } from '@/lib/AyContext'
 import { supabase } from '@/lib/supabase'
 import { ayLabel, isGunuSayisi, RESMI_TATILLER, AYLAR, isOgretmen } from '@/lib/hesaplama'
 import { Ogrenci, Tahsilat, HesapHareketi, Ayarlar, Personel, kulupOgrencisi, Sinif, Bordro, Puantaj, Tatil, type OkulBildirimi } from '@/lib/types'
-import { kulupAySonuBakiye } from '@/lib/isletmeDefteri'
+import { kulupAySonuBakiye, kulupAySonuBakiyeleri } from '@/lib/isletmeDefteri'
 import { belgeDonemde, donemBelgeleriniGetir, TESLIM_DURUM_ETIKET, type DenetimMadde, type DenetimBelge, type DenetimTeslim } from '@/lib/denetimDosyasi'
 import Link from 'next/link'
 
@@ -13,6 +13,7 @@ import { useAuth } from '@/lib/AuthContext'
 import { uyari } from '@/lib/diyalog'
 import {
   CheckCircle2, PlusCircle, UserCheck, AlertTriangle, Megaphone, GraduationCap, ShieldCheck, Search, Info,
+  Check,
 } from 'lucide-react'
 import { useYukleme } from '@/lib/useYukleme'
 
@@ -38,7 +39,7 @@ function Banner({ color, bg, border, icon, title, children, action }: { color: s
 
 export default function DashboardPage() {
   const { ay, yil } = useAy()
-  const { okul, profil, session } = useAuth()
+  const { okul, profil, session, demo } = useAuth()
   const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
   const [tahsilatlar, setTahsilatlar] = useState<Tahsilat[]>([])
   const [prevTahsilatlar, setPrevTahsilatlar] = useState<Tahsilat[]>([])
@@ -48,8 +49,12 @@ export default function DashboardPage() {
   const [bildirimler, setBildirimler] = useState<OkulBildirimi[]>([])
   const [loading, setLoading] = useState(true)
   const [personel, setPersonel] = useState<Personel[]>([])
-  const [siniflar, setSiniflar] = useState<Pick<Sinif, 'kapasite'>[]>([])
-  const [bordrolar, setBordrolar] = useState<Pick<Bordro, 'personel_id'>[]>([])
+  const [siniflar, setSiniflar] = useState<Pick<Sinif, 'ad' | 'kapasite'>[]>([])
+  const [bordrolar, setBordrolar] = useState<Pick<Bordro, 'personel_id' | 'net'>[]>([])
+  // Bakiye eğrisi için ay sonu bakiyeleri: [önceki yıl 12 ay, bu yıl 12 ay] (yüklenemezse null)
+  const [bakiyeSerisi, setBakiyeSerisi] = useState<number[] | null>(null)
+  const [grafikAy, setGrafikAy] = useState<6 | 12>(6)
+  const [grafikOdak, setGrafikOdak] = useState<number | null>(null)
   const [tatiller, setTatiller] = useState<Tatil[]>([])
   const [puantajliPersonel, setPuantajliPersonel] = useState<Set<number>>(new Set())
   const [banka, setBanka] = useState<{ bakiye: number; ayNet: number } | null>(null)
@@ -92,16 +97,17 @@ export default function DashboardPage() {
       { data: brd },
       bankaDurumu,
       denetimDurumu,
+      bakiyeler,
     ] = await Promise.all([
-      supabase.from('ogrenciler').select('id,ad,soyad,aktif,ucretsiz_mi,kardes_indirimi,gunluk_saat,ogrenci_turu').eq('okul_id', okul?.id),
+      supabase.from('ogrenciler').select('id,ad,soyad,sinif,aktif,ucretsiz_mi,kardes_indirimi,gunluk_saat,ogrenci_turu').eq('okul_id', okul?.id),
       supabase.from('tahsilat').select('ogrenci_id,tutar').eq('ay', ay).eq('yil', yil).eq('okul_id', okul?.id),
       supabase.from('tahsilat').select('ogrenci_id,tutar').eq('ay', prevMonth).eq('yil', prevYear).eq('okul_id', okul?.id),
       supabase.from('hesap_hareketleri').select('tur,tutar,ay,yil').eq('okul_id', okul?.id),
       supabase.from('ayarlar').select('*').eq('okul_id', okul?.id).single(),
       supabase.from('tatiller').select('*').or(`okul_id.eq.${okul?.id ?? 0},okul_id.is.null`),
       supabase.from('personel').select('id,ad,aktif,iban,tc,gorev').eq('okul_id', okul?.id),
-      supabase.from('siniflar').select('kapasite').eq('aktif', true).eq('okul_id', okul?.id),
-      supabase.from('bordro').select('personel_id').eq('ay', ay).eq('yil', yil).eq('okul_id', okul?.id),
+      supabase.from('siniflar').select('ad,kapasite').eq('aktif', true).eq('okul_id', okul?.id),
+      supabase.from('bordro').select('personel_id,net').eq('ay', ay).eq('yil', yil).eq('okul_id', okul?.id),
       // Kartlardan biri yüklenemezse (ör. migration eksik) panelin geri kalanı yine açılır
       kulupAySonuBakiye(yil, ay).catch(() => null),
       (async () => {
@@ -113,6 +119,9 @@ export default function DashboardPage() {
         if (m.error) throw m.error
         return { maddeler: (m.data || []) as DenetimMadde[], teslim: (t.data as DenetimTeslim) || null, belgeler: b }
       })().catch(() => null),
+      // Önceki yıl yalnızca son 6 ay ona taştığında gerekir
+      Promise.all([ay < 6 ? kulupAySonuBakiyeleri(yil - 1) : Promise.resolve(Array(12).fill(0)), kulupAySonuBakiyeleri(yil)])
+        .then(([o, b]) => [...o, ...b]).catch(() => null),
     ])
 
     let pua: Pick<Puantaj, 'personel_id' | 'tarih' | 'saat'>[] = []
@@ -150,6 +159,7 @@ export default function DashboardPage() {
     setPuantajliPersonel(new Set(pua.filter(x => Number(x.saat) > 0).map(x => x.personel_id)))
     setBanka(bankaDurumu)
     setDenetim(denetimDurumu)
+    setBakiyeSerisi(bakiyeler)
     setLoading(false)
   }, [ay, yil, okul?.id])
 
@@ -288,7 +298,8 @@ export default function DashboardPage() {
   const bordroDurumu = bordrolar.length > 0 ? 1 : 0
 
   const lisansBitisBanner = (() => {
-    if (!okul?.lisans_bitis) return null
+    // Demoda deneme süresi uyarısının yerini üstteki demo şeridi alır
+    if (demo || !okul?.lisans_bitis) return null
     const bugun = new Date()
     const bitis = new Date(okul.lisans_bitis)
     const kalanGun = Math.ceil((bitis.getTime() - bugun.getTime()) / (1000 * 60 * 60 * 24))
@@ -313,25 +324,26 @@ export default function DashboardPage() {
   }
 
   // ---- Atlas genel bakış: görünüm için türetilen değerler ----
-  const son6 = (() => {
+  // Grafikte gösterilen aylar (6 ya da 12), en eskiden bu aya
+  const seri = (() => {
     const liste: { ay: number; yil: number }[] = []
     let tAy = ay, tYil = yil
-    for (let i = 0; i < 6; i++) { liste.push({ ay: tAy, yil: tYil }); tAy--; if (tAy === 0) { tAy = 12; tYil-- } }
-    return liste.reverse().map(m => ({
-      ...m,
-      gelir: hareketler.filter(h => h.tur === 'gelir' && h.ay === m.ay && h.yil === m.yil).reduce((s, h) => s + Number(h.tutar), 0),
-      gider: hareketler.filter(h => h.tur === 'gider' && h.ay === m.ay && h.yil === m.yil).reduce((s, h) => s + Number(h.tutar), 0),
-    }))
+    for (let i = 0; i < grafikAy; i++) { liste.push({ ay: tAy, yil: tYil }); tAy--; if (tAy === 0) { tAy = 12; tYil-- } }
+    return liste.reverse().map(m => {
+      const gelir = hareketler.filter(h => h.tur === 'gelir' && h.ay === m.ay && h.yil === m.yil).reduce((s, h) => s + Number(h.tutar), 0)
+      const gider = hareketler.filter(h => h.tur === 'gider' && h.ay === m.ay && h.yil === m.yil).reduce((s, h) => s + Number(h.tutar), 0)
+      return { ...m, gelir, gider, net: gelir - gider }
+    })
   })()
-  const buAy = son6[son6.length - 1]
-  const buAyNet = buAy.gelir - buAy.gider
+  const buAy = seri[seri.length - 1]
+  const oncekiAy = seri[seri.length - 2]
+  const buAyNet = buAy.net
   const grafikMax = (() => {
-    const m = Math.max(...son6.flatMap(d => [d.gelir, d.gider]), 1)
+    const m = Math.max(...seri.flatMap(d => [d.gelir, d.gider]), 1)
     const us = Math.pow(10, Math.floor(Math.log10(m)))
     return Math.ceil(m / us * 2) / 2 * us || 1
   })()
   const kisalt = (v: number) => v >= 1e6 ? `${(v / 1e6).toFixed(1).replace('.', ',')} Mn` : v >= 1e3 ? `${Math.round(v / 1e3)} B` : `${Math.round(v)}`
-  const GRAFIK_H = 200
   const tlTam = (v: number) => `₺${Math.round(v).toLocaleString('tr-TR')}`
 
   const tatilListesi: { ad: string; gun: number; tip: string; sonGun?: boolean }[] = (() => {
@@ -410,39 +422,61 @@ export default function DashboardPage() {
   const onem = { alert: 0, warn: 1, info: 2 }
   uyarilar.sort((a, b) => onem[a.type] - onem[b.type])
 
-  const kpis = [
-    {
-      label: 'Tahsilat verimi', value: `%${tahsilatYuzdesi}`,
-      chip: trendAnlamli && prevToplamTahsilat > 0 ? `${tahsilatTrendi >= 0 ? '+' : '−'}%${Math.abs(tahsilatTrendi)} geçen aya göre` : '', chipOk: tahsilatTrendi >= 0,
-      bar: tahsilatYuzdesi, barColor: 'var(--accent)',
-      sub: `${tlTam(toplamTahsilat)} / ${tlTam(toplamBeklenen)}`,
-    },
-    {
-      label: 'Kapasite doluluğu', value: `%${kapasiteYuzdesi}`,
-      chip: `${aktifOgrenci} / ${toplamKapasite}`, chipOk: null as boolean | null,
-      bar: kapasiteYuzdesi, barColor: 'var(--accent)',
-      sub: toplamKapasite > aktifOgrenci ? `${toplamKapasite - aktifOgrenci} boş kontenjan` : 'Kontenjan dolu',
-    },
-    {
-      label: 'Bordro', value: bordroDurumu ? 'Tahakkuk edildi' : 'Bekleniyor',
-      chip: bordrolar.length ? `${bordrolar.length} kayıt` : '', chipOk: bordroDurumu > 0 ? true : null,
-      bar: bordroDurumu ? 100 : 8, barColor: bordroDurumu > 0 ? 'var(--success)' : gunGecti(20) ? 'var(--warn)' : 'var(--border-strong)',
-      sub: bordroDurumu > 0 ? `${ayLabel(ay, yil)} dönemi` : 'Veri girişi bekleniyor',
-    },
-    {
-      label: 'Bankada kalan', value: banka ? tlTam(banka.bakiye) : '—',
-      chip: banka ? `${banka.ayNet >= 0 ? '+' : '−'}${tlTam(Math.abs(banka.ayNet))}` : '—', chipOk: banka ? banka.ayNet >= 0 : null,
-      bar: -1, barColor: '',
-      sub: `${AYLAR[ay]} sonu · kulüp işletme defterine göre`,
-    },
-  ]
+  const ayKisa3 = (a: number) => AYLAR[a].slice(0, 3)
+  const degisim = (simdi: number, once: number) => (trendAnlamli && once > 0 ? Math.round(((simdi - once) / once) * 100) : null)
+
+  // Bankada kalan: son 6 ayın ay sonu bakiyesi
+  const bakiyeNoktalari = bakiyeSerisi ? Array.from({ length: 6 }, (_, i) => {
+    let a = ay - 5 + i, y = yil
+    if (a <= 0) { a += 12; y-- }
+    return { ay: a, bakiye: bakiyeSerisi[(y === yil ? 12 : 0) + a - 1] }
+  }) : null
+  const bakiyeEgrisi = (() => {
+    if (!bakiyeNoktalari) return null
+    const v = bakiyeNoktalari.map(n => n.bakiye)
+    const mn = Math.min(...v), mx = Math.max(...v), aralik = mx - mn || 1
+    // Bakiye hiç değişmediyse çizgi ortada durur
+    const pts = v.map((x, i) => [(i / (v.length - 1)) * 300, mx === mn ? 40 : 62 - ((x - mn) / aralik) * 52])
+    const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ')
+    return { d, alan: `${d} L300 70 L0 70Z` }
+  })()
+
+  // Tahsilat
+  const ucretliOgrenciler = ogrenciler.filter(o => o.aktif !== false && getGereken(o) > 0)
+  const odeyenSayisi = ucretliOgrenciler.filter(o => odenen(o) >= getGereken(o) - 1).length
+  const tahsilatOrani = toplamBeklenen > 0 ? Math.min(toplamTahsilat / toplamBeklenen, 1) : 0
+
+  // Şubeler: öğrencinin sınıf alanı şube adıyla eşleşir
+  const subeler = siniflar
+    .filter(c => (c.kapasite || 0) > 0)
+    .map(c => ({ ad: c.ad, kapasite: c.kapasite || 0, mevcut: ogrenciler.filter(o => o.aktif !== false && o.sinif === c.ad).length }))
+  const bosYer = Math.max(toplamKapasite - aktifOgrenci, 0)
+  const tasanSube = subeler.filter(c => c.mevcut > c.kapasite).length
+
+  // Bordro adımları: puantaj, tahakkuk, MUHSGK beyanı (bu ayın bordrosu ertesi ayın 26'sında beyan edilir)
+  const ogretmenSayisi = personel.filter(p => p.aktif !== false && isOgretmen(p.gorev)).length
+  const puantajTamam = ogretmenSayisi - personel.filter(p => p.aktif !== false && isOgretmen(p.gorev) && !puantajliPersonel.has(p.id)).length
+  const netBordro = bordrolar.reduce((s, b) => s + Number(b.net || 0), 0)
+  const beyanAy = ay === 12 ? 1 : ay + 1, beyanYil = ay === 12 ? yil + 1 : yil
+  const beyanGunu = isGununeKaydir(beyanYil, beyanAy, 26)
+  const beyanaKalan = Math.round((beyanGunu.getTime() - new Date(new Date().setHours(0, 0, 0, 0)).getTime()) / 86400000)
+  const bordroAdimlari = (() => {
+    const tamam = [ogretmenSayisi === 0 || puantajTamam >= ogretmenSayisi, bordroDurumu > 0, false]
+    const ilkAcik = tamam.indexOf(false)
+    const notlar = [
+      ogretmenSayisi ? `${puantajTamam} / ${ogretmenSayisi}` : 'Gerekmiyor',
+      bordroDurumu ? `${tlTam(netBordro)} net` : 'Bekleniyor',
+      beyanaKalan >= 0 && beyanaKalan <= 45 ? `${beyanGunu.getDate()} ${ayKisa3(beyanAy)}, ${beyanaKalan === 0 ? 'bugün' : `${beyanaKalan} gün`}` : `${beyanGunu.getDate()} ${ayKisa3(beyanAy)}`,
+    ]
+    return ['Puantaj', 'Bordro tahakkuku', 'MUHSGK beyanı'].map((ad, i) => ({ ad, not: notlar[i], durum: tamam[i] ? 'tamam' as const : i === ilkAcik ? 'sirada' as const : 'bekliyor' as const }))
+  })()
 
   const chipStyle = (ok: boolean | null): React.CSSProperties => ({
     fontSize: 12.5, fontWeight: 600, padding: '2px 7px', borderRadius: 5, whiteSpace: 'nowrap',
     background: ok === null ? '#eef0f4' : ok ? 'var(--success-light)' : 'var(--danger-light)',
     color: ok === null ? 'var(--text2)' : ok ? 'var(--success-dark)' : 'var(--danger-dark)',
   })
-  const panel: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }
+  const panel: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-card)', boxShadow: 'var(--shadow-card)' }
   const panelTitle: React.CSSProperties = { fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, letterSpacing: '-0.02em', margin: 0, color: 'var(--text)' }
   const tone = (t: string) => t === 'danger' || t === 'alert' ? 'var(--danger)' : t === 'warning' || t === 'warn' ? 'var(--warn)' : 'var(--accent)'
 
@@ -480,7 +514,7 @@ export default function DashboardPage() {
                   {filteredResults.map(item => (
                     <Link key={`${item.type}-${item.id}`} href={item.type === 'ogrenci' ? `/ogrenciler?id=${item.id}` : `/personel?id=${item.id}`} style={{ textDecoration: 'none' }}>
                       <div className="sidebar-link" style={{ padding: '8px 10px', borderRadius: 7, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                        <div style={{ width: 28, height: 28, background: item.type === 'ogrenci' ? 'var(--accent-lighter)' : 'var(--warn-light)', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.type === 'ogrenci' ? 'var(--accent)' : 'var(--warn)' }}>
+                        <div style={{ width: 28, height: 28, background: item.type === 'ogrenci' ? 'var(--accent-lighter)' : 'var(--coral-light)', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.type === 'ogrenci' ? 'var(--accent)' : 'var(--accent2)' }}>
                           {item.type === 'ogrenci' ? <GraduationCap size={15} /> : <UserCheck size={15} />}
                         </div>
                         <div style={{ flex: 1 }}>
@@ -549,68 +583,246 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* KPI ŞERİDİ */}
-        <section style={{ ...panel, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
-          {kpis.map((k, i) => (
-            <div key={k.label} style={{ padding: '16px 20px', borderLeft: i === 0 ? 'none' : '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12.5, color: 'var(--text3)', fontWeight: 500 }}>{k.label}</span>
-                {k.chip && <span className="tabular" style={chipStyle(k.chipOk)}>{k.chip}</span>}
-              </div>
-              <div className="tabular" style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1.1, marginTop: 8, color: 'var(--text)' }}>{k.value}</div>
-              {k.bar >= 0 ? (
-                <div style={{ height: 4, borderRadius: 2, background: '#eef0f4', marginTop: 12, overflow: 'hidden' }}>
-                  <div style={{ width: `${Math.min(k.bar, 100)}%`, height: '100%', background: k.barColor, borderRadius: 2 }} />
+        {/* ÖZET KARTLARI */}
+        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
+          {/* Bankada kalan: son 6 ayın ay sonu bakiyesi */}
+          <div style={{
+            position: 'relative', overflow: 'hidden', borderRadius: 18, padding: '18px 20px 14px', color: '#fff', display: 'flex', flexDirection: 'column',
+            background: 'linear-gradient(150deg, var(--accent) 0%, var(--accent-dark) 60%, #14287f 100%)',
+            boxShadow: '0 18px 40px -14px rgba(35, 71, 217, 0.55)',
+          }}>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)', fontWeight: 500 }}>Bankada kalan</div>
+            <div className="tabular" style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.1, margin: '6px 0 8px' }}>{banka ? tlTam(banka.bakiye) : '—'}</div>
+            {banka && (
+              <div><span className="tabular" style={{ display: 'inline-block', fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.16)' }}>
+                Bu ay {banka.ayNet >= 0 ? '+' : '−'}{tlTam(Math.abs(banka.ayNet))}
+              </span></div>
+            )}
+            {bakiyeEgrisi && bakiyeNoktalari ? (
+              <div style={{ marginTop: 'auto', paddingTop: 12 }}>
+                <svg viewBox="0 0 300 70" preserveAspectRatio="none" width="100%" height="64" role="img"
+                  aria-label={`Son 6 ay ay sonu bakiyesi: ${bakiyeNoktalari.map(n => `${AYLAR[n.ay]} ${tlTam(n.bakiye)}`).join(', ')}`}>
+                  <defs>
+                    <linearGradient id="bakiyeDolgu" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0" stopColor="#fff" stopOpacity="0.3" /><stop offset="1" stopColor="#fff" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <path d={bakiyeEgrisi.alan} fill="url(#bakiyeDolgu)" />
+                  <path d={bakiyeEgrisi.d} fill="none" stroke="#fff" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                </svg>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'rgba(255,255,255,0.72)', marginTop: 4 }}>
+                  {bakiyeNoktalari.map(n => <span key={n.ay}>{ayKisa3(n.ay)}</span>)}
                 </div>
-              ) : <div style={{ height: 4, marginTop: 12 }} />}
-              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text3)' }}>{k.sub}</div>
+              </div>
+            ) : (
+              <div style={{ marginTop: 'auto', paddingTop: 12, fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>{AYLAR[ay]} sonu, kulüp işletme defterine göre</div>
+            )}
+          </div>
+
+          {/* Tahsilat verimi */}
+          <div className="stat-card" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <div className="stat-label">Tahsilat verimi</div>
+                <div className="stat-value">%{tahsilatYuzdesi}</div>
+                <div className="stat-sub">{odeyenSayisi} / {ucretliOgrenciler.length} öğrenci ödedi</div>
+              </div>
+              <svg width="72" height="72" viewBox="0 0 72 72" aria-hidden="true" style={{ flexShrink: 0 }}>
+                <circle cx="36" cy="36" r="29" fill="none" strokeWidth="9" stroke={toplamBorc > 0 ? 'var(--coral)' : '#eef0f4'} />
+                {tahsilatOrani > 0 && (
+                  <circle cx="36" cy="36" r="29" fill="none" strokeWidth="9" stroke="var(--accent)" transform="rotate(-90 36 36)"
+                    strokeDasharray={`${Math.max(2 * Math.PI * 29 * tahsilatOrani - (tahsilatOrani < 1 ? 3 : 0), 0)} ${2 * Math.PI * 29}`} />
+                )}
+              </svg>
             </div>
-          ))}
+            <div style={{ marginTop: 'auto', paddingTop: 14, borderTop: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, color: 'var(--text2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: 'var(--accent)', marginRight: 7 }} />Tahsil edilen</span>
+                <b className="tabular" style={{ color: 'var(--text)', fontWeight: 600 }}>{tlTam(toplamTahsilat)}</b>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: 'var(--coral)', marginRight: 7 }} />{aidatErken ? 'Beklenen' : 'Geciken'}</span>
+                <b className="tabular" style={{ color: 'var(--text)', fontWeight: 600 }}>{tlTam(toplamBorc)}</b>
+              </div>
+            </div>
+          </div>
+
+          {/* Kontenjan doluluğu: şube şube */}
+          <div className="stat-card" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+              <div>
+                <div className="stat-label">Kontenjan doluluğu</div>
+                <div className="stat-value">%{kapasiteYuzdesi}</div>
+              </div>
+              <span className="tabular" style={chipStyle((aktifOgrenci > toplamKapasite && toplamKapasite > 0) || tasanSube > 0 ? false : null)}>
+                {aktifOgrenci > toplamKapasite && toplamKapasite > 0 ? `${aktifOgrenci - toplamKapasite} kişi fazla` : tasanSube > 0 ? `${tasanSube} şubede fazla` : bosYer > 0 ? `${bosYer} boş yer` : 'Dolu'}
+              </span>
+            </div>
+            <div style={{ marginTop: 'auto', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {subeler.length === 0 ? (
+                <div className="stat-sub">Şube kontenjanı tanımlanmamış. <Link href="/siniflar" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>Sınıflar</Link></div>
+              ) : subeler.slice(0, 3).map(c => {
+                const oran = Math.min(c.mevcut / c.kapasite, 1)
+                return (
+                  <div key={c.ad}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--text2)', marginBottom: 4, gap: 8 }}>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.ad}</span>
+                      <b className="tabular" style={{ color: c.mevcut > c.kapasite ? 'var(--danger)' : 'var(--text)', fontWeight: 600 }}>{c.mevcut} / {c.kapasite}</b>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 3, background: '#eef0f4', overflow: 'hidden' }}>
+                      <div style={{ width: `${oran * 100}%`, height: '100%', borderRadius: 3, background: c.mevcut > c.kapasite ? 'var(--danger)' : c.mevcut === c.kapasite ? 'var(--success)' : 'var(--accent)' }} />
+                    </div>
+                  </div>
+                )
+              })}
+              {subeler.length > 3 && <Link href="/siniflar" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>+{subeler.length - 3} şube daha</Link>}
+            </div>
+          </div>
+
+          {/* Bordro adımları */}
+          <div className="stat-card" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <div className="stat-label">{AYLAR[ay]} bordrosu</div>
+                <div className="stat-value" style={{ fontSize: bordroDurumu ? 24 : 22 }}>{bordroDurumu ? tlTam(netBordro) : 'Bekleniyor'}</div>
+              </div>
+              <span style={chipStyle(bordroDurumu ? true : null)}>{bordroDurumu ? 'Tahakkuk edildi' : 'Hazırlanıyor'}</span>
+            </div>
+            <ol style={{ listStyle: 'none', margin: 'auto 0 0', padding: '14px 0 0' }}>
+              {bordroAdimlari.map((a, i) => (
+                <li key={a.ad} style={{ display: 'grid', gridTemplateColumns: '22px 1fr auto', gap: 10, alignItems: 'center', padding: '5px 0', position: 'relative', fontSize: 12.5 }}>
+                  {i > 0 && <span aria-hidden style={{ position: 'absolute', left: 10, top: -6, width: 2, height: 12, background: bordroAdimlari[i - 1].durum === 'tamam' ? 'var(--success)' : 'var(--border)' }} />}
+                  <span aria-hidden style={{
+                    width: 22, height: 22, borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, position: 'relative', zIndex: 1,
+                    border: `2px solid ${a.durum === 'tamam' ? 'var(--success)' : a.durum === 'sirada' ? 'var(--coral)' : 'var(--border-strong)'}`,
+                    background: a.durum === 'tamam' ? 'var(--success)' : a.durum === 'sirada' ? 'var(--coral-light)' : '#fff',
+                    color: a.durum === 'tamam' ? '#fff' : a.durum === 'sirada' ? 'var(--accent2)' : 'var(--text3)',
+                  }}>{a.durum === 'tamam' ? <Check size={12} strokeWidth={3} /> : i + 1}</span>
+                  <span style={{ color: a.durum === 'bekliyor' ? 'var(--text3)' : 'var(--text)' }}>
+                    {a.ad}<span className="sr-only">{a.durum === 'tamam' ? ' (tamamlandı)' : a.durum === 'sirada' ? ' (sırada)' : ''}</span>
+                  </span>
+                  <span className="tabular" style={{ fontSize: 12, color: a.durum === 'sirada' ? 'var(--accent2)' : 'var(--text3)', fontWeight: a.durum === 'sirada' ? 600 : 400 }}>{a.not}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
         </section>
 
         {/* GRAFİK + AKILLI TAKİP */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
-          <section style={{ ...panel, padding: '18px 20px', gridColumn: 'span 2', minWidth: 0 }}>
+          <section style={{ ...panel, padding: '18px 22px 14px', gridColumn: 'span 2', minWidth: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
               <div>
-                <h3 style={panelTitle}>Finansal akış</h3>
-                <div style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 2 }}>Son 6 aylık gelir ve gider</div>
+                <h3 style={panelTitle}>Gelir ve gider</h3>
+                <div style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 2 }}>Ayın ayrıntısı için çubukların üzerine gelin</div>
               </div>
-              <div style={{ display: 'flex', gap: 22, textAlign: 'right' }}>
-                <div><div style={{ fontSize: 12, color: 'var(--text3)' }}>Gelir</div><div className="tabular" style={{ fontSize: 15, fontWeight: 500, color: 'var(--accent)' }}>{tlTam(buAy.gelir)}</div></div>
-                <div><div style={{ fontSize: 12, color: 'var(--text3)' }}>Gider</div><div className="tabular" style={{ fontSize: 15, fontWeight: 500 }}>{tlTam(buAy.gider)}</div></div>
-                <div><div style={{ fontSize: 12, color: 'var(--text3)' }}>Net</div><div className="tabular" style={{ fontSize: 15, fontWeight: 500, color: buAyNet >= 0 ? 'var(--success)' : 'var(--danger)' }}>{buAyNet >= 0 ? '+' : '−'}{tlTam(Math.abs(buAyNet))}</div></div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', marginTop: 18 }}>
-              <div className="tabular" style={{ width: 46, height: GRAFIK_H, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end', paddingRight: 10, fontSize: 11.5, color: 'var(--text3)' }}>
-                {[1, 0.75, 0.5, 0.25, 0].map(f => <span key={f}>{f === 0 ? '0' : kisalt(grafikMax * f)}</span>)}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ position: 'relative', height: GRAFIK_H }}>
-                  <div aria-hidden style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    {[0, 1, 2, 3].map(i => <div key={i} style={{ borderTop: '1px dashed var(--border)' }} />)}
-                    <div style={{ borderTop: '1px solid var(--border-strong)' }} />
-                  </div>
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around' }}>
-                    {son6.map((d, i) => (
-                      <div key={`${d.ay}-${d.yil}`} style={{ display: 'flex', alignItems: 'flex-end', gap: 4 }} title={`${ayLabel(d.ay, d.yil)} · Gelir ${tlTam(d.gelir)} · Gider ${tlTam(d.gider)}`}>
-                        <div style={{ width: 24, height: Math.max((d.gelir / grafikMax) * GRAFIK_H, d.gelir > 0 ? 3 : 0), background: i === son6.length - 1 ? 'var(--accent)' : '#8ea3ee', borderRadius: '3px 3px 0 0' }} />
-                        <div style={{ width: 24, height: Math.max((d.gider / grafikMax) * GRAFIK_H, d.gider > 0 ? 3 : 0), background: '#c5cad3', borderRadius: '3px 3px 0 0' }} />
+              <div style={{ display: 'flex', gap: 26, flexWrap: 'wrap' }}>
+                {([
+                  ['gelir', `${AYLAR[ay]} geliri`, buAy.gelir, 'var(--accent)', degisim(buAy.gelir, oncekiAy.gelir)],
+                  ['gider', `${AYLAR[ay]} gideri`, buAy.gider, 'var(--text)', degisim(buAy.gider, oncekiAy.gider)],
+                ] as const).map(([k, etiket, v, renk, d]) => (
+                  <div key={k}>
+                    <div style={{ fontSize: 12, color: 'var(--text3)' }}>{etiket}</div>
+                    <div className="tabular" style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 650, letterSpacing: '-0.02em', color: renk }}>{tlTam(v)}</div>
+                    {d !== null && (
+                      <div style={{ fontSize: 11.5, fontWeight: 600, color: k === 'gelir' ? (d >= 0 ? 'var(--success)' : 'var(--danger)') : 'var(--text3)' }}>
+                        {d >= 0 ? '↑' : '↓'} %{Math.abs(d)} {AYLAR[oncekiAy.ay]}&apos;a göre
                       </div>
-                    ))}
+                    )}
                   </div>
+                ))}
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>Net</div>
+                  <div className="tabular" style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 650, letterSpacing: '-0.02em', color: buAyNet >= 0 ? 'var(--success)' : 'var(--danger)' }}>{buAyNet >= 0 ? '+' : '−'}{tlTam(Math.abs(buAyNet))}</div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 8, fontSize: 12.5, color: 'var(--text3)' }}>
-                  {son6.map((d, i) => <span key={`l-${d.ay}-${d.yil}`} style={{ width: 52, textAlign: 'center', fontWeight: i === son6.length - 1 ? 600 : 400, color: i === son6.length - 1 ? 'var(--text)' : undefined }}>{ayLabel(d.ay, d.yil).split(' ')[0].slice(0, 3)}</span>)}
-                </div>
+              </div>
+              <div role="group" aria-label="Dönem" style={{ display: 'inline-flex', background: 'var(--surface2)', border: '1px solid var(--border-light)', borderRadius: 9, padding: 3 }}>
+                {([6, 12] as const).map(n => (
+                  <button key={n} type="button" aria-pressed={grafikAy === n} onClick={() => { setGrafikAy(n); setGrafikOdak(null) }}
+                    style={{ border: 0, borderRadius: 7, padding: '5px 11px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                      background: grafikAy === n ? '#fff' : 'transparent', color: grafikAy === n ? 'var(--text)' : 'var(--text3)',
+                      boxShadow: grafikAy === n ? '0 1px 2px rgba(16,24,40,0.08)' : 'none' }}>
+                    {n} ay
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border-light)', fontSize: 12.5, color: 'var(--text2)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent)' }} />Gelirler</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#c5cad3' }} />Giderler</span>
+            {(() => {
+              const netVar = seri.some(d => Math.abs(d.net) > 1)
+              const W = 780, H = 250, L = 52, R = netVar ? 52 : 12, T = 12, B = 30, iw = W - L - R, ih = H - T - B
+              const Y = (v: number) => T + ih - (v / grafikMax) * ih
+              const netMax = Math.max(...seri.map(d => Math.abs(d.net)), 1) * 1.25
+              const YN = (v: number) => T + ih / 2 - (v / netMax) * (ih / 2)
+              const slot = iw / seri.length, bw = Math.min(26, slot * 0.27)
+              const noktalar = seri.map((d, i) => [L + slot * i + slot / 2, YN(d.net)] as const)
+              const odak = grafikOdak != null ? seri[grafikOdak] : null
+              const isaret = (v: number) => (v > 0 ? '+' : v < 0 ? '−' : '')
+              return (
+                <div style={{ position: 'relative', marginTop: 16 }} onMouseLeave={() => setGrafikOdak(null)}>
+                  <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" style={{ display: 'block', overflow: 'visible' }}
+                    aria-label={`Son ${seri.length} ay gelir ve gider: ${seri.map(d => `${AYLAR[d.ay]} gelir ${tlTam(d.gelir)}, gider ${tlTam(d.gider)}`).join('; ')}`}>
+                    {[0, 1, 2, 3, 4].map(i => {
+                      const y = Y((grafikMax * i) / 4)
+                      return (
+                        <g key={i}>
+                          <line x1={L} x2={W - R} y1={y} y2={y} stroke={i ? 'var(--border-light)' : 'var(--border-strong)'} strokeDasharray={i ? '3 4' : undefined} />
+                          <text x={L - 10} y={y + 4} textAnchor="end" fontSize="12" fill="var(--text3)">{i ? kisalt((grafikMax * i) / 4) : '0'}</text>
+                        </g>
+                      )
+                    })}
+                    {netVar && [-1, 0, 1].map(k => (
+                      <text key={k} x={W - R + 10} y={YN((k * netMax) / 1.25) + 4} fontSize="11.5" fill="var(--success)">
+                        {k ? `${k > 0 ? '+' : '−'}${kisalt(netMax / 1.25)}` : '0'}
+                      </text>
+                    ))}
+                    {seri.map((d, i) => {
+                      const cx = L + slot * i + slot / 2
+                      const sonAy = i === seri.length - 1
+                      return (
+                        <g key={`${d.ay}-${d.yil}`}>
+                          {grafikOdak === i && <rect x={cx - slot / 2 + 4} y={T} width={slot - 8} height={ih} rx="10" fill="var(--accent-lighter)" opacity="0.8" />}
+                          <rect x={cx - bw - 2} y={Y(d.gelir)} width={bw} height={Math.max(T + ih - Y(d.gelir), d.gelir > 0 ? 2 : 0)} rx={Math.min(6, bw / 2)} fill={sonAy ? 'var(--accent)' : 'var(--accent-light)'} />
+                          <rect x={cx + 2} y={Y(d.gider)} width={bw} height={Math.max(T + ih - Y(d.gider), d.gider > 0 ? 2 : 0)} rx={Math.min(6, bw / 2)} fill={sonAy ? 'var(--coral)' : '#ffc2ad'} />
+                          <text x={cx} y={H - 10} textAnchor="middle" fontSize="12.5" fill={sonAy ? 'var(--text)' : 'var(--text3)'} fontWeight={sonAy ? 700 : 400}>{ayKisa3(d.ay)}</text>
+                        </g>
+                      )
+                    })}
+                    {/* Net çizgisi yalnızca gelir ile gider ayrıştığında anlamlı */}
+                    {netVar && <path d={noktalar.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ')} fill="none" stroke="var(--success)" strokeWidth="2.5" strokeLinejoin="round" />}
+                    {netVar && noktalar.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={grafikOdak === i ? 6 : 4.5} fill="#fff" stroke="var(--success)" strokeWidth="2.5" />)}
+                    {seri.map((d, i) => (
+                      <rect key={`h-${i}`} x={L + slot * i} y={0} width={slot} height={H} fill="transparent" tabIndex={0}
+                        aria-label={`${ayLabel(d.ay, d.yil)}: gelir ${tlTam(d.gelir)}, gider ${tlTam(d.gider)}, net ${isaret(d.net)}${tlTam(Math.abs(d.net))}`}
+                        onMouseEnter={() => setGrafikOdak(i)} onFocus={() => setGrafikOdak(i)} onBlur={() => setGrafikOdak(null)} style={{ outline: 'none' }} />
+                    ))}
+                  </svg>
+                  {odak && grafikOdak != null && (
+                    <div role="status" style={{
+                      position: 'absolute', pointerEvents: 'none', zIndex: 5,
+                      left: `clamp(90px, ${((L + slot * grafikOdak + slot / 2) / W) * 100}%, calc(100% - 90px))`,
+                      top: `${(Y(Math.max(odak.gelir, odak.gider)) / H) * 100}%`,
+                      transform: 'translate(-50%, calc(-100% - 10px))',
+                      background: '#10131a', color: '#fff', borderRadius: 10, padding: '10px 12px', fontSize: 12.5, minWidth: 176,
+                      boxShadow: '0 12px 28px -8px rgba(16,19,26,0.45)',
+                    }}>
+                      <div style={{ fontWeight: 600, color: '#c9ced6', marginBottom: 6 }}>{ayLabel(odak.ay, odak.yil)}</div>
+                      {([['Gelir', odak.gelir, 'var(--accent-light)'], ['Gider', odak.gider, 'var(--coral)'], ['Net', odak.net, '#5fd39b']] as const).map(([k, v, r]) => (
+                        <div key={k} className="tabular" style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginTop: 3 }}>
+                          <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: r, marginRight: 6 }} />{k}</span>
+                          <b style={{ fontWeight: 600 }}>{k === 'Net' ? isaret(v) : ''}{tlTam(Math.abs(v))}</b>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
+            <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 8, fontSize: 12.5, color: 'var(--text2)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--accent)' }} />Gelir</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--coral)' }} />Gider</span>
+              {seri.some(d => Math.abs(d.net) > 1) && <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ width: 12, height: 3, borderRadius: 2, background: 'var(--success)' }} />Net (sağ eksen)</span>}
             </div>
           </section>
 
@@ -694,12 +906,17 @@ export default function DashboardPage() {
                 <div style={{ fontSize: 13, color: 'var(--text3)' }}>{AYLAR[ay]} dosyası henüz hazırlanmadı.</div>
               ) : (
                 <>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                    <span className="tabular" style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }}>{denetimOzet.tamam}/{denetimOzet.toplam}</span>
-                    <span style={{ fontSize: 12.5, color: 'var(--text3)' }}>madde hazır</span>
-                  </div>
-                  <div style={{ height: 4, borderRadius: 2, background: '#eef0f4', marginTop: 8, overflow: 'hidden' }}>
-                    <div style={{ width: `${(denetimOzet.tamam / denetimOzet.toplam) * 100}%`, height: '100%', background: denetimOzet.tamam === denetimOzet.toplam ? 'var(--success)' : 'var(--accent)', borderRadius: 2 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 12, borderRadius: 12, background: 'var(--surface2)' }}>
+                    <svg width="52" height="52" viewBox="0 0 52 52" role="img" aria-label={`${denetimOzet.tamam} / ${denetimOzet.toplam} madde hazır`} style={{ flexShrink: 0 }}>
+                      <circle cx="26" cy="26" r="21" fill="none" stroke="var(--border)" strokeWidth="5" />
+                      <circle cx="26" cy="26" r="21" fill="none" strokeWidth="5" strokeLinecap="round" transform="rotate(-90 26 26)"
+                        stroke={denetimOzet.tamam === denetimOzet.toplam ? 'var(--success)' : 'var(--accent)'}
+                        strokeDasharray={`${(denetimOzet.tamam / denetimOzet.toplam) * 2 * Math.PI * 21} ${2 * Math.PI * 21}`} />
+                    </svg>
+                    <div>
+                      <div className="tabular" style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 650, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{denetimOzet.tamam}/{denetimOzet.toplam}</div>
+                      <div style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 2 }}>madde hazır</div>
+                    </div>
                   </div>
                   <div style={{ marginTop: 10, fontSize: 12.5, lineHeight: 1.45, color: denetimOzet.durum === 'iade' ? 'var(--danger)' : 'var(--text2)' }}>
                     {denetimOzet.durum === 'iade' ? `Denetçi iade etti${denetimOzet.not ? `: ${denetimOzet.not}` : '.'}`

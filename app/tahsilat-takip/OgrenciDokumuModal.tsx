@@ -10,6 +10,7 @@ import { perdeKapat } from '@/lib/perdeKapat'
 import { useAuth } from '@/lib/AuthContext'
 import { Download, X, FileText, Mail, Send } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { demoEpostaGoster } from '@/lib/demo/ekran'
 import { overlay, bugunISO } from './yardimcilar'
 import { ogrenciDokumu, type Dokum } from './ogrenciDokumu'
 import { dokumBilgileri, dokumSayfasi, dokumVerisiYukle, type DokumVerisi } from './dokumPdf'
@@ -18,7 +19,7 @@ export const varsayilanEgitimYili = () => new Date().getMonth() + 1 >= 9 ? new D
 
 /** Tek öğrencinin bir eğitim yılındaki tüm ödemeleri ve ödenmemiş kalemleri; tek tıkla yazdırılır */
 export default function OgrenciDokumuModal({ ogrenci: o, kapat }: { ogrenci: Ogrenci; kapat: () => void }) {
-  const { okul } = useAuth()
+  const { okul, demo } = useAuth()
   const [egitimYili, setEgitimYili] = useState(varsayilanEgitimYili)
   const [ayarlar, setAyarlar] = useState<Ayarlar | null>(null)
   const kurumAdi = birimKurumAdi('okul', ayarlar, okul?.ad)
@@ -60,6 +61,11 @@ export default function OgrenciDokumuModal({ ogrenci: o, kapat }: { ogrenci: Ogr
     const adres = mailAdres.trim()
     if (!dokum) return
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adres)) { setMailDurum({ tip: 'hata', text: 'Geçerli bir e-posta adresi yazın.' }); return }
+    if (demo) {
+      setMailDurum({ tip: 'bilgi', text: 'Demoda e-posta gönderilmez.' })
+      await demoEpostaGoster({ alici: adres, ek: `${adSoyad} ödeme dökümü`, pdf: async () => (await pdfUret()).output('blob') })
+      return
+    }
     setMailDurum({ tip: 'bilgi', text: 'Gönderiliyor…' })
     try {
       const pdf = await pdfUret()

@@ -344,7 +344,7 @@ function AuthBrand() {
           <ul>
             <li><span className="su-bico"><Calculator size={15} /></span> Otomatik bordro ve puantaj</li>
             <li><span className="su-bico"><BarChart3 size={15} /></span> Anlık tahsilat ve raporlar</li>
-            <li><span className="su-bico"><ShieldCheck size={15} /></span> MEB yönergesine %100 uyum</li>
+            <li><span className="su-bico"><ShieldCheck size={15} /></span> MEB Çocuk Kulüpleri Yönergesi’ne göre hesaplar</li>
           </ul>
         </div>
         <p className="su-brand-foot">© {new Date().getFullYear()} Klüp360</p>

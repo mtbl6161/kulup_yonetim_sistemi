@@ -2,6 +2,7 @@
 // Çıktılar genelde siyah-beyaz yazdırıldığı için renk yalnızca hafif gri tonlarla ve "gelmedi / tatil" gibi durumlarda kullanılır.
 import type { jsPDF } from 'jspdf'
 import type { UserOptions } from 'jspdf-autotable'
+import { tarayicidaDemoMu, demoDosyaAdi, DEMO_PDF_ISARETI } from './demo/mod'
 
 export type Pdf = jsPDF
 export type { RowInput, CellInput, CellHookData, UserOptions } from 'jspdf-autotable'
@@ -46,7 +47,29 @@ export async function pdfHazirla(yon: 'portrait' | 'landscape' = 'portrait') {
   pdf.addFont('NotoSans-Bold.ttf', 'NotoSans', 'bold', 'Identity-H')
   pdf.setFont('NotoSans')
   pdf.setTextColor(...PDF_RENK.metin)
+  if (tarayicidaDemoMu()) demoIsaretiEkle(pdf)
   return { pdf, autoTable }
+}
+
+/** Demoda üretilen her PDF'in her sayfasına, çıktı alınırken "ÖRNEK — KURGUSAL VERİ" işareti basılır;
+ *  böylece demo çıktısı gerçek belge gibi kullanılamaz. Bütün PDF'ler pdfHazirla'dan geçtiği için tek yer burası. */
+function demoIsaretiEkle(pdf: Pdf) {
+  const asilCikti = pdf.output.bind(pdf)
+  let basildi = false
+  pdf.output = ((...a: Parameters<Pdf['output']>) => {
+    if (!basildi) {
+      basildi = true
+      const n = pdf.getNumberOfPages()
+      for (let i = 1; i <= n; i++) {
+        pdf.setPage(i)
+        const W = pdf.internal.pageSize.getWidth()
+        pdf.setFont('NotoSans', 'bold'); pdf.setFontSize(9); pdf.setTextColor(...PDF_RENK.hata)
+        pdf.text(DEMO_PDF_ISARETI, W - PDF_KENAR, 6, { align: 'right' })
+      }
+      pdf.setTextColor(...PDF_RENK.metin)
+    }
+    return asilCikti(...a)
+  }) as Pdf['output']
 }
 
 export const PDF_KENAR = 10
@@ -145,7 +168,7 @@ export function pdfIndir(pdf: Pdf, dosyaAdi: string, belge?: string) {
   pdf.setProperties({ title: ad.replace(/\.pdf$/i, '') })
   const url = URL.createObjectURL(pdf.output('blob'))
   const a = document.createElement('a')
-  a.href = url; a.download = /\.pdf$/i.test(ad) ? ad : `${ad}.pdf`
+  a.href = url; a.download = demoDosyaAdi(/\.pdf$/i.test(ad) ? ad : `${ad}.pdf`)
   document.body.appendChild(a); a.click(); a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 60000)
 }

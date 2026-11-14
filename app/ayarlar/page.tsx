@@ -34,6 +34,8 @@ import { Okul } from '@/lib/types'
 import { onayla } from '@/lib/diyalog'
 import { useDegisince } from '@/lib/useDegisince'
 import LisansSekmesi from '@/components/ayarlar/LisansSekmesi'
+import { DemoKapaliKart } from '@/components/DemoSeridi'
+import { tarayicidaDemoMu } from '@/lib/demo/mod'
 import GuvenlikSekmesi from '@/components/ayarlar/GuvenlikSekmesi'
 import TatilSekmesi from '@/components/ayarlar/TatilSekmesi'
 import KulupBilgileriSekmesi from '@/components/ayarlar/KulupBilgileriSekmesi'
@@ -742,10 +744,14 @@ export default function AyarlarPage() {
             {activeTab === 'tatil' && <TatilSekmesi tatiller={tatiller} kbMevcut={kbMevcut} kbYil={kbYil} setKbYil={setKbYil} kbTarih={kbTarih} setKbTarih={setKbTarih} kbSaving={kbSaving} kulupBaslangicKaydet={kulupBaslangicKaydet} varsayilanEgitimYili={varsayilanEgitimYili} setTatilEkleAcik={setTatilEkleAcik} setTatilForm={setTatilForm} tatilSil={tatilSil} />}
 
             {/* TAB 6: LİSANS & ÖDEME */}
-            {activeTab === 'lisans' && <LisansSekmesi okulData={okulData} />}
+            {activeTab === 'lisans' && (tarayicidaDemoMu()
+              ? <DemoKapaliKart baslik="Bu bir demo hesabı" aciklama="Demoda abonelik ve ödeme işlemleri yapılmaz. Kendi okulunuz için 15 gün ücretsiz deneme hesabı açabilirsiniz; kredi kartı gerekmez." />
+              : <LisansSekmesi okulData={okulData} />)}
 
             {/* TAB 5: GÜVENLİK & PROFİL */}
-            {activeTab === 'guvenlik' && <GuvenlikSekmesi passForm={passForm} setPassForm={setPassForm} passSaving={passSaving} sifreGuncelle={sifreGuncelle} />}
+            {activeTab === 'guvenlik' && (tarayicidaDemoMu()
+              ? <DemoKapaliKart baslik="Demo hesabının şifresi yoktur" aciklama="Demoya şifresiz girdiniz. Kendi hesabınızı açtığınızda şifrenizi buradan değiştirebilirsiniz." />
+              : <GuvenlikSekmesi passForm={passForm} setPassForm={setPassForm} passSaving={passSaving} sifreGuncelle={sifreGuncelle} />)}
           </div>
 
           {/* SİDEBAR SUMMARY (Özellikle Mali Sekmesinde Aktif) */}

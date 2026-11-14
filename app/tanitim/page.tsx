@@ -1,325 +1,210 @@
-'use client'
+import Image from 'next/image'
 import Link from 'next/link'
-import { useCallback, useRef, useState, type MouseEvent } from 'react'
-import { Check, Menu, PlayCircle, X } from 'lucide-react'
-import { useAuth } from '@/lib/AuthContext'
-import { Film, Sinema, FILM_CSS, KULUP_SETI, kaydiriciBul, type FilmSeti } from './Film'
-import { BOLUMLER } from './sahneler'
-import { DENETCI_SETI, DENETCI_CSS } from './denetciSahneleri'
-import { AySeridi, AY_CSS, type AyOlayi, type AySeridiTutamak } from './AySeridi'
-import { BrandMark, Wordmark } from '@/components/brand/Logo'
-import { AYLIK_UCRET, DENEME_GUN, YILLIK_UCRET, tl } from '@/lib/abonelikPlanlari'
+import { Fragment } from 'react'
+import './tanitim.css'
+import { TanitimNav } from './TanitimNav'
+import { SORULAR, TANITIM_YAPISAL_VERI, type Soru } from './sorular'
+import { AYLIK_UCRET, DENEME_GUN, YILLIK_TASARRUF, YILLIK_UCRET, tl } from '@/lib/abonelikPlanlari'
 
-/* ----------------------------------------------------------------- içerik */
-
-// Ay şeridindeki olaylar. bolum: filmdeki karşılığı; hedef: sayfadaki bölüm
-const AY_OLAYLARI: AyOlayi[] = [
-  { gun: 1, ad: 'Kayıt', bolum: 0 },
-  { gun: 2, ad: 'Her gün yoklama', bolum: 1, satir: 2 },
-  { gun: 10, ad: 'Tahsilat', bolum: 2 },
-  { gun: 20, ad: 'Bordro', bolum: 3 },
-  { gun: 26, ad: 'Muhtasar', hedef: 'muhtasar' },
-  { gun: 30, ad: 'Ay sonu', bolum: 4, satir: 2, hizala: 'son' },
-  { gun: 31, ad: 'Denetim', bolum: 5, hizala: 'son' },
-]
-
-// Filmde gösterilmeyen ama sistemde bulunan modüller (fihrist)
-const FIHRIST = [
-  ['Ders programı', 'Sınıf ve öğretmen bazlı haftalık program; sınıf defterine aktarılır'],
-  ['Personel', 'Görev, SGK durumu, IBAN ve iletişim bilgileri tek kayıtta'],
-  ['Sınıflar ve kontenjan', 'Yaş grubu ve kapasite; doluluk panelde izlenir'],
-  ['Tahsilat takip', 'Kırtasiye, gezi, etkinlik ödemeleri ve taksit planları'],
-  ['Gelir, gider ve bilanço', 'Aylık kâr-zarar, ücret dağıtım bilançosu, hesap hareketleri'],
-  ['Okul Aile Birliği', 'Bağış ve aidat tahsilatı, birliğin kendi işletme defteri'],
-  ['Hatırlatmalar', 'Geciken ödeme, eksik puantaj ve yaklaşan beyanname günü'],
-  ['Raporlar', 'Aylık özet, işletme defteri ve bilanço PDF olarak'],
-]
-
-const DENETIM_MADDELERI = [
-  ['İl geneli özet', 'İldeki kulüplerin öğrenci, personel ve dosya durumu tek ekranda; ilçeye göre süzülür.'],
-  ['Okul okul dosya', 'Her kulübün dosyasına inilir; öğrenci ve kapasite kontrolleri o anda hesaplanır.'],
-  ['Madde madde evrak', 'Gönderilen belgeler tek tek incelenir, onaylanır ya da notla iade edilir.'],
-  ['Bordro kontrolü', 'Beyan edilen bordro sistemin yeniden hesaplamasıyla karşılaştırılır; farklar listelenir.'],
-  ['Fiilî devam', 'Hangi öğretmenin hangi sınıfta derste olduğu sınıf defterinden görülür.'],
-  ['Yalnızca okuma', 'Denetim yetkilisi kayıtları değiştiremez ve silemez.'],
-]
-
-const SORULAR = [
-  ['Denetçi verilerimizi değiştirebilir mi?', 'Hayır. Denetim yetkilisi kayıtları yalnızca görüntüler; değiştiremez, silemez. Gönderdiğiniz dosyayı onaylar ya da notla size iade eder.'],
-  ['Başka bir okul bizim kayıtlarımızı görebilir mi?', 'Hayır. Her kurumun verisi ayrı tutulur ve yalnızca o kurumun kullanıcılarına açılır. Veriler şifrelenmiş olarak bulutta saklanır.'],
-  ['Bordro neye göre hesaplanıyor?', 'Puantajdaki ders saatlerinden; MEB katsayıları, güncel SGK oranları ve gelir vergisi dilimleriyle. Vergi dilimlerini ayarlardan kendiniz de güncelleyebilirsiniz.'],
-  ['Bilgisayara program kurmam gerekiyor mu?', 'Hayır. Klüp360 tarayıcıda çalışır; okuldaki bilgisayardan da telefonunuzdan da açılır.'],
-  ['Deneme bitince ne olur?', `${DENEME_GUN} günlük deneme bitince aylık ₺${tl(AYLIK_UCRET)} ya da yıllık ₺${tl(YILLIK_UCRET)} ile devam edersiniz. Abone olmazsanız girdiğiniz kayıtlar silinmez; abone olduğunuzda kaldığınız yerden sürer.`],
-]
-
-/* ----------------------------------------------------------------- sayfa */
+// Tanıtım sayfası. Tasarım kaynağı: tasarim-onerileri/tanitim/famly-tarzi.html (stiller tanitim.css'te, .tn kabıyla sınırlı).
+// Sayfa sunucuda üretilir; yalnızca menü (oturum ve mobil menü) istemci bileşenidir.
 
 export default function TanitimPage() {
-  const { user, profil } = useAuth()
-  const panelUrl = profil?.rol === 'super_admin' ? '/yonetim' : (profil?.rol === 'denetim_yetkilisi' ? '/denetim' : '/')
-
-  // Filmler sayfadan ayrılmadan tam ekran izleme katmanında açılır
-  const [sinema, setSinema] = useState<{ set: FilmSeti; bolum: number; donus?: HTMLElement | null } | null>(null)
-  const sinemayiKapat = useCallback(() => setSinema(null), [])
-  const [menuAcik, setMenuAcik] = useState(false)
-
-  // Ay şeridi ↔ film: film her karede şeridi günceller (yalnızca şerit yeniden çizilir), şerit filmi bölüme atlatır
-  const serit = useRef<AySeridiTutamak>(null)
-  const kareBildir = useCallback((bolum: number, t: number) => serit.current?.guncelle(bolum, t), [])
-  const [atla, setAtla] = useState<{ bolum: number; n: number } | undefined>(undefined)
-  const bolumeAtla = useCallback((bolum: number) => setAtla(a => ({ bolum, n: (a?.n ?? 0) + 1 })), [])
-
-  // Sayfa içi bağlantılar: iç kaydırma kabını kaydır, sabit üst menünün altında kalmasın
-  const git = useCallback((id: string, e?: MouseEvent) => {
-    const el = document.getElementById(id), s = kaydiriciBul(el)
-    if (!el || !s) return
-    e?.preventDefault()
-    setMenuAcik(false)
-    const hareketAz = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    s.scrollTo({ top: el.getBoundingClientRect().top - s.getBoundingClientRect().top + s.scrollTop - 72, behavior: hareketAz ? 'auto' : 'smooth' })
-    history.replaceState(null, '', `#${id}`)
-  }, [])
-
   return (
-    <div className="tz">
-      <style>{CSS + AY_CSS + FILM_CSS + DENETCI_CSS}</style>
+    <div className="tn">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(TANITIM_YAPISAL_VERI) }} />
+      <a className="atla" href="#icerik">İçeriğe geç</a>
+      <TanitimNav />
+      <main id="icerik" tabIndex={-1}>
 
-      {/* ---------------------------------------------------------- MENÜ */}
-      <nav className="tz-nav">
-        <div className="tz-nav-ic">
-          <Link href="/tanitim" className="tz-marka" aria-label="Klüp360 ana sayfa">
-            <BrandMark size={36} title="" />
-            <Wordmark height={28} />
-          </Link>
-
-          <div className="tz-nav-baglantilar">
-            <a href="#ay" onClick={e => git('ay', e)}>Nasıl çalışır</a>
-            <a href="#muhtasar" onClick={e => git('muhtasar', e)}>Muhtasar</a>
-            <Link href="/fiyatlandirma">Fiyatlandırma</Link>
-            <Link href="/rehber">Rehber ve araçlar</Link>
-            <Link href="/tanitim/iletisim">İletişim</Link>
-          </div>
-
-          <div className="tz-nav-eylem">
-            {user ? (
-              <Link href={panelUrl} className="tz-dugme tz-dugme-ikincil">Panele dön</Link>
-            ) : (
-              <>
-                <Link href="/login" className="tz-nav-giris">Giriş yap</Link>
-                <Link href="/signup" className="tz-dugme tz-dugme-ana">Ücretsiz deneyin</Link>
-              </>
-            )}
-            <button type="button" className="tz-menu-dugme" onClick={() => setMenuAcik(v => !v)} aria-expanded={menuAcik} aria-controls="tz-mobil-menu" aria-label={menuAcik ? 'Menüyü kapat' : 'Menüyü aç'}>
-              {menuAcik ? <X size={20} /> : <Menu size={20} />}
-            </button>
-          </div>
-        </div>
-        {menuAcik && (
-          <div id="tz-mobil-menu" className="tz-mobil-menu" onKeyDown={e => { if (e.key === 'Escape') setMenuAcik(false) }}>
-            <a href="#ay" onClick={e => git('ay', e)}>Nasıl çalışır</a>
-            <a href="#muhtasar" onClick={e => git('muhtasar', e)}>Muhtasar</a>
-            <Link href="/fiyatlandirma" onClick={() => setMenuAcik(false)}>Fiyatlandırma</Link>
-            <Link href="/rehber" onClick={() => setMenuAcik(false)}>Rehber ve araçlar</Link>
-            <Link href="/tanitim/iletisim" onClick={() => setMenuAcik(false)}>İletişim</Link>
-            {!user && <Link href="/login" onClick={() => setMenuAcik(false)} className="tz-mobil-giris">Giriş yap</Link>}
-          </div>
-        )}
-      </nav>
-
-      {/* ---------------------------------------------------------- GİRİŞ: başlık, ay şeridi, film */}
-      <header className="tz-giris" id="film">
-        <div className="tz-kap">
-          <div className="tz-giris-metin">
-            <h1 className="tz-h1">Kulübün bir ayı, kayıttan denetime.</h1>
-            <p className="tz-giris-ozet">
-              Yoklama, bordro, aidat, muhtasar beyannamesi ve aylık denetim dosyası aynı sistemde birbirine bağlı.
-              Aşağıda bir ayın tamamını izleyin; ekranlar sistemin kendisi, veriler örnek.
-            </p>
-            <div className="tz-eylemler">
-              <Link href="/signup" className="tz-dugme tz-dugme-ana tz-dugme-buyuk">{DENEME_GUN} gün ücretsiz deneyin</Link>
-              <span className="tz-not">Kredi kartı istenmez. Hesaplar MEB Çocuk Kulüpleri Yönergesi’ne göre yapılır.</span>
-            </div>
-          </div>
-
-          <div className="tz-ay">
-            <AySeridi ref={serit} olaylar={AY_OLAYLARI} onBolum={bolumeAtla} onHedef={id => git(id)} />
-          </div>
-          <div className="tz-film">
-            <Film onKare={kareBildir} atla={atla} esik={0.12} onBuyut={b => setSinema({ set: KULUP_SETI, bolum: b })} />
-          </div>
-        </div>
-      </header>
-
-      {/* ---------------------------------------------------------- AYIN AKIŞI */}
-      <section className="tz-bolum" id="ay">
-        <div className="tz-kap">
-          <div className="tz-bas">
-            <h2 className="tz-h2">Bir kez girdiğiniz bilgi ayın sonuna kadar taşınır</h2>
-            <p className="tz-ozet">
-              Öğrencinin aidatı kayıtla birlikte hesaplanır. Sınıf defterindeki dersler puantaja, puantaj bordroya geçer.
-              Tahsilatlar işletme defterine, bordro ve puantaj denetim dosyasına kendiliğinden yansır.
-            </p>
-          </div>
-
-          <ol className="tz-akis">
-            {BOLUMLER.flatMap((b, i) => {
-              const satir = (
-                <AkisSatiri key={b.id} gun={b.gun} baslik={b.baslik}
-                  eylem={<button type="button" className="tz-metin-dugme" onClick={e => setSinema({ set: KULUP_SETI, bolum: i, donus: e.currentTarget })}><PlayCircle size={16} /> Bu adımı izleyin</button>}>
-                  <p>{b.anlatim}</p>
-                  <ul className="tz-maddeler">{b.maddeler.map(m => <li key={m}>{m}</li>)}</ul>
-                </AkisSatiri>
-              )
-              if (b.id !== 'bordro') return [satir]
-              return [satir, (
-                <AkisSatiri key="muhtasar" gun="Ayın 26’sı" baslik="Muhtasar ve prim hizmet beyannamesi hazır" vurgu
-                  eylem={<a href="#muhtasar" className="tz-metin-dugme" onClick={e => git('muhtasar', e)}>Dosyaya bakın</a>}>
-                  <p>Bordrodaki tutarlar ve puantajdaki günler, e-Beyanname’ye yüklenecek XML dosyasına dönüşür. Muhasebeciye ayrıca bordro göndermeniz gerekmez.</p>
-                </AkisSatiri>
-              )]
-            })}
-          </ol>
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------- MUHTASAR */}
-      <section className="tz-bolum tz-muhtasar" id="muhtasar">
-        <div className="tz-kap tz-muh">
+      <section className="hero" aria-label="Tanıtım">
+        <div className="kap hero-ic">
           <div>
-            <h2 className="tz-h2">Muhtasar beyannamesini yeniden yazmayın.</h2>
-            <p className="tz-ozet">
-              Bordro bittiğinde muhtasar ve prim hizmet beyannamesinin XML dosyası da hazırdır. Dosyayı indirip e-Beyanname’ye
-              yüklemeniz yeterli; personel bilgileri, prim günleri ve kazançlar yeniden girilmez.
-            </p>
-            <ul className="tz-tikler">
-              <li>GİB’in Ekim 2026 döneminden itibaren istediği 22. sürüm</li>
-              <li>Muhtasar matrahları ve SGK prim hizmet bildirimi tek dosyada</li>
-              <li>Eksik gün sayısı ve nedeni puantajdan gelir</li>
-              <li>Vergi dairesi kodu gibi eksik bir bilgi varsa dosya üretilmeden önce uyarır</li>
-            </ul>
-          </div>
-          <figure className="tz-dosya">
-            <figcaption className="tz-dosya-ust">
-              <span>MUHSGK_22_2026-10.xml</span>
-              <span className="tz-dosya-etiket">Örnek dosya</span>
-            </figcaption>
-            <pre aria-label="Muhtasar beyannamesi XML dosyasından kısaltılmış satırlar">{XML_ORNEK}</pre>
-            <div className="tz-dosya-alt">
-              <p><b>Önce:</b> bordrolar muhasebeciye gider, her personel e-Beyanname’de tek tek yeniden girilir.</p>
-              <p><b>Şimdi:</b> dosyayı indirin, yükleyin.</p>
+            <h1>Dosya dosya değil, tıkla tıkla.</h1>
+            <p className="ozet">Çocuk kulübünün klasörlerle dolu ay sonu tek ekrana sığar: aidat, bordro, muhtasar ve denetim dosyası.</p>
+            <div className="eylemler">
+              <Link href="/signup" className="btn btn-ana">{DENEME_GUN} gün ücretsiz deneyin</Link>
+              <a href="/demo" className="btn btn-cer">Demoyu deneyin</a>
             </div>
-          </figure>
+            <div className="guven">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+              <span>{DENEME_GUN} gün ücretsiz, kredi kartı istenmez. Sonra aylık ₺{tl(AYLIK_UCRET)}, kurum başına sabit fiyat.</span>
+            </div>
+          </div>
+
+          <div className="sahne foto">
+            <Image className="pano-foto" src="/tanitim/ogretmen.webp" alt="Sınıfta dizüstü bilgisayarıyla çalışan bir kulüp sorumlusu öğretmen; arkada el işi yapan çocuklar" width={1400} height={788} sizes="(max-width: 1100px) 100vw, 50vw" preload />
+            <div className="foto-not" aria-hidden="true"><b>Ay sonunu gülümseyerek karşılayın.</b>Bordro, aidat, muhtasar: hepsi yerli yerinde.</div>
+          </div>
         </div>
+
       </section>
 
-      {/* ---------------------------------------------------------- FİHRİST */}
-      <section className="tz-bolum tz-bolum-ince">
-        <div className="tz-kap">
-          <div className="tz-bas">
-            <h2 className="tz-h2">Kulübün diğer işleri de aynı sistemde</h2>
-          </div>
-          <dl className="tz-fihrist">
-            {FIHRIST.map(([ad, ne]) => (
-              <div key={ad}><dt>{ad}</dt><dd>{ne}</dd></div>
-            ))}
-          </dl>
-        </div>
-      </section>
 
-      {/* ---------------------------------------------------------- DENETÇİ */}
-      <section className="tz-denetci">
-        <div className="tz-kap">
-          <div className="tz-bas">
-            <h2 className="tz-h2">Denetçinin gördüğü ekran</h2>
-            <p className="tz-ozet">
-              İl millî eğitim denetçileri için: ildeki kulüplerin aylık dosyaları tek kuyrukta toplanır. Belgeleri açar,
-              bordroyu sistemin yeniden hesaplamasıyla kontrol eder, onaylar ya da notla iade edersiniz.
-            </p>
-          </div>
-          <div className="tz-film">
-            <Film set={DENETCI_SETI} onBuyut={b => setSinema({ set: DENETCI_SETI, bolum: b })} />
-          </div>
-          <div className="tz-tutanak">
-            <ul>
-              {DENETIM_MADDELERI.map(([ad, ne]) => (
-                <li key={ad}><Check size={18} strokeWidth={3} aria-hidden /><span><b>{ad}.</b> {ne}</span></li>
-              ))}
-            </ul>
-            <Link href="/login?type=denetim" className="tz-dugme tz-dugme-acik">Denetçi olarak giriş yapın</Link>
+      <section className="kimler" aria-labelledby="kimler-bas">
+        <div className="kap">
+          <h2 id="kimler-bas">Kulübü yürüten <em>herkes</em> için tek sistem</h2>
+          <div className="kim-satir">
+            <div className="rol c"><div className="rol-ust"><span className="ik ik-mercan"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M8 2v4M16 2v4M3 10h18M8 15l2 2 4-4" /></svg></span><div><h3>Kulüp sorumluları</h3><p>Günlük işleri girer, gerisi hesaplanır.</p></div></div><ul className="rol-liste" role="list"><li>Kayıt ve yoklamayı girer</li><li>Aidat tahsilatını işler</li><li>Puantajı hazırlar</li></ul></div>
+            <div className="rol y"><div className="rol-ust"><span className="ik ik-yesil"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M9 6h6M9 11h.01M12 11h.01M15 11h.01M9 15h.01M12 15h.01M15 15h.01M9 18h6" /></svg></span><div><h3>Muhasebeciler</h3><p>Bordroyu yeniden yazmadan hazır bulur.</p></div></div><ul className="rol-liste" role="list"><li>Bordroyu kontrol eder</li><li>Muhtasar XML’ini indirir</li><li>Banka ödeme listesini alır</li></ul></div>
+            <div className="rol l"><div className="rol-ust"><span className="ik ik-lacivert"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg></span><div><h3>İl denetçileri</h3><p>İldeki dosyaları tek listeden inceler.</p></div></div><ul className="rol-liste" role="list"><li>Dosyaları okul okul açar</li><li>Bordro farklarını görür</li><li>Onaylar ya da notla iade eder</li></ul></div>
           </div>
         </div>
       </section>
 
-      {/* ---------------------------------------------------------- SORULAR */}
-      <section className="tz-bolum">
-        <div className="tz-kap">
-          <div className="tz-bas">
-            <h2 className="tz-h2">Okulların ilk sorduğu sorular</h2>
-          </div>
-          <dl className="tz-sorular">
-            {SORULAR.map(([s, c]) => (
-              <div key={s}><dt>{s}</dt><dd>{c}</dd></div>
-            ))}
-          </dl>
-        </div>
-      </section>
 
-      {/* ---------------------------------------------------------- KAPANIŞ */}
-      <section className="tz-kapanis">
-        <div className="tz-kap">
-          <h2 className="tz-h2">Bu ayı Klüp360’ta kapatın.</h2>
-          <ol className="tz-adimlar">
-            <li>Kurumunuzu kaydedin; okul, SGK ve vergi bilgilerini girin.</li>
-            <li>Personel ve öğrencileri ekleyin ya da Excel’den aktarın.</li>
-            <li>Ayı yönetin: yoklama, tahsilat, bordro, muhtasar ve denetim dosyası.</li>
-          </ol>
-          <div className="tz-eylemler">
-            <Link href="/signup" className="tz-dugme tz-dugme-ana tz-dugme-buyuk">{DENEME_GUN} gün ücretsiz deneyin</Link>
-            <Link href="/fiyatlandirma" className="tz-metin-dugme">Fiyatları görün</Link>
+      <section className="bolum" aria-labelledby="ks-bas" style={{ paddingBottom: '0' }}>
+        <div className="kap">
+          <h2 className="orta-baslik" id="ks-bas" style={{ maxWidth: '18ch' }}>Ay sonu artık bir koşturma değil</h2>
+          <p className="orta-ozet">Aynı işler, iki farklı ay.</p>
+          <div className="bs-izgara" lang="tr">
+            <div className="bs-kart bs-once"><div className="bs-ust"><h3>Bugün</h3><span className="bs-rozet">Dağınık</span></div><ul className="bs-liste" role="list"><li><span className="kutu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></svg></span><div><b>Kayıtlar</b><span>Yoklama defterde, aidat Excel’de, bordro muhasebecide</span></div></li><li><span className="kutu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg></span><div><b>Bilgi girişi</b><span>Aynı öğrenci ve personel bilgisi her ay yeniden yazılır</span></div></li><li><span className="kutu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" /><path d="M14 3v6h6M10 13l-2 2 2 2m4-4 2 2-2 2" /></svg></span><div><b>Muhtasar</b><span>Bordrolar muhasebeciye gönderilir, beyanname ayrıca hazırlanır</span></div></li><li><span className="kutu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></svg></span><div><b>Denetim dosyası</b><span>Ay sonunda klasör klasör toplanır</span></div></li></ul></div>
+            <div className="bs-ok" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></div>
+            <div className="bs-kart bs-sonra"><div className="bs-ust"><h3>Klüp360 ile</h3><span className="bs-rozet">Tek sistem</span></div><ul className="bs-liste" role="list"><li><span className="kutu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></svg></span><div><b>Kayıtlar</b><span>Yoklama, aidat ve bordro tek sistemde, birbirine bağlı</span></div></li><li><span className="kutu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg></span><div><b>Bilgi girişi</b><span>Bilgi bir kez girilir, sonraki aylarda yeniden yazılmaz</span></div></li><li><span className="kutu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" /><path d="M14 3v6h6M10 13l-2 2 2 2m4-4 2 2-2 2" /></svg></span><div><b>Muhtasar</b><span>Muhtasar XML dosyası bordrodan hazırlanır</span></div></li><li><span className="kutu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></svg></span><div><b>Denetim dosyası</b><span>Ay boyunca girilen kayıtlarla dolar</span></div></li></ul></div>
           </div>
         </div>
       </section>
 
-      {/* ---------------------------------------------------------- ALTBİLGİ */}
-      <footer className="tz-alt">
-        <div className="tz-kap tz-alt-ic">
-          <div className="tz-alt-marka">
-            <BrandMark size={40} tone="blue" title="" />
+
+      <section className="bolum" id="ozellikler" aria-labelledby="oz-bas">
+        <div className="kap">
+          <h2 className="orta-baslik" id="oz-bas">Bir kez girin, bir daha yazmayın</h2>
+          <p className="orta-ozet">Sınıf defterindeki dersler puantaja, puantaj bordroya, bordro muhtasara geçer. Aidat ve diğer tahsilatlar işletme defterine işlenir; aynı rakamı iki kez yazmazsınız.</p>
+
+          <div className="oz-liste" lang="tr">
+          <div className="oz mercan">
+            <div className="oz-sahne"><div className="oz-pen"><div className="oz-pen-ust"><span className="oz-nok" aria-hidden="true"><i></i><i></i><i></i></span>Aidat takibi<span className="oz-sag">Kasım 2026</span></div><div className="oz-tah"><div className="oz-tah-ust"><span>Bu ay tahsil edilen</span><b className="num">₺2.800 <small>/ ₺5.250</small></b></div><div className="oz-cubuk" aria-hidden="true"><i style={{ width: '53%' }}></i></div></div><div className="oz-ogr"><span className="oz-av" style={{ background: '#fff1eb', color: '#c2410c' }} aria-hidden="true">EY</span><span className="oz-ad"><b>Elif Y.</b><span>Papatyalar</span></span><span className="rozet r-ok">Tahsil edildi</span><span className="oz-tt num">₺1.400</span></div><div className="oz-ogr"><span className="oz-av" style={{ background: '#eef2fe', color: '#1b38b8' }} aria-hidden="true">CD</span><span className="oz-ad"><b>Can D.</b><span>Laleler</span></span><span className="rozet r-bek">Bekleniyor</span><span className="oz-tt num">₺1.400</span></div><div className="oz-ogr"><span className="oz-av" style={{ background: '#e4f4ec', color: '#0b7a4b' }} aria-hidden="true">ZK</span><span className="oz-ad"><b>Zeynep K.</b><span>Papatyalar</span></span><span className="rozet r-mav">Kardeş indirimi</span><span className="oz-tt num">₺1.050</span></div><div className="oz-ogr"><span className="oz-av" style={{ background: '#e9ecf7', color: '#14287f' }} aria-hidden="true">MA</span><span className="oz-ad"><b>Mert A.</b><span>Menekşeler</span></span><span className="rozet r-ok">Tahsil edildi</span><span className="oz-tt num">₺1.400</span></div></div><div className="oz-bildirim"><span className="oz-bik yesil"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg></span><div><b>Banka ekstresi yüklendi</b><span>2 ödeme öğrencilerle eşleşti</span></div></div></div>
+            <div className="oz-metin"><span className="oz-et"><span className="oz-eik"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="13" rx="2" /><path d="M2 10h20M6 15h4" /></svg></span>Aidat ve tahsilat</span><h3>Çocuk kulübü aidatı kayıtla birlikte hesaplanır</h3><p>Aidat iş gününe, ders saatine ve kardeş indirimine göre hesaplanır. Banka ekstresini yükleyin; ödemeler öğrencilerle eşleşip işletme defterine işlenir.</p><ul className="oz-tik" role="list"><li>Banka ekstresiyle eşleşme</li><li>Kardeş indirimi</li><li>Geciken ödemeler listesi</li><li>Gezi ve etkinlik tahsilatı</li><li>Veliye ödeme dökümü</li><li>Ücretsiz öğrenci</li></ul><div className="oz-alt"><Link href="/cocuk-kulubu-aidat-hesaplama" className="oz-git">Aidat hesaplama aracını deneyin <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></Link></div></div>
+          </div>
+          <div className="oz yesil ters">
+            <div className="oz-sahne"><div className="oz-pen"><div className="oz-pen-ust"><span className="oz-nok" aria-hidden="true"><i></i><i></i><i></i></span>Ücret zarfı<span className="oz-sag">Kasım 2026</span></div><div className="oz-zarf"><div><span>Personel</span><b>Ayşe K.</b></div><div><span>Görev</span><b>Usta öğretici</b></div><div><span>Ders saati</span><b className="num">96</b></div><div><span>Ders saati ücreti</span><b className="num">₺223,75</b></div><div><span>Brüt ücret</span><b className="num">₺21.480,00</b></div><div><span>SGK ve işsizlik payı</span><b className="num">₺3.222,00</b></div><div><span>Gelir vergisi</span><b className="num">₺0,00</b></div><div><span>Damga vergisi</span><b className="num">₺0,00</b></div><p className="oz-zarf-not">Gelir ve damga vergisinde asgari ücret istisnası uygulandı</p><div className="oz-net"><span>Ödenecek net</span><span className="num">₺18.258,00</span></div></div></div><div className="oz-bildirim"><span className="oz-bik yesil"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 6 12 13 2 6" /><rect x="2" y="4" width="20" height="16" rx="2" /></svg></span><div><b>Ücret zarfları gönderildi</b><span>Personele e-postayla</span></div></div></div>
+            <div className="oz-metin"><span className="oz-et"><span className="oz-eik"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M9 6h6M9 11h6M9 15h6M9 18h3" /></svg></span>Bordro ve ücret zarfı</span><h3>Çocuk kulübü bordrosu puantajdan hesaplanır</h3><p>Sınıf defterindeki dersler puantaja, puantaj bordroya geçer. MEB katsayıları, 2026 SGK oranları ve gelir vergisi dilimleri hesaba katılır.</p><ul className="oz-tik" role="list"><li>Kişi başı ücret zarfı (PDF)</li><li>Zarflar personele e-postayla</li><li>Banka ödeme listesi</li><li>Asgari ücret istisnası</li><li>SGK ve işsizlik payları</li><li>Güncellenebilir vergi dilimleri</li></ul><div className="oz-alt"><Link href="/cocuk-kulubu-bordro-hesaplama" className="oz-git">Bordro hesaplama aracını deneyin <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></Link><Link href="/gelir-vergisi-dilimleri-2026" className="oz-ikincil">2026 gelir vergisi dilimleri</Link></div></div>
+          </div>
+          <div className="oz mavi">
+            <div className="oz-sahne"><div className="oz-pen"><div className="oz-pen-ust"><span className="oz-nok" aria-hidden="true"><i></i><i></i><i></i></span>Muhtasar dosyası<span className="oz-sag">Ekim 2026 dönemi</span></div><div className="oz-dos"><div>Son gün<b>26 Kasım</b></div><div>Çalışan<b className="num">14</b></div><div>Muhtasar matrahı<b>Bordrodan</b></div><div>Prim günleri<b>Puantajdan</b></div></div><div className="oz-dosya"><span className="oz-dik"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" /><path d="M14 3v6h6M10 13l-2 2 2 2m4-4 2 2-2 2" /></svg></span><div><b>MUHSGK_2026_10.xml</b><span>e-Beyanname’ye yüklemeye hazır</span></div><span className="oz-in"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14" /></svg></span></div><details className="xml-ac"><summary>Dosyanın içini görün (XML)</summary>
+      <pre className="xml" tabIndex={0} role="region" aria-label="Muhtasar beyannamesi XML dosyasından kısaltılmış satırlar">{XML_ORNEK}</pre></details></div><div className="oz-bildirim"><span className="oz-bik mavi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg></span><div><b>Kontrol tamamlandı</b><span>Eksik bilgi bulunmadı</span></div></div></div>
+            <div className="oz-metin"><span className="oz-et"><span className="oz-eik"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" /><path d="M14 3v6h6M10 13l-2 2 2 2m4-4 2 2-2 2" /></svg></span>Muhtasar ve prim hizmet</span><h3>Muhtasarı yeniden yazmayın: MUHSGK XML hazır</h3><p>Bordroyu hesapladığınızda muhtasar ve prim hizmet beyannamesinin XML dosyası da hazırdır. İndirin, e-Beyanname’ye yükleyin; personeli tek tek yeniden girmezsiniz.</p><ul className="oz-tik" role="list"><li>GİB’in istediği 22. sürüm</li><li>Muhtasar ve SGK tek dosyada</li><li>Eksik gün puantajdan</li><li>Eksik gün nedeni listeden</li><li>Eksik bilgide önceden uyarı</li><li>Son gün yaklaşınca panelde uyarı</li></ul></div>
+          </div>
+          <div className="oz lac ters">
+            <div className="oz-sahne"><div className="oz-pen"><div className="oz-pen-ust"><span className="oz-nok" aria-hidden="true"><i></i><i></i><i></i></span>Denetim dosyası<span className="oz-sag">Kasım 2026</span></div><div className="oz-tah"><div className="oz-tah-ust"><span>Hazır belgeler</span><b className="num">12 <small>/ 13</small></b></div><div className="oz-cubuk lac" aria-hidden="true"><i style={{ width: '92%' }}></i></div></div><div className="oz-madde"><span className="oz-k" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg></span><span className="oz-mad">Personel listesi ve görevleri</span><span className="rozet r-ok">Sistemden</span></div><div className="oz-madde"><span className="oz-k" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg></span><span className="oz-mad">Aylık puantaj ve bordro</span><span className="rozet r-ok">Sistemden</span></div><div className="oz-madde"><span className="oz-k" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg></span><span className="oz-mad">Ücret dağıtım bilançosu</span><span className="rozet r-ok">Sistemden</span></div><div className="oz-madde"><span className="oz-k u" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 7v6M12 17h.01" /></svg></span><span className="oz-mad">SGK hizmet listesi</span><span className="rozet r-bek">Yüklenecek</span></div></div><div className="oz-bildirim"><span className="oz-bik mercan"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" /></svg></span><div><b>Denetçiden not</b><span>SGK hizmet listesini ekleyin</span></div></div></div>
+            <div className="oz-metin"><span className="oz-et"><span className="oz-eik"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /><path d="m9 13 2 2 4-4" /></svg></span>Denetim dosyası</span><h3>Denetim dosyası ay boyunca dolar</h3><p>Personel listesi, puantaj, bordro ve bilanço gibi sistemin ürettiği belgeler dosyaya eklenir. Siz yalnızca imzalı ve dışarıdan gelen belgeleri yüklersiniz.</p><ul className="oz-tik" role="list"><li>İlinizin evrak listesi hazır</li><li>Eksikler madde madde</li><li>Hazır olunca denetçiye gönderim</li><li>Denetçinin notu dosyada</li></ul></div>
+          </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="kap"><div className="cs"><div className="cs-sol"><div className="cs-yigin" aria-hidden="true"><span className="cs-ik mercan"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="13" rx="2" /><path d="M2 10h20M6 15h4" /></svg></span><span className="cs-ik yesil"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M9 6h6M9 11h6M9 15h6M9 18h3" /></svg></span><span className="cs-ik mavi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" /><path d="M14 3v6h6M10 13l-2 2 2 2m4-4 2 2-2 2" /></svg></span><span className="cs-ik lac"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /><path d="m9 13 2 2 4-4" /></svg></span></div><div><p className="cs-bas">Aidat, bordro, muhtasar ve denetim tek yerde.</p><p className="cs-alt">Bu ayın işlerini Klüp360’ta deneyin ya da önce demoyu açın; demoda girdiğiniz bilgiler kaydedilmez.</p></div></div><div className="cs-dug"><a href="/demo" className="btn btn-cer">Demoyu açın</a><Link href="/signup" className="btn btn-ana">{DENEME_GUN} gün ücretsiz deneyin</Link></div></div></div>
+
+
+      <section className="bolum" id="fiyat" aria-labelledby="fy-bas">
+        <div className="kap">
+          <h2 className="orta-baslik" id="fy-bas" style={{ maxWidth: 'none' }}>Kurum başına tek fiyat</h2>
+          <p className="orta-ozet">Öğrenci, personel ve sınıf sayısında sınır yoktur. Kulübünüz büyüdükçe fiyat değişmez.</p>
+          <div className="fiyat-izgara">
+            <div className="plan">
+              <h3>Aylık</h3>
+              <div className="tutar num">₺{tl(AYLIK_UCRET)} <small>/ ay</small></div>
+              <p className="alt">İstediğiniz ay bırakabilirsiniz.</p>
+              <ul className="tikler" role="list"><li>Bütün modüller</li><li>Sınırsız öğrenci ve personel</li><li>İptal ücreti yok</li></ul>
+            </div>
+            <div className="plan one">
+              <span className="etiket">İki ay ücretsiz</span>
+              <h3>Yıllık</h3>
+              <div className="tutar num">₺{tl(YILLIK_UCRET)} <small>/ yıl</small></div>
+              <p className="alt">Aylık ödemeye göre ₺{tl(YILLIK_TASARRUF)} daha az.</p>
+              <ul className="tikler" role="list"><li>Bütün modüller</li><li>Sınırsız öğrenci ve personel</li><li>İptal ücreti yok</li></ul>
+            </div>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: '30px' }}><Link href="/signup" className="btn btn-ana">{DENEME_GUN} gün ücretsiz deneyin</Link></div>
+          <p className="fiyat-not">Planı deneme bitince seçersiniz. Ödemeden sonraki 14 gün içinde iptal ederseniz ücretin tamamı iade edilir. Birden fazla okul için <Link href="/tanitim/iletisim" className="metin-bag">indirimli teklif isteyin</Link>. İptal, Ayarlar › Abonelik’teki müşteri portalından kimseyle görüşmeden yapılır. <Link href="/fiyatlandirma" className="metin-bag">Fiyatların ayrıntısı</Link></p>
+        </div>
+      </section>
+
+
+      <section className="fihrist" aria-labelledby="fh-bas">
+        <div className="kap">
+          <div className="dh-sar" lang="tr">
+            <div className="dh-menu" aria-hidden="true"><div className="dh-menu-bas"><i>ü</i>Klüp360</div><div className="dh-menu-et">Kulüp</div><div className="dh-m on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6" /></svg>Öğrenciler</div><div className="dh-m on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13" /><path d="M9 21v-6h6v6" /></svg>Sınıflar</div><div className="dh-m on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M8 2v4M16 2v4M3 10h18M8 14h3M8 17h6" /></svg>Ders programı</div><div className="dh-m"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 4h12a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4Z" /><path d="M8 9h8M8 13h5" /></svg>Sınıf defteri</div><div className="dh-menu-et">Personel</div><div className="dh-m on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2" /><circle cx="9" cy="11" r="2.5" /><path d="M5.5 17a3.5 3.5 0 0 1 7 0M15 10h3M15 14h3" /></svg>Personel</div><div className="dh-m"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M9 6h6M9 11h6M9 15h6" /></svg>Puantaj ve bordro</div><div className="dh-menu-et">Para</div><div className="dh-m"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="13" rx="2" /><path d="M2 10h20M6 15h4" /></svg>Tahsilat</div><div className="dh-m on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><path d="m7 15 4-4 3 3 5-6" /></svg>Gelir ve gider</div><div className="dh-m on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10Z" /></svg>Okul Aile Birliği</div><div className="dh-menu-et">Resmî</div><div className="dh-m"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" /><path d="M14 3v6h6M10 13l-2 2 2 2m4-4 2 2-2 2" /></svg>Muhtasar</div><div className="dh-m"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></svg>Denetim dosyası</div><div className="dh-m on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" /><path d="M14 3v6h6M8 17v-3M12 17v-6M16 17v-2" /></svg>Raporlar</div></div>
             <div>
-              <Wordmark height={26} onDark />
-              <div className="tz-alt-etiket">MEB çocuk kulüpleri yönetim sistemi</div>
+              <h2 id="fh-bas">Kulübün diğer işleri de aynı sistemde</h2>
+              <p className="dh-ozet">Öğrenciden rapora, günlük işlerin hepsi aynı kayıtlardan beslenir.</p>
+              <ul className="dh-liste" role="list"><li className="dh-gm"><span className="dh-ik"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6" /></svg></span><div><h3>Öğrenciler</h3><p>Veli iletişimi, grup ve kardeş bilgisi tek kayıtta.</p></div></li><li className="dh-gm"><span className="dh-ik"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13" /><path d="M9 21v-6h6v6" /></svg></span><div><h3>Sınıflar ve kontenjan</h3><p>Yaş grubu ve kapasite; doluluk panelde izlenir.</p></div></li><li className="dh-gy"><span className="dh-ik"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M8 2v4M16 2v4M3 10h18M8 14h3M8 17h6" /></svg></span><div><h3>Ders programı</h3><p>Sınıf ve öğretmen bazlı haftalık program; sınıf defterine aktarılır.</p></div></li><li className="dh-gy"><span className="dh-ik"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2" /><circle cx="9" cy="11" r="2.5" /><path d="M5.5 17a3.5 3.5 0 0 1 7 0M15 10h3M15 14h3" /></svg></span><div><h3>Personel</h3><p>Görev, SGK durumu, IBAN ve iletişim bilgileri tek kayıtta.</p></div></li><li className="dh-ga"><span className="dh-ik"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><path d="m7 15 4-4 3 3 5-6" /></svg></span><div><h3>Gelir, gider ve bilanço</h3><p>Aylık kâr-zarar, ücret dağıtım bilançosu, hesap hareketleri ve taksit planları.</p></div></li><li className="dh-ga"><span className="dh-ik"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10Z" /></svg></span><div><h3>Okul Aile Birliği</h3><p>Bağış ve aidat tahsilatı, birliğin kendi işletme defteri.</p></div></li><li className="dh-gl"><span className="dh-ik"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0" /></svg></span><div><h3>Panel uyarıları</h3><p>Geciken ödeme, eksik puantaj ve yaklaşan beyanname günü panelde.</p></div></li><li className="dh-gl"><span className="dh-ik"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" /><path d="M14 3v6h6M8 17v-3M12 17v-6M16 17v-2" /></svg></span><div><h3>Raporlar</h3><p>Aylık özet, işletme defteri ve bilanço PDF olarak.</p></div></li></ul>
             </div>
           </div>
-          <div className="tz-alt-baglantilar">
-            <Link href="/rehber">Rehber ve araçlar</Link>
-            <Link href="/fiyatlandirma">Fiyatlandırma</Link>
-            <Link href="/tanitim/kullanim-kosullari">Kullanım koşulları</Link>
-            <Link href="/tanitim/gizlilik-politikasi">Gizlilik</Link>
-            <Link href="/tanitim/kvkk-aydinlatma-metni">KVKK</Link>
-            <Link href="/tanitim/iade-politikasi">İade</Link>
-            <Link href="/tanitim/iletisim">İletişim</Link>
-            <Link href="/login">Giriş</Link>
+        </div>
+      </section>
+
+
+      <section className="bolum" id="denetci" aria-labelledby="dn-bas">
+        <div className="kap">
+          <div className="dn-bant" lang="tr">
+            <div className="dn-metin">
+              <span className="dn-et"><span className="dn-eik"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg></span>İl denetçileri için</span>
+              <h2 id="dn-bas">Denetçi dosyanızı aynı sistemden inceler</h2>
+              <p>İl Millî Eğitim Müdürlüğü denetçileri ildeki kulüplerin aylık dosyalarını tek listede görür. Belgeleri açar, bordroyu sistemin yeniden hesabıyla karşılaştırır; dosyayı onaylar ya da notla iade eder.</p>
+              <ul className="dn-tik" role="list"><li>İl geneli özet, ilçeye göre süzme</li><li>Bordro farkları listelenir</li><li>Denetçi yalnızca görür, değiştiremez</li></ul>
+              <div className="dn-alt"><Link href="/login?type=denetim" className="btn dn-btn">Denetçi girişi</Link></div>
+            </div>
+            <div className="dn-sahne">
+              <div className="dn-pen"><div className="dn-pen-ust"><span className="dn-nok" aria-hidden="true"><i></i><i></i><i></i></span>İl denetim listesi<span className="dn-sag">Kasım 2026</span></div><div className="dn-ozet"><div>Gönderilen<b className="num">24</b></div><div className="y">Onaylanan<b className="num">15</b></div><div>İncelemede<b className="num">6</b></div><div className="c">İade<b className="num">3</b></div></div><div className="dn-okul"><span className="dn-av"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13" /><path d="M9 21v-6h6v6" /></svg></span><span><b>Papatya İlkokulu</b><small className="dn-fark">Bordro farkı ₺240,00</small></span><span className="rozet r-bek">İncelemede</span></div><div className="dn-okul"><span className="dn-av"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13" /><path d="M9 21v-6h6v6" /></svg></span><span><b>Çınar İlkokulu</b><small>Kuzey · 13 / 13 belge</small></span><span className="rozet r-ok">Onaylandı</span></div><div className="dn-okul"><span className="dn-av"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13" /><path d="M9 21v-6h6v6" /></svg></span><span><b>Lale İlkokulu</b><small>Güney · 13 / 13 belge</small></span><span className="rozet r-mav">Gönderildi</span></div><div className="dn-okul"><span className="dn-av"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13" /><path d="M9 21v-6h6v6" /></svg></span><span><b>Menekşe İlkokulu</b><small>Doğu · 13 / 13 belge</small></span><span className="rozet r-ok">Onaylandı</span></div></div>
+              <div className="dn-bildirim"><span className="dn-bik"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg></span><div><b>Çınar İlkokulu onaylandı</b><span>Kasım dosyası · 13 / 13 belge</span></div></div>
+            </div>
           </div>
         </div>
-        <div className="tz-kap tz-alt-telif">© {new Date().getFullYear()} Klüp360. Tüm hakları saklıdır.</div>
-      </footer>
+      </section>
 
-      {sinema && <Sinema set={sinema.set} bolum={sinema.bolum} donus={sinema.donus} onKapat={sinemayiKapat} />}
+
+      <section className="bolum" id="sorular" style={{ paddingTop: '0' }} aria-labelledby="ss-bas">
+        <div className="kap">
+          <h2 className="orta-baslik" id="ss-bas" style={{ maxWidth: 'none' }}>Sık sorulan sorular</h2>
+          <div className="sorular">
+            {SORULAR.map(({ soru, cevap, bag }, i) => (
+              <details key={soru} open={i === 0}><summary>{soru}</summary><p>{cevapParcala(cevap, bag)}</p></details>
+            ))}
+
+          </div>
+        </div>
+      </section>
+
+
+      <section className="kapanis" aria-labelledby="kp-bas">
+        <div className="kap">
+          <div className="kapanis-kutu">
+            <div>
+              <h2 id="kp-bas">Bu ayı Klüp360’ta kapatın</h2>
+              <ol className="adimlar" role="list">
+                <li>Kurumunuzu kaydedin; okul, SGK ve vergi bilgilerini girin.</li>
+                <li>Öğrenci ve personel listelerinizi Excel’den aktarın.</li>
+                <li>Ayı yönetin: yoklama, tahsilat, bordro, muhtasar ve denetim dosyası.</li>
+              </ol>
+            </div>
+            <div className="kapanis-eylem">
+              <Link href="/signup" className="btn btn-beyaz">{DENEME_GUN} gün ücretsiz deneyin</Link>
+              <small>Kredi kartı istenmez. Deneme bitince kayıtlarınız silinmez.</small>
+              <Link href="/tanitim/iletisim" className="acik">Kurulumda yardım ister misiniz? Bize yazın</Link>
+            </div>
+          </div>
+        </div>
+      </section>
+      </main>
+
+      <footer>
+        <div className="kap alt-ic">
+          <span>© {new Date().getFullYear()} Klüp360 · MEB çocuk kulüpleri için yönetim sistemi. Klüp360, MEB’in resmî ürünü değildir.</span>
+          <div className="alt-bag">
+            <Link href="/rehber">Rehber</Link><Link href="/cocuk-kulubu-bordro-hesaplama">Bordro hesaplama</Link><Link href="/cocuk-kulubu-aidat-hesaplama">Aidat hesaplama</Link><Link href="/ek-ders-hesaplama">Ek ders hesaplama</Link><Link href="/cocuk-kulubu-butce-tablosu">Bütçe tablosu</Link><Link href="/fiyatlandirma">Fiyatlandırma</Link><Link href="/tanitim/kullanim-kosullari">Kullanım koşulları</Link><Link href="/tanitim/gizlilik-politikasi">Gizlilik</Link><Link href="/tanitim/kvkk-aydinlatma-metni">KVKK</Link><Link href="/tanitim/iade-politikasi">İade</Link><Link href="/tanitim/iletisim">İletişim</Link>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
 
-function AkisSatiri({ gun, baslik, eylem, vurgu, children }: { gun: string; baslik: string; eylem: React.ReactNode; vurgu?: boolean; children: React.ReactNode }) {
-  return (
-    <li className={`tz-akis-satir${vurgu ? ' vurgu' : ''}`}>
-      <div className="tz-akis-gun">{gun}</div>
-      <div className="tz-akis-icerik">
-        <h3>{baslik}</h3>
-        {children}
-        {eylem}
-      </div>
-    </li>
-  )
+/** Cevaptaki {bag} yer tutucusunu bağlantıya çevirir */
+function cevapParcala(cevap: string, bag: Soru['bag']) {
+  if (!bag) return cevap
+  const [once, sonra] = cevap.split('{bag}')
+  return <Fragment>{once}<Link href={bag.href} className="metin-bag">{bag.metin}</Link>{sonra}</Fragment>
 }
 
 // Sistemin ürettiği dosyanın kısaltılmış satırları; etiket adları lib/muhsgk.ts ile aynı
@@ -339,162 +224,4 @@ const XML_ORNEK = `<?xml version="1.0" encoding="ISO-8859-9"?>
         <turKodu>…</turKodu>
         <gayrisafiTutar>…</gayrisafiTutar> …
   </ozel>
-  <ekler> … <calisanBilgisi>
-    <eksikGunSayisi>…</eksikGunSayisi>
-    <eksikGunNedeni>…</eksikGunNedeni> …
-  </ekler>
-</beyanname>`
-
-/* ----------------------------------------------------------------- stiller */
-
-const CSS = `
-.tz{
-  --tz-kagit:#FFFFFF; --tz-zemin:#F6F8FC; --tz-cizgi:#DCE3F3; --tz-murekkep:#1A2233;
-  --tz-mavi:#2347D9; --tz-mavi-koyu:#1B38B8; --tz-acik:#8EA3EE; --tz-kalem:#C8322B;
-  --tz-mavi-soluk:#E6ECFC; --tz-mavi-soluk-cizgi:#C9D4FA;
-  --tz-tx2:#465066; --tz-tx3:#66708A; --tz-gece:#141C2E;
-  --tz-baslik:var(--font-tz-baslik), var(--font-display), system-ui, sans-serif;
-  --tz-govde:var(--font-tz-govde), var(--font-sans), system-ui, sans-serif;
-  font-family:var(--tz-govde); font-size:17px; line-height:1.6; color:var(--tz-murekkep); background:var(--tz-kagit);
-  -webkit-font-smoothing:antialiased;
-}
-.tz *,.tz *::before,.tz *::after{box-sizing:border-box}
-.tz :where(a){color:inherit;text-decoration:none}
-.tz :where(h1,h2,h3,p,ul,ol,dl,dd,figure){margin:0}
-.tz-kap{width:100%;max-width:1120px;margin:0 auto;padding:0 clamp(16px,4vw,40px)}
-
-/* yazı ölçeği: 14 · 17 · 21 · 28 · 40 · 60 */
-.tz-h1,.tz-h2,.tz h3,.tz-akis-gun{font-family:var(--tz-baslik);font-weight:700;letter-spacing:-.012em}
-.tz-h1{font-size:clamp(38px,5.4vw,60px);line-height:1.04;max-width:17ch;text-wrap:balance}
-.tz-h2{font-size:clamp(28px,3.6vw,40px);line-height:1.12;max-width:22ch}
-.tz h3{font-size:21px;line-height:1.25}
-.tz-ozet{color:var(--tz-tx2);max-width:62ch;margin-top:14px}
-
-/* düğmeler */
-.tz-dugme{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:10px;
-  font:600 15px/1 var(--tz-govde);border:1px solid transparent;cursor:pointer;white-space:nowrap}
-.tz-dugme-buyuk{min-height:52px;padding:0 24px;font-size:16.5px}
-.tz-dugme-ana{background:var(--tz-mavi);color:#fff}
-.tz-dugme-ana:hover{background:var(--tz-mavi-koyu)}
-.tz-dugme-ikincil{background:var(--tz-kagit);color:var(--tz-murekkep);border-color:var(--tz-cizgi)}
-.tz-dugme-ikincil:hover{border-color:var(--tz-mavi)}
-.tz-dugme-acik{background:#fff;color:var(--tz-gece)}
-.tz-dugme-acik:hover{background:var(--tz-mavi-soluk)}
-.tz-metin-dugme{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0;border:0;background:none;cursor:pointer;
-  font:600 15px/1 var(--tz-govde);color:var(--tz-mavi);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:5px}
-.tz-metin-dugme:hover{text-decoration-thickness:2px}
-.tz a:focus-visible,.tz button:focus-visible{outline:3px solid var(--tz-mavi);outline-offset:3px;border-radius:6px}
-.tz-eylemler{display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;margin-top:28px}
-.tz-not{font-size:14px;color:var(--tz-tx3);max-width:40ch;line-height:1.45}
-
-/* menü */
-.tz-nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.94);border-bottom:1px solid var(--tz-cizgi)}
-.tz-nav-ic{max-width:1120px;margin:0 auto;height:68px;padding:0 clamp(16px,4vw,40px);display:flex;align-items:center;gap:28px}
-.tz-marka{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.tz-nav-baglantilar{display:flex;gap:24px;margin-right:auto}
-.tz-nav-baglantilar a{font-size:15px;color:var(--tz-tx2)}
-.tz-nav-baglantilar a:hover{color:var(--tz-murekkep);text-decoration:underline;text-underline-offset:5px}
-.tz-nav-eylem{display:flex;align-items:center;gap:16px;margin-left:auto}
-.tz-nav-giris{font-size:15px;font-weight:600}
-.tz-menu-dugme{display:none;width:44px;height:44px;border-radius:10px;border:1px solid var(--tz-cizgi);background:var(--tz-kagit);color:var(--tz-murekkep);align-items:center;justify-content:center;cursor:pointer}
-.tz-mobil-menu{display:none}
-
-/* giriş */
-.tz-giris{padding:clamp(40px,6vw,72px) 0 clamp(48px,6vw,72px);border-bottom:1px solid var(--tz-cizgi)}
-.tz-giris-metin{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:22px 56px;align-items:end}
-.tz-giris-metin .tz-h1{grid-column:1/-1;max-width:none}
-.tz-giris-ozet{font-size:clamp(17px,1.6vw,19px);color:var(--tz-tx2);max-width:56ch}
-.tz-giris-metin .tz-eylemler{margin-top:0;flex-direction:column;align-items:flex-start;gap:10px}
-.tz-giris-metin .tz-not{max-width:34ch}
-.tz-ay{margin-top:clamp(36px,4.5vw,52px)}
-.tz-film{margin-top:16px}
-
-/* bölümler */
-.tz-bolum{padding:clamp(64px,8vw,104px) 0;border-bottom:1px solid var(--tz-cizgi)}
-.tz-bolum-ince{padding:clamp(56px,6vw,80px) 0}
-.tz-bas{margin-bottom:clamp(32px,4vw,48px)}
-
-/* ayın akışı: sol sütun gün, sağ sütun anlatım */
-.tz-akis{list-style:none;padding:0;border-top:2px solid var(--tz-murekkep)}
-.tz-akis-satir{display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px;padding:28px 0;border-bottom:1px solid var(--tz-cizgi)}
-.tz-akis-gun{font-size:21px;color:var(--tz-mavi);padding-top:1px}
-.tz-akis-icerik{max-width:68ch}
-.tz-akis-icerik p{color:var(--tz-tx2);margin-top:10px}
-.tz-akis-icerik .tz-metin-dugme{margin-top:8px}
-.tz-akis-satir.vurgu .tz-akis-gun{color:var(--tz-murekkep)}
-.tz-akis-satir.vurgu .tz-akis-gun::after{content:"";display:block;width:32px;height:4px;border-radius:2px;background:var(--tz-mavi);margin-top:10px}
-.tz-maddeler{list-style:none;padding:0;margin-top:12px;display:flex;flex-wrap:wrap;gap:6px 8px}
-.tz-maddeler li{font-size:14px;color:var(--tz-murekkep);background:var(--tz-zemin);border:1px solid var(--tz-cizgi);border-radius:6px;padding:3px 9px}
-
-/* muhtasar */
-.tz-muhtasar{background:var(--tz-zemin)}
-.tz-muh{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(32px,5vw,64px);align-items:start}
-.tz-tikler{list-style:none;padding:0;margin-top:24px;display:grid;gap:10px}
-.tz-tikler li{position:relative;padding-left:28px}
-.tz-tikler li::before{content:"";position:absolute;left:2px;top:7px;width:14px;height:8px;border-left:3px solid var(--tz-mavi);border-bottom:3px solid var(--tz-mavi);transform:rotate(-45deg)}
-.tz-dosya{background:var(--tz-kagit);border:1px solid var(--tz-cizgi);border-radius:12px;overflow:hidden}
-.tz-dosya-ust{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--tz-gece);color:#fff;padding:10px 14px;font:600 14.5px/1.3 var(--tz-govde)}
-.tz-dosya-etiket{font-weight:500;font-size:13px;color:rgba(255,255,255,.66)}
-.tz-dosya pre{margin:0;padding:16px 18px;font:12.5px/1.6 ui-monospace,'SF Mono',Consolas,monospace;color:#2A3550;white-space:pre-wrap;word-break:break-word;border-bottom:1px solid var(--tz-cizgi)}
-.tz-dosya-alt{padding:14px 18px;font-size:15px;display:grid;gap:4px}
-
-/* fihrist: noktalı kılavuz çizgisiyle iki sütun */
-.tz-fihrist{display:grid;grid-template-columns:1fr 1fr;gap:0 56px;border-top:2px solid var(--tz-murekkep)}
-.tz-fihrist>div{display:grid;grid-template-columns:minmax(0,max-content) 1fr;align-items:baseline;gap:0 10px;padding:16px 0;border-bottom:1px solid var(--tz-cizgi)}
-.tz-fihrist dt{font-weight:600;display:flex;align-items:baseline;gap:10px;white-space:nowrap}
-.tz-fihrist dt::after{content:"";flex:1;min-width:24px;border-bottom:2px dotted var(--tz-cizgi);transform:translateY(-4px)}
-.tz-fihrist dd{color:var(--tz-tx2);font-size:15.5px}
-
-/* denetçi (koyu) */
-.tz-denetci{background:var(--tz-gece);color:#fff;padding:clamp(64px,8vw,104px) 0}
-.tz-denetci .tz-ozet{color:rgba(255,255,255,.74)}
-.tz-tutanak{margin-top:clamp(32px,4vw,48px);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px 48px;align-items:end}
-.tz-tutanak ul{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:14px 40px}
-.tz-tutanak li{display:flex;gap:12px;align-items:flex-start;color:rgba(255,255,255,.78);font-size:15.5px}
-.tz-tutanak li svg{color:#F06A5F;flex-shrink:0;margin-top:3px}
-.tz-tutanak b{color:#fff;font-weight:600}
-
-/* sorular */
-.tz-sorular{display:grid;grid-template-columns:1fr 1fr;gap:32px 56px}
-.tz-sorular dt{font-family:var(--tz-baslik);font-weight:700;font-size:19px;line-height:1.3}
-.tz-sorular dd{color:var(--tz-tx2);margin-top:8px;max-width:58ch}
-
-/* kapanış */
-.tz-kapanis{padding:clamp(64px,8vw,104px) 0}
-.tz-adimlar{list-style:decimal;margin-top:24px;padding-left:24px;display:grid;gap:8px;max-width:62ch;color:var(--tz-tx2)}
-.tz-adimlar li::marker{font-family:var(--tz-baslik);font-weight:700;color:var(--tz-mavi)}
-
-/* altbilgi */
-.tz-alt{background:var(--tz-gece);color:#fff;padding:44px 0 26px}
-.tz-alt-ic{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;padding-bottom:24px;border-bottom:1px solid rgba(255,255,255,.12)}
-.tz-alt-marka{display:flex;align-items:center;gap:12px}
-.tz-alt-etiket{font-size:13px;color:rgba(255,255,255,.6);margin-top:4px}
-.tz-alt-baglantilar{display:flex;flex-wrap:wrap;gap:8px 22px}
-.tz-alt-baglantilar a{font-size:14px;color:rgba(255,255,255,.72)}
-.tz-alt-baglantilar a:hover{color:#fff;text-decoration:underline;text-underline-offset:4px}
-.tz-alt-telif{font-size:13px;color:rgba(255,255,255,.62);padding-top:20px}
-
-@media (max-width:960px){
-  .tz-nav-baglantilar{display:none}
-  .tz-menu-dugme{display:inline-flex}
-  .tz-mobil-menu{display:flex;flex-direction:column;padding:4px clamp(16px,4vw,40px) 12px;border-top:1px solid var(--tz-cizgi);background:var(--tz-kagit)}
-  .tz-mobil-menu a{display:flex;align-items:center;min-height:48px;font-weight:600;border-bottom:1px solid var(--tz-cizgi)}
-  .tz-mobil-menu a:last-child{border-bottom:0}
-  .tz-mobil-menu .tz-mobil-giris{color:var(--tz-mavi)}
-  .tz-muh{grid-template-columns:1fr}
-  .tz-tutanak{grid-template-columns:1fr}
-  .tz-giris-metin{grid-template-columns:1fr}
-}
-@media (max-width:760px){
-  .tz-akis-satir{grid-template-columns:1fr;gap:6px;padding:24px 0}
-  .tz-fihrist,.tz-sorular,.tz-tutanak ul{grid-template-columns:1fr}
-  .tz-fihrist>div{grid-template-columns:1fr}
-  .tz-fihrist dt::after{display:none}
-  .tz-fihrist dd{margin-top:2px}
-}
-@media (max-width:520px){
-  .tz-nav-giris{display:none}
-  .tz-nav-eylem .tz-dugme-ana{padding:0 14px}
-  .tz-marka svg:last-child{display:none !important}
-}
-`
+  <ekler> … <calisanBilgisi> …`

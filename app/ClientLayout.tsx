@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import SistemBildirimi from '@/components/SistemBildirimi'
+import DemoSeridi from '@/components/DemoSeridi'
 import GlobalDiyalog from '@/components/GlobalDiyalog'
 import { AyProvider } from '@/lib/AyContext'
 import { AuthProvider, useAuth } from '@/lib/AuthContext'
@@ -68,6 +69,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
           transition: 'margin-left 0.3s ease',
         }}
       >
+        <DemoSeridi />
         {children}
       </main>
     </div>

@@ -10,7 +10,7 @@ const jetbrains = JetBrains_Mono({ subsets: ['latin', 'latin-ext'], variable: '-
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.klup360.com'),
   title: 'Klüp360 | MEB Çocuk Kulüpleri Yönetim Sistemi',
-  description: "MEB Çocuk Kulüpleri Yönergesi'ne %100 uyumlu, dijital yoklama, otomatik puantaj, bordro ve aidat takibi sunan profesyonel okul yönetim platformu.",
+  description: 'MEB çocuk kulüpleri için aidat, puantaj, bordro, muhtasar XML ve denetim dosyası tek programda. 15 gün ücretsiz deneyin.',
   keywords: [
     'meb çocuk kulübü yönergesi', 
     'çocuk kulübü ek ders hesaplama', 
@@ -24,17 +24,16 @@ export const metadata: Metadata = {
   authors: [{ name: 'Klüp360 Ekibi' }],
   robots: 'index, follow',
   openGraph: {
-    title: 'Klüp360 | Dijital Okul Yönetim Platformu',
-    description: 'MEB uyumlu en gelişmiş çocuk kulübü yönetim yazılımı. İş yükünüzü azaltın, verimliliği artırın.',
-    url: 'https://www.klup360.com/tanitim',
+    title: 'Klüp360 | MEB Çocuk Kulüpleri Yönetim Sistemi',
+    description: 'MEB çocuk kulüpleri için aidat, puantaj, bordro, muhtasar XML ve denetim dosyası tek programda.',
     siteName: 'Klüp360',
     locale: 'tr_TR',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Klüp360 | Çocuk Kulübü Yönetimi',
-    description: 'Puantaj, Bordro, Yoklama ve Aidat takibi tek platformda.',
+    title: 'Klüp360 | MEB Çocuk Kulüpleri Yönetim Sistemi',
+    description: 'MEB çocuk kulüpleri için aidat, puantaj, bordro, muhtasar XML ve denetim dosyası tek programda.',
   },
   verification: {
     google: 'ab4aWvn31CkvUn_uzV1H5_rNf9CaFdBflT3l7-ecEN4',
@@ -45,32 +44,11 @@ export const viewport = {
   themeColor: '#0e1116',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="tr" suppressHydrationWarning className={`${inter.variable} ${interTight.variable} ${jetbrains.variable}`}>
-      <head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'SoftwareApplication',
-              'name': 'Klüp360',
-              'operatingSystem': 'Web Based',
-              'applicationCategory': 'EducationalApplication, BusinessApplication',
-              'offers': {
-                '@type': 'Offer',
-                'price': '1250',
-                'priceCurrency': 'TRY'
-              },
-              'description': 'MEB Çocuk Kulüpleri Yönergesi\'ne uygun okul yönetim sistemi.'
-            })
-          }}
-        />
-      </head>
       <body>
         <ClientLayout>{children}</ClientLayout>
       </body>

@@ -1,4 +1,5 @@
 'use client'
+import { DemoDosyaNotu } from '@/components/DemoSeridi'
 import { useCallback, useRef, useState } from 'react'
 import Topbar from '@/components/Topbar'
 import ConfirmModal from '@/components/ConfirmModal'
@@ -222,6 +223,7 @@ export default function DenetimDosyasiPage() {
       />
       <div style={{ padding: 28 }}>
         <input ref={dosyaInput} type="file" multiple accept={KABUL_EDILEN} style={{ display: 'none' }} onChange={e => dosyalariYukle(e.target.files)} />
+        <DemoDosyaNotu />
 
         {/* Durum bandı */}
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>

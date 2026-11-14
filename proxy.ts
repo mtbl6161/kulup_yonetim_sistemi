@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { DEMO_CEREZ } from '@/lib/demo/mod'
 
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next({
@@ -33,6 +34,26 @@ export async function proxy(request: NextRequest) {
   }
 
   if (request.method === 'POST') {
+    return response
+  }
+
+  // DEMO: /demo ve /demo/cikis çerezi yazan/silen rotalardır, oturum gerektirmez
+  if (pathname === '/demo' || pathname.startsWith('/demo/')) {
+    return response
+  }
+
+  // DEMO MODU: veri tarayıcı belleğindeki örnek okuldan gelir; sunucu veritabanına (bakım ve lisans
+  // sorguları dahil) hiç gidilmez. Panel sayfaları istemci bileşenidir, çerez tek başına hiçbir veriye erişim açmaz.
+  if (request.cookies.get(DEMO_CEREZ)?.value === '1') {
+    // Giriş/kayıt sayfaları gerçek hesapla çalışır: demo çerezi silinip aynı sayfa demo dışı yüklenir
+    if (pathname === '/login' || pathname === '/signup' || pathname === '/reset-password') {
+      const temiz = NextResponse.redirect(request.nextUrl)
+      temiz.cookies.set(DEMO_CEREZ, '', { path: '/', maxAge: 0 })
+      return temiz
+    }
+    const demodaKapali = pathname.startsWith('/yonetim') || pathname.startsWith('/denetim')
+      || pathname === '/kurulum' || pathname === '/odeme-yap' || pathname === '/abonelik-yenile'
+    if (demodaKapali) return NextResponse.redirect(new URL('/', request.url))
     return response
   }
 

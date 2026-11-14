@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   Klüp360 · Atlas tasarım dili
+   Klüp360 · Atlas tasarım dili (kobalt + mercan)
    Değişken adları korunmuştur; sayfalar değerleri buradan devralır.
    ========================================================================== */
 :root {
@@ -11,11 +11,11 @@
   --font-mono: var(--font-jetbrains), ui-monospace, 'SF Mono', Consolas, monospace;
 
   /* Zemin */
-  --bg: #f5f6f8;
+  --bg: #f3f5f9;
   --bg2: #eef0f3;
   --surface: #ffffff;
-  --surface2: #f4f5f8;
-  --border: #e3e6eb;
+  --surface2: #f6f7fb;
+  --border: #e6e9ef;
   --border-strong: #cbd0d8;
   --border-light: #eef0f3;
 
@@ -25,8 +25,13 @@
   --accent-hover: #1c3bbe;
   --accent-light: #8ea3ee;
   --accent-lighter: #eef2fe;
-  --accent2: #c77d00;
-  --accent2-hover: #a66600;
+  /* İkinci renk: mercan. #ff7a50 yalnızca dolgu, grafik ve süs içindir;
+     yazı ve beyaz yazılı düğmelerde okunur koyu tonu (--accent2) kullanılır. */
+  --accent2: #c2410c;
+  --accent2-hover: #a8360a;
+  --coral: #ff7a50;
+  --coral-light: #fff1eb;
+  --coral-border: #ffd3c2;
 
   /* Metin */
   --text: #0e1116;
@@ -39,16 +44,17 @@
   --success: #0b7a4b;
   --success-light: #e4f4ec;
   --success-border: #b6dec9;
-  --warn: #c77d00;
-  --warn-light: #fff8e8;
-  --warn-border: #f0d9a8;
+  /* Uyarı: mercanla karışmasın diye sarıya yakın amber */
+  --warn: #a86f00;
+  --warn-light: #fff8e1;
+  --warn-border: #f2dca0;
   --danger: #c0262d;
   --danger-light: #fce9ea;
   --danger-border: #f1c4c6;
   --danger-hover: #a91f26;
   /* Koyu durum tonları: açık zemin üzerindeki rozet ve etiket yazıları için */
   --success-dark: #0b6b42;
-  --warn-dark: #8a5200;
+  --warn-dark: #7a5000;
   --danger-dark: #a91f26;
 
   /* Yazı ölçeği (panel). Okunurluk için en küçük boyut 12px; daha küçüğü yalnızca basılı belge görünümlerinde. */
@@ -73,6 +79,10 @@
   --radius-lg: 12px;
   --ring: 0 0 0 3px rgba(35, 71, 217, 0.18);
   --shadow-float: 0 24px 56px rgba(14, 17, 22, 0.2);
+  /* Kart gölgeleri: hafif, mavi tonlu */
+  --radius-card: 16px;
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 16px -6px rgba(35, 71, 217, 0.08);
+  --shadow-stat: 0 1px 2px rgba(16, 24, 40, 0.04), 0 12px 32px -8px rgba(35, 71, 217, 0.12);
 }
 
 * { box-sizing: border-box; }
@@ -127,16 +137,23 @@ input, select, textarea, button { font-family: inherit; }
 .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
 .badge-green { background: var(--success-light); color: var(--success-dark); }
 .badge-red { background: var(--danger-light); color: var(--danger-dark); }
-.badge-orange { background: #fff1d6; color: var(--warn-dark); }
+.badge-orange { background: var(--warn-light); color: var(--warn-dark); }
+.badge-coral { background: var(--coral-light); color: var(--accent2); }
 .badge-gray { background: #eef0f4; color: var(--text2); }
 .badge-blue { background: var(--accent-lighter); color: var(--accent-dark); }
 
 /* CARD */
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 20px; }
+/* Tablo ve liste taşıyan kartlar: ince çerçeve korunur, gölge çok hafiftir */
+.card { background: var(--surface); border: 1px solid var(--border-light); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 20px; margin-bottom: 20px; }
 .card-title { font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
 
 /* STAT CARD */
-.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; }
+/* Özet kartları: çerçevesiz, 18px köşe, yumuşak mavi gölge */
+.stat-card { background: var(--surface); border: 1px solid transparent; border-radius: 18px; box-shadow: var(--shadow-stat); padding: 18px 20px; }
+.stat-chip { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 14px; background: var(--accent-lighter); color: var(--accent); }
+.stat-chip.coral { background: var(--coral-light); color: var(--accent2); }
+.stat-chip.red { background: var(--danger-light); color: var(--danger); }
+.stat-chip.green { background: var(--success-light); color: var(--success); }
 .stat-label { font-size: var(--yazi-sm); color: var(--text2); font-weight: 500; }
 .stat-value { font-family: var(--font-display); font-size: 28px; font-weight: 600; letter-spacing: -0.03em; margin-top: 6px; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.1; }
 .stat-sub { font-size: var(--yazi-xs); color: var(--text3); margin-top: 6px; }
@@ -176,7 +193,7 @@ input, select, textarea, button { font-family: inherit; }
 .btn-secondary:hover { background: #f4f5f7; border-color: #aeb5c0; }
 .btn-danger { background: var(--danger); color: #fff; border-color: #8e161c; }
 .btn-danger:hover { background: var(--danger-hover); }
-.btn-warn { background: var(--accent2); color: #fff; border-color: #8a5600; }
+.btn-warn { background: var(--accent2); color: #fff; border-color: #8f3009; }
 .btn-warn:hover { background: var(--accent2-hover); }
 .btn-success { background: var(--success); color: #fff; border-color: #085c38; }
 .btn-success:hover { background: #096a40; }
@@ -197,7 +214,7 @@ input, select, textarea, button { font-family: inherit; }
 /* ALERTS */
 .alert { padding: 11px 14px; border-radius: var(--radius); margin-bottom: 16px; font-size: var(--yazi-sm); display: flex; align-items: flex-start; gap: 10px; line-height: 1.5; }
 .alert-info { background: var(--accent-lighter); color: var(--accent-dark); border: 1px solid #c9d4fa; }
-.alert-warn { background: var(--warn-light); color: #7a4c00; border: 1px solid var(--warn-border); }
+.alert-warn { background: var(--warn-light); color: var(--warn-dark); border: 1px solid var(--warn-border); }
 .alert-success { background: var(--success-light); color: #0b6b42; border: 1px solid var(--success-border); }
 .alert-danger { background: var(--danger-light); color: #a91f26; border: 1px solid var(--danger-border); }
 
@@ -208,7 +225,7 @@ input, select, textarea, button { font-family: inherit; }
 /* PROGRESS */
 .prog-bar { background: #eef0f4; border-radius: 4px; height: 6px; overflow: hidden; margin-top: 4px; }
 .prog-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width 0.3s; }
-.prog-fill.orange { background: var(--accent2); }
+.prog-fill.orange { background: var(--coral); }
 .prog-fill.red { background: var(--danger); }
 
 /* TABS */
@@ -221,9 +238,9 @@ input, select, textarea, button { font-family: inherit; }
 .att-day { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: var(--yazi-xs); font-weight: 500; cursor: pointer; border: 1px solid var(--border); transition: all 0.1s; background: var(--surface); color: var(--text3); user-select: none; }
 .att-day.present { background: var(--success-light); color: #0b6b42; border-color: var(--success-border); }
 .att-day.absent { background: var(--danger-light); color: var(--danger); border-color: var(--danger-border); }
-.att-day.excused { background: var(--warn-light); color: #7a4c00; border-color: var(--warn-border); }
+.att-day.excused { background: var(--warn-light); color: var(--warn-dark); border-color: var(--warn-border); }
 .att-day.weekend { background: var(--surface2); color: var(--text3); cursor: default; opacity: 0.55; }
-.att-day.holiday { background: #fff8e8; color: #7a4c00; cursor: default; }
+.att-day.holiday { background: var(--warn-light); color: var(--warn-dark); cursor: default; }
 
 /* MODAL */
 .modal-overlay { position: fixed; inset: 0; background: rgba(14,17,22,0.45); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -240,6 +257,8 @@ input, select, textarea, button { font-family: inherit; }
 .font-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 /* Rakam hizası için: font değişmez (eş aralıklı fontta ₺ işareti bozuk görünüyordu) */
 .tabular { font-variant-numeric: tabular-nums; }
+/* Yalnızca ekran okuyucular için metin */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .sep { height: 1px; background: var(--border); margin: 16px 0; }
 .empty-state { text-align: center; padding: 48px 20px; color: var(--text3); display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .empty-state svg { margin-bottom: 8px; }

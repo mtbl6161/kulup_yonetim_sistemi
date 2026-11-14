@@ -117,7 +117,7 @@ export default function HesapHareketleriPage() {
       <div style={{ padding: 28 }}>
         {/* Özet */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 20 }}>
-          <StatCard title="Toplam Gelir" value={fmtTL(toplamGelir)} trend={`${hareketler.filter(h => h.tur === 'gelir').length} işlem`} variant="orange" />
+          <StatCard title="Toplam Gelir" value={fmtTL(toplamGelir)} trend={`${hareketler.filter(h => h.tur === 'gelir').length} işlem`} />
           <StatCard title="Toplam Gider" value={fmtTL(toplamGider)} trend={`${hareketler.filter(h => h.tur === 'gider').length} işlem`} variant="red" />
           <StatCard title="Net Kasa Bakiyesi" value={fmtTL(netBakiye)} trend="Anlık bakiye" variant="teal" />
         </div>

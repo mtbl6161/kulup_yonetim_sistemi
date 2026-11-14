@@ -18,7 +18,11 @@ export default function robots(): MetadataRoute.Robots {
         '/bilanco/',
         '/gelir-gider/',
         '/odeme/',
-        '/abonelik-yenile/'
+        '/abonelik-yenile/',
+        // Giriş gerektiren diğer panel sayfaları
+        '/denetim', '/kurulum', '/hesap-hareketleri', '/isletme-defteri', '/oab', '/kulup', '/evrak-dosyasi',
+        '/ders-programi', '/egitim', '/okul-ogrenciler', '/tahsilat-takip', '/ayarlar', '/reset-password',
+        '/odeme-yap', '/bakim', '/demo',
       ],
     },
     sitemap: 'https://www.klup360.com/sitemap.xml',

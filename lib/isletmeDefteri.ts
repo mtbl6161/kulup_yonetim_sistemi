@@ -27,6 +27,23 @@ export async function kulupOtomatikHareketler(yil: number): Promise<IsletmeHarek
 }
 
 /** Kulüp işletme defterine göre seçili ayın sonunda bankada kalan ve o ayın neti (defter kapağındaki "Ay Sonu Bankada Kalan" ile aynı hesap). */
+/** Yılın her ayı için ay sonu banka bakiyesi (index 0 = Ocak). Genel bakıştaki bakiye eğrisi için. */
+export async function kulupAySonuBakiyeleri(yil: number): Promise<number[]> {
+  const [{ data: elle }, { data: devir }, otomatik] = await Promise.all([
+    supabase.from('isletme_defteri').select('tur, tutar, ay').eq('birim', 'kulup').eq('yil', yil),
+    supabase.from('isletme_devir').select('devreden_tutar').eq('birim', 'kulup').eq('yil', yil).maybeSingle(),
+    kulupOtomatikHareketler(yil),
+  ])
+  const hareketler: Pick<IsletmeHareket, 'tur' | 'tutar' | 'ay'>[] = [...(elle || []), ...otomatik]
+  const topla = (liste: typeof hareketler) => liste.reduce((s, h) => s + (h.tur === 'gelir' ? 1 : -1) * Number(h.tutar || 0), 0)
+  // Ayı boş kayıtlar, kulupAySonuBakiye'deki gibi her aya dahil edilir
+  let bakiye = Number(devir?.devreden_tutar || 0) + topla(hareketler.filter(h => !h.ay))
+  return Array.from({ length: 12 }, (_, i) => {
+    bakiye += topla(hareketler.filter(h => h.ay === i + 1))
+    return bakiye
+  })
+}
+
 export async function kulupAySonuBakiye(yil: number, ay: number): Promise<{ bakiye: number; ayNet: number }> {
   const [{ data: elle }, { data: devir }, otomatik] = await Promise.all([
     supabase.from('isletme_defteri').select('tur, tutar, ay').eq('birim', 'kulup').eq('yil', yil),

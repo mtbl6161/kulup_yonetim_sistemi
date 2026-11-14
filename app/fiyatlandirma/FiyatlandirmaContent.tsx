@@ -18,7 +18,7 @@ const DAHIL = [
 
 const SORULAR = [
   ['Öğrenci ya da personel sayısına göre fiyat değişir mi?', 'Hayır. Öğrenci, personel ve sınıf sayısında sınır yoktur; ücret kurum başına sabittir.'],
-  ['Nasıl iptal ederim?', 'Ayarlar › Abonelik’ten, kimseyle görüşmeden. İptal ettiğinizde ödediğiniz dönemin sonuna kadar kullanmaya devam edersiniz; cayma bedeli yoktur.'],
+  ['Nasıl iptal ederim?', 'Ayarlar › Abonelik’teki müşteri portalından, kimseyle görüşmeden. İptal ettiğinizde ödediğiniz dönemin sonuna kadar kullanmaya devam edersiniz; iptal ücreti yoktur.'],
   ['Deneme bitince ne olur?', `${DENEME_GUN} günlük deneme için kart bilgisi istenmez. Deneme bitince abone olmazsanız girdiğiniz kayıtlar silinmez; abone olduğunuzda kaldığınız yerden sürer.`],
   ['Fatura alabilir miyim?', 'Her ödemede faturanız e-posta adresinize gelir. Geçmiş faturalara Ayarlar › Abonelik’ten de ulaşırsınız.'],
   ['Verilerimiz nerede saklanıyor?', 'Şifrelenmiş olarak bulutta. Her kurumun verisi ayrı tutulur; başka bir okul sizin kayıtlarınızı göremez.'],

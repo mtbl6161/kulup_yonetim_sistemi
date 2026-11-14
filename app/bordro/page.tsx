@@ -21,10 +21,11 @@ import { useYukleme } from '@/lib/useYukleme'
 import { bordroOzetPdf, bordroSirala, bordroToplamlari } from '@/lib/bordroOzet'
 import { bordroSatirlariHesapla } from '@/lib/bordroHesap'
 import { istisnaKartiOlustur } from '@/lib/hesapKontrol'
+import { demoEpostaGoster, base64Blob } from '@/lib/demo/ekran'
 
 export default function BordroPage() {
   const { ay, yil } = useAy()
-  const { okul, profil } = useAuth()
+  const { okul, profil, demo } = useAuth()
   const [, setPersonel] = useState<Personel[]>([])
   const [, setDefter] = useState<SinifDefteri[]>([])
   const [puantajData, setPuantajData] = useState<Puantaj[]>([])
@@ -261,6 +262,13 @@ export default function BordroPage() {
       uyari('Bu personelin e-posta adresi kayıtlı değil!')
       return
     }
+    if (demo) {
+      await demoEpostaGoster({
+        alici: row.personel.email, ek: `${row.personel.ad} ${AYLAR[ay]} ${yil} bordro zarfı`,
+        pdf: async () => { const b64 = await generateSlipPdfBase64(row); return b64 ? base64Blob(b64) : null },
+      })
+      return
+    }
     setConfirmModal({ isOpen: true, type: 'single', row })
   }
 
@@ -306,6 +314,10 @@ export default function BordroPage() {
     const mailliPersoneller = sortedSatirlar.filter(s => s.personel.email)
     if (mailliPersoneller.length === 0) {
       uyari('E-posta adresi kayıtlı personel bulunamadı!')
+      return
+    }
+    if (demo) {
+      await demoEpostaGoster({ adet: mailliPersoneller.length, ek: `${AYLAR[ay]} ${yil} bordro zarfı` })
       return
     }
 

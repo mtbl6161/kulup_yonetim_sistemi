@@ -15,7 +15,7 @@ const RENK: Record<string, { bg: string; fg: string }> = {
   taslak: { bg: 'var(--surface2)', fg: 'var(--text2)' },
   gonderildi: { bg: 'var(--info-light)', fg: 'var(--info)' },
   onaylandi: { bg: 'var(--success-light)', fg: 'var(--success)' },
-  iade: { bg: '#fff1d6', fg: 'var(--warn-dark)' },
+  iade: { bg: 'var(--warn-light)', fg: 'var(--warn-dark)' },
   bekliyor: { bg: 'var(--surface2)', fg: 'var(--text2)' },
 }
 const rozet = (d: string, metin: string) => (

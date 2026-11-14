@@ -7,6 +7,8 @@
 import { supabase } from './supabase'
 import { AYLAR, fmt, gunSayisi, tahakkukDagitimHesapla, detectActiveCategories, isDenetim, kisiTekillestir } from './hesaplama'
 import { Ayarlar } from './types'
+import { belgeAdresiCoz } from './demo/istemci'
+import { demoDosyaAdi } from './demo/mod'
 import { pdfHazirla, pdfBaslik, pdfTablo, pdfImza, pdfSonY, pdfAltBilgi, type Pdf as PdfBelgesi } from './pdf'
 
 export const DENETIM_BUCKET = 'denetim'
@@ -383,14 +385,16 @@ export async function belgeAc(b: Pick<DenetimBelge, 'dosya_yolu'>) {
   const w = window.open('', '_blank')
   const { data, error } = await supabase.storage.from(DENETIM_BUCKET).createSignedUrl(b.dosya_yolu, 300)
   if (error || !data) { w?.close(); throw error || new Error('Bağlantı oluşturulamadı') }
-  if (w) w.location.href = data.signedUrl
-  else window.location.href = data.signedUrl
+  // Demoda imzalı adres bu sekmedeki bellek içi belgeye (blob:) çevrilir
+  const adres = await belgeAdresiCoz(data.signedUrl)
+  if (w) w.location.href = adres
+  else window.location.href = adres
 }
 
 export function blobKaydet(blob: Blob, ad: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
-  a.href = url; a.download = ad
+  a.href = url; a.download = demoDosyaAdi(ad)
   document.body.appendChild(a); a.click(); a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 60000)
 }

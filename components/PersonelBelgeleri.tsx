@@ -2,6 +2,8 @@
 import { useRef, useState } from 'react'
 import { FileText, Upload, Trash2, ExternalLink } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { belgeAdresiCoz } from '@/lib/demo/istemci'
+import { DemoDosyaNotu } from '@/components/DemoSeridi'
 import type { PersonelBelgesi } from '@/lib/types'
 import { guvenliAd, boyutFmt, MAKS_DOSYA_BOYUTU } from '@/lib/denetimDosyasi'
 import { useYukleme } from '@/lib/useYukleme'
@@ -16,8 +18,10 @@ export async function personelBelgesiAc(b: Pick<PersonelBelgesi, 'dosya_yolu'>) 
   const w = window.open('', '_blank')
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(b.dosya_yolu, 300)
   if (error || !data) { w?.close(); throw error || new Error('Bağlantı oluşturulamadı') }
-  if (w) w.location.href = data.signedUrl
-  else window.location.href = data.signedUrl
+  // Demoda imzalı adres bu sekmedeki bellek içi belgeye (blob:) çevrilir
+  const adres = await belgeAdresiCoz(data.signedUrl)
+  if (w) w.location.href = adres
+  else window.location.href = adres
 }
 
 export default function PersonelBelgeleri({ personelId, okulId, saltOkunur = false }: { personelId: number; okulId: number; saltOkunur?: boolean }) {
@@ -96,6 +100,7 @@ export default function PersonelBelgeleri({ personelId, okulId, saltOkunur = fal
           ))}
         </div>
       )}
+      {!saltOkunur && <DemoDosyaNotu />}
       {!saltOkunur && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <input className="form-input" style={{ flex: 1, minWidth: 200 }} value={ad} onChange={e => setAd(e.target.value)}

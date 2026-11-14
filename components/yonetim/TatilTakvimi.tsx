@@ -17,7 +17,7 @@ const SABIT = [
   ['15 Temmuz Demokrasi ve Millî Birlik Günü', '07-15', '07-15'], ['30 Ağustos Zafer Bayramı', '08-30', '08-30'],
   ['29 Ekim Cumhuriyet Bayramı', '10-28', '10-29'],
 ] as const
-const RENK = { resmi: { zemin: 'var(--accent-lighter)', yazi: 'var(--accent-dark)' }, idari: { zemin: '#fff1d6', yazi: 'var(--warn-dark)' } }
+const RENK = { resmi: { zemin: 'var(--accent-lighter)', yazi: 'var(--accent-dark)' }, idari: { zemin: 'var(--warn-light)', yazi: 'var(--warn-dark)' } }
 
 export default function TatilTakvimi({ bildir }: Ortak) {
   const [tatiller, setTatiller] = useState<Tatil[]>([])

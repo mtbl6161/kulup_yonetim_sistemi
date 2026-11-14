@@ -4,6 +4,7 @@ import { supabase } from './supabase'
 import { User, Session } from '@supabase/supabase-js'
 import { useRouter, usePathname } from 'next/navigation'
 import { Profil, Okul, Il } from './types'
+import { tarayicidaDemoMu, demoCikisAdresi } from './demo/mod'
 
 interface AuthContextType {
   user: User | null
@@ -12,6 +13,8 @@ interface AuthContextType {
   okul: Okul | null
   il: Il | null
   loading: boolean
+  /** Tanıtımdaki "Demoyu deneyin" ile açılan, verisi yalnızca tarayıcıda duran demo okul */
+  demo: boolean
   signOut: () => Promise<void>
   refresh: () => Promise<void>
 }
@@ -30,9 +33,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
 
-  // Realtime listener for school updates
+  // Kurgusal demo kullanıcısı; değer yalnızca tarayıcıda oluşan oturumdan okunur (SSR'de false)
+  const demo = user?.app_metadata?.demo === true
+
+  // Realtime listener for school updates (demoda gerçek zamanlı bağlantı açılmaz)
   useEffect(() => {
-    if (!okul?.id) return
+    if (!okul?.id || tarayicidaDemoMu()) return
     const channel = supabase
       .channel(`okul_status_${okul.id}`)
       .on(
@@ -168,13 +174,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    if (tarayicidaDemoMu()) {
+      // Demodan çıkış: çerez sunucuda silinir, bellekteki örnek veri sayfa değişince kendiliğinden yok olur
+      window.location.assign(new URL(demoCikisAdresi('/tanitim'), window.location.origin))
+      return
+    }
     await supabase.auth.signOut()
     // Tam yeniden yükleme: çıkıştan sonra bellekte hiçbir kurum verisi kalmasın
     window.location.assign(new URL('/login', window.location.origin))
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, profil, okul, il, loading, signOut, refresh }}>
+    <AuthContext.Provider value={{ user, session, profil, okul, il, loading, demo, signOut, refresh }}>
       {children}
     </AuthContext.Provider>
   )

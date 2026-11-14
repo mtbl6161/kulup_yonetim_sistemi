@@ -1,4 +1,6 @@
 import { createBrowserClient } from '@supabase/ssr'
+import { tarayicidaDemoMu } from './demo/mod'
+import { demoAgKorumasiKur, demoFetch, demoIstemcisiOlustur } from './demo/istemci'
 
 // ── Sessiz hata ağı ──────────────────────────────────────────────
 // Sayfaların bir kısmı Supabase'in döndürdüğü `error` alanını okumuyor; kayıt başarısız
@@ -22,13 +24,13 @@ function anlasilirMesaj(durum: number, govde: { code?: string; message?: string 
   return yazma ? `İşlem kaydedilemedi${govde?.message ? `: ${govde.message}` : '.'}` : 'Veriler yüklenemedi.'
 }
 
-const izliFetch: typeof fetch = async (girdi, init) => {
+const izliFetchOlustur = (icFetch: () => typeof fetch): typeof fetch => async (girdi, init) => {
   const url = typeof girdi === 'string' ? girdi : girdi instanceof URL ? girdi.href : girdi.url
   const yontem = (init?.method || (girdi instanceof Request ? girdi.method : 'GET')).toUpperCase()
   const veriIstegi = url.includes('/rest/v1/')
   let yanit: Response
   try {
-    yanit = await fetch(girdi, init)
+    yanit = await icFetch()(girdi, init)
   } catch (e) {
     if (veriIstegi) bildir('İnternet bağlantısı yok ya da sunucuya ulaşılamıyor. Son işleminiz kaydedilmemiş olabilir.')
     throw e
@@ -46,8 +48,19 @@ const izliFetch: typeof fetch = async (girdi, init) => {
   return yanit
 }
 
-export const supabase = createBrowserClient(
+const gercekIstemci = () => createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  { global: { fetch: izliFetch } }
+  // fetch her istekte okunur: test ortamları ve ağ koruması window.fetch'i sonradan sarabilir
+  { global: { fetch: izliFetchOlustur(() => fetch) } }
 )
+
+// Demo modu (tanıtımdaki "Demoyu deneyin"): panel aynı kalır, veri katmanı tarayıcı belleğindeki örnek okula yönlenir.
+// Demo istemcisi canlı Supabase adresini hiç kullanmaz; /api ve Supabase istekleri ayrıca ağa çıkmadan kesilir.
+// Ayrıntı: docs/demo-hesabi.md
+const demoModu = tarayicidaDemoMu()
+if (demoModu) demoAgKorumasiKur()
+
+export const supabase: ReturnType<typeof gercekIstemci> = demoModu
+  ? (demoIstemcisiOlustur(izliFetchOlustur(() => demoFetch)) as unknown as ReturnType<typeof gercekIstemci>)
+  : gercekIstemci()
