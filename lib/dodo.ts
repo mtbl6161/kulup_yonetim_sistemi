@@ -12,6 +12,31 @@ import { bosAbonelikBilgisi, type AbonelikBilgisi, type AbonelikDurumu, type Fat
 
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://www.klup360.com'
 
+// Ödeme sayfasının görünümü: uygulamanın renkleri (app/globals.css) ve yazı tipi (Inter) ile aynı.
+// Logo ve marka adı Dodo panelinden (Settings › Business / Brand) gelir.
+export const ODEME_TEMASI = {
+  font_primary_url: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
+  radius: '8px',
+  light: {
+    bg_primary: '#ffffff',
+    bg_secondary: '#f3f5f9',
+    border_primary: '#e6e9ef',
+    border_secondary: '#cbd0d8',
+    button_primary: '#2347d9',
+    button_primary_hover: '#1c3bbe',
+    button_text_primary: '#ffffff',
+    button_secondary: '#eef2fe',
+    button_secondary_hover: '#dfe6fd',
+    button_text_secondary: '#2347d9',
+    input_focus_border: '#2347d9',
+    text_primary: '#0e1116',
+    text_secondary: '#5f6876',
+    text_placeholder: '#8a93a1',
+    text_error: '#c2410c',
+    text_success: '#15803d',
+  },
+} as const
+
 let istemci: DodoPayments | null = null
 
 /** Ortam değişkeni eksik ya da yanlışsa test modu seçilir; canlı mod yalnızca açıkça 'live_mode' yazılınca açılır. */
@@ -83,7 +108,7 @@ export async function odemeOturumuAc({ okulId, donem, customerId, email, kurumAd
       force_language: 'tr',
       theme: 'light',
       show_order_details: true,
-      theme_config: { pay_button_text: `${DONEM_ADI[donem]} aboneliği başlat` },
+      theme_config: { ...ODEME_TEMASI, pay_button_text: `${DONEM_ADI[donem]} aboneliği başlat` },
     },
     return_url: `${APP_URL()}/ayarlar?sekme=lisans&odeme=tamam`,
     cancel_url: `${APP_URL()}/ayarlar?sekme=lisans`,
