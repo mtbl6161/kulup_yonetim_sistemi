@@ -1,6 +1,7 @@
-// Abonelik planlarının tek kaynağı: fiyatlar, Lemon Squeezy ürün (variant) kodları ve paket içeriği.
+// Abonelik planlarının tek kaynağı: fiyatlar ve paket içeriği.
 // Ödeme ekranları, Ayarlar › Abonelik, fiyatlandırma sayfası ve checkout API'si buradan okur.
-// Fiyatlar Lemon Squeezy panelindeki variant fiyatlarıyla aynı tutulmalı: ödemede çekilen tutarı orası belirler.
+// Fiyatlar Dodo Payments panelindeki ürün fiyatlarıyla aynı tutulmalı: ödemede çekilen tutarı orası belirler.
+// Dodo ürün kodları test/canlı moda göre değiştiği için ortam değişkenindedir (DODO_URUN_AYLIK, DODO_URUN_YILLIK).
 
 export type AbonelikDonemi = 'month' | 'year'
 
@@ -18,6 +19,7 @@ export const YILLIK_AYLIK_KARSILIGI = Math.round(YILLIK_UCRET / 12)
 /** Yıllık plan rozeti: gerçek tasarruf tutarı; tasarruf yoksa boş */
 export const YILLIK_INDIRIM_ETIKETI = YILLIK_TASARRUF > 0 ? `₺${tl(YILLIK_TASARRUF)} tasarruf` : ''
 
+/** Eski Lemon Squeezy ürün (variant) kodları; yalnızca mevcut Lemon aboneliklerinin dönemini bulmak için */
 export const PLAN_VARIANTLARI: Record<AbonelikDonemi, string> = {
   month: '1588063',
   year: '1588065',

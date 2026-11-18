@@ -26,6 +26,8 @@ export interface Okul {
   personel_sayisi?: number
   lemonsqueezy_customer_id?: string
   lemonsqueezy_subscription_id?: string
+  dodo_customer_id?: string        // migration_dodo_odeme.sql
+  dodo_subscription_id?: string
 }
 
 export type KullaniciRol = 'admin' | 'super_admin' | 'denetim_yetkilisi'

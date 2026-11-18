@@ -35,7 +35,7 @@ export default function OdemeEkrani({ mod }: { mod: 'baslat' | 'yenile' }) {
     setHata(null)
     try {
       await odemeyeYonlendir(okul.id, donem)
-      // Başarılıysa sayfa Lemon Squeezy'ye geçer; düğme yönlendirme sürerken kilitli kalır
+      // Başarılıysa sayfa Dodo Payments'a geçer; düğme yönlendirme sürerken kilitli kalır
     } catch (e) {
       setHata(hataMesaji(e, 'Ödeme bağlantısı oluşturulamadı. Lütfen tekrar deneyin.'))
       setYukleniyor(false)
@@ -60,7 +60,7 @@ export default function OdemeEkrani({ mod }: { mod: 'baslat' | 'yenile' }) {
         </ul>
         <div className="oe-side-foot">
           <span><Lock size={13} /> 256-bit SSL</span>
-          <span>Ödeme altyapısı: Lemon Squeezy</span>
+          <span>Ödeme altyapısı: Dodo Payments</span>
         </div>
       </aside>
 
@@ -94,7 +94,7 @@ export default function OdemeEkrani({ mod }: { mod: 'baslat' | 'yenile' }) {
             : <>{yenile ? 'Aboneliği yenile' : 'Ödemeye geç'} · ₺{tl(tutar)} <ArrowRight size={18} /></>}
         </button>
         <p className="oe-fine">
-          Kart bilgilerinizi bir sonraki adımda Lemon Squeezy&apos;nin güvenli sayfasında girersiniz.
+          Kart bilgilerinizi bir sonraki adımda Dodo Payments&apos;ın güvenli sayfasında girersiniz.
           Aboneliğiniz her {donem === 'year' ? 'yıl' : 'ay'} otomatik yenilenir; istediğiniz an Ayarlar › Abonelik&apos;ten iptal edebilirsiniz.
         </p>
 

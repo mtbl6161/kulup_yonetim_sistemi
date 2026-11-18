@@ -91,7 +91,7 @@ export default function AyarlarPage() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [activeTab, setActiveTab] = useState<'kurumsal' | 'mali' | 'vergi' | 'kulup' | 'tatil' | 'guvenlik' | 'lisans'>('kurumsal')
-  // ?sekme=lisans ile doğrudan Abonelik sekmesi açılır (Lemon Squeezy ödeme dönüşü, panel bağlantıları)
+  // ?sekme=lisans ile doğrudan Abonelik sekmesi açılır (Dodo Payments ödeme dönüşü, panel bağlantıları)
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('sekme') !== 'lisans') return
     // Sunucu çıktısı varsayılan sekmeyle eşleşsin diye ilk çizimden sonra geçilir

@@ -8,7 +8,7 @@ puantaj, bordro, tahsilat takibi, işletme defteri, okul aile birliği muhasebes
 - **Next.js 16** (App Router, Turbopack) ve **React 19**. Bu sürümde API ve dosya kuralları eski sürümlerden farklıdır;
   kod yazmadan önce `node_modules/next/dist/docs/` altındaki ilgili belgeye bakın (bkz. `AGENTS.md`).
 - **Supabase**: veritabanı, kimlik doğrulama ve dosya deposu. Okul verisi satır düzeyi güvenlikle (RLS) ayrılır.
-- **Resend** (e-posta), **Lemon Squeezy** (abonelik ödemesi), **Upstash Redis** (istek sınırlama).
+- **Resend** (e-posta), **Dodo Payments** (abonelik ödemesi; eski aboneler için Lemon Squeezy), **Upstash Redis** (istek sınırlama).
 - PDF çıktıları `jspdf` + `jspdf-autotable` ile istemcide üretilir (`lib/pdf.ts` ortak stil).
 
 ## Kurulum

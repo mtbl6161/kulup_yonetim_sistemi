@@ -2,14 +2,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowRight, CheckCircle2, CreditCard, ExternalLink, FileText, Loader2, Lock, RefreshCw, Repeat } from 'lucide-react'
 import type { Okul } from '@/lib/types'
-import type { AbonelikBilgisi } from '@/lib/lemonsqueezy'
+import type { AbonelikBilgisi } from '@/lib/abonelikBilgisi'
 import { supabase } from '@/lib/supabase'
 import { hataMesaji } from '@/lib/hata'
 import { odemeyeYonlendir } from '@/lib/abonelikOdeme'
 import { PlanSecici, SiparisOzeti } from '@/components/abonelik/PlanSecici'
-import { DENEME_GUN, DONEM_ADI, planUcreti, tl, variantDonemi, type AbonelikDonemi } from '@/lib/abonelikPlanlari'
+import { DENEME_GUN, DONEM_ADI, planUcreti, tl, type AbonelikDonemi } from '@/lib/abonelikPlanlari'
 
-// Okul Ayarları › Abonelik: plan durumu, kart, faturalar, iptal (Lemon Squeezy müşteri portalı) ve yeni abonelik.
+// Okul Ayarları › Abonelik: plan durumu, kart, faturalar, iptal (Dodo Payments müşteri portalı) ve yeni abonelik.
 
 const LS_DURUM: Record<string, { ad: string; ton: 'ok' | 'warn' | 'bad' }> = {
   active: { ad: 'Aktif', ton: 'ok' },
@@ -25,7 +25,7 @@ const CANLI = ['active', 'on_trial', 'past_due', 'paused', 'cancelled']
 
 async function abonelikCek(): Promise<AbonelikBilgisi> {
   const { data: { session } } = await supabase.auth.getSession()
-  const res = await fetch('/api/lemonsqueezy/abonelik', { headers: { Authorization: `Bearer ${session?.access_token ?? ''}` } })
+  const res = await fetch('/api/abonelik/bilgi', { headers: { Authorization: `Bearer ${session?.access_token ?? ''}` } })
   const json = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(json.error || 'Abonelik bilgisi alınamadı')
   return json
@@ -41,7 +41,7 @@ export default function LisansSekmesi({ okulData }: { okulData: Okul | null }) {
   const [donem, setDonem] = useState<AbonelikDonemi>('year')
   const [odemeYukleniyor, setOdemeYukleniyor] = useState(false)
   const [odemeHata, setOdemeHata] = useState<string | null>(null)
-  // Lemon Squeezy ödeme sonrası ?odeme=tamam ile döner. Sekme yalnızca istemcide açıldığı için window güvenle okunur.
+  // Dodo ödeme sayfası işlem sonrası ?odeme=tamam ile döner. Sekme yalnızca istemcide açıldığı için window güvenle okunur.
   const [odemeTamam] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('odeme') === 'tamam')
   const [simdi] = useState(() => Date.now())
 
@@ -77,7 +77,7 @@ export default function LisansSekmesi({ okulData }: { okulData: Okul | null }) {
   }
 
   const abonelikVar = !!bilgi?.durum && CANLI.includes(bilgi.durum)
-  const abonelikDonemi = bilgi?.variantId ? variantDonemi(bilgi.variantId) : null
+  const abonelikDonemi = bilgi?.donem ?? null
   const lisansBitis = okulData?.lisans_bitis ?? null
   const kalanGun = lisansBitis ? Math.max(0, Math.ceil((new Date(lisansBitis).getTime() - simdi) / 86400000)) : 0
   const deneme = okulData?.odeme_durumu === 'deneme'
@@ -97,7 +97,7 @@ export default function LisansSekmesi({ okulData }: { okulData: Okul | null }) {
       {odemeTamam && (
         <div className="alert alert-success" role="status" style={{ fontSize: 14 }}>
           <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: 1 }} />
-          <span><strong>Ödemeniz alındı.</strong> Lisansınız birkaç saniye içinde etkinleşir; faturanız e-posta adresinize gönderildi.</span>
+          <span><strong>İşleminiz tamamlandı.</strong> Aboneliğiniz birkaç saniye içinde burada görünür; ödeme alındığında faturanız e-posta adresinize gönderilir.</span>
         </div>
       )}
 
@@ -150,7 +150,7 @@ export default function LisansSekmesi({ okulData }: { okulData: Okul | null }) {
         </div>
       )}
 
-      {/* Hızlı işlemler (aktif Lemon Squeezy aboneliği varsa) */}
+      {/* Hızlı işlemler (aktif online abonelik varsa) */}
       {abonelikVar && (
         <div className="ls-actions">
           <Aksiyon href={bilgi?.portalUrl} ikon={<Repeat size={17} />} t={bilgi?.iptalEdildi ? 'Yeniden başlat' : 'Planı değiştir'} s={bilgi?.iptalEdildi ? 'Aboneliği sürdürün' : 'Aylık ↔ yıllık geçiş'} />
@@ -164,7 +164,7 @@ export default function LisansSekmesi({ okulData }: { okulData: Okul | null }) {
         <section className="card ls-card">
           <h3 className="ls-h">{lisansGecerli && !deneme ? 'Online aboneliğe geçin' : deneme ? 'Deneme bitmeden abone olun' : 'Aboneliğinizi başlatın'}</h3>
           <p className="ls-muted" style={{ margin: '0 0 16px' }}>
-            {lisansGecerli ? 'Ödediğiniz süre mevcut bitiş tarihinizin üzerine eklenir; hiçbir gün kaybetmezsiniz.' : 'Ödeme tamamlandığı anda erişiminiz açılır. Kayıtlarınız korunuyor.'}
+            {lisansGecerli ? `Kartınızı şimdi kaydedin; ilk ödeme mevcut süreniz bittiğinde (${tarih(lisansBitis)}) çekilir. Hiçbir gün kaybetmezsiniz.` : 'Ödeme tamamlandığı anda erişiminiz açılır. Kayıtlarınız korunuyor.'}
           </p>
           <PlanSecici donem={donem} setDonem={setDonem} />
           <div style={{ margin: '16px 0' }}><SiparisOzeti donem={donem} /></div>
@@ -175,7 +175,7 @@ export default function LisansSekmesi({ okulData }: { okulData: Okul | null }) {
               : <>Ödemeye geç · ₺{tl(planUcreti(donem))} <ArrowRight size={18} /></>}
           </button>
           <p className="ls-muted" style={{ fontSize: 12.5, margin: '12px 0 0', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Lock size={13} /> Ödemeler Lemon Squeezy güvencesiyle 256-bit SSL ile alınır. İstediğiniz an iptal edebilirsiniz.
+            <Lock size={13} /> Ödemeler Dodo Payments güvencesiyle 256-bit SSL ile alınır. İstediğiniz an iptal edebilirsiniz.
           </p>
         </section>
       )}

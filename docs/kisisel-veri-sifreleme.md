@@ -266,7 +266,7 @@ Konum: `app/api/kisisel-veri/coz/route.ts`, `app/api/kisisel-veri/sifrele/route.
   - Konudan öğrenci adını çıkarmak.
   - Bordro zarfındaki TC'yi maskelemek (`123******01`).
   - Resend'de e-posta içeriğinin saklanma süresini gözden geçirmek.
-- Lemon Squeezy'ye öğrenci verisi gitmiyor; yalnızca okul ve abonelik bilgisi gidiyor.
+- Dodo Payments'a (ve eski aboneler için Lemon Squeezy'ye) öğrenci verisi gitmiyor; yalnızca okul ve abonelik bilgisi gidiyor.
 
 ### 4.7 KVKK açısından
 
