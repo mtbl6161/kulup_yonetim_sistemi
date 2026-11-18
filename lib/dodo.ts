@@ -39,22 +39,39 @@ export const ODEME_TEMASI = {
 
 let istemci: DodoPayments | null = null
 
-/** Ortam değişkeni eksik ya da yanlışsa test modu seçilir; canlı mod yalnızca açıkça 'live_mode' yazılınca açılır. */
+type DodoOrtami = 'live_mode' | 'test_mode'
+
+/**
+ * Mod anahtarın önekinden belirlenir: dodo_live_ yalnızca canlı, dodo_test_ yalnızca test sunucusunda geçerlidir,
+ * bu yüzden DODO_PAYMENTS_ENVIRONMENT yanlış yazılsa bile anahtar yanlış sunucuya gitmez.
+ * Önek tanınmazsa ortam değişkenine bakılır; o da açıkça 'live_mode' değilse test modu seçilir.
+ */
+export function dodoOrtami(anahtar: string, ortamDegiskeni: string | undefined): DodoOrtami {
+  if (anahtar.startsWith('dodo_live_')) return 'live_mode'
+  if (anahtar.startsWith('dodo_test_')) return 'test_mode'
+  return ortamDegiskeni?.trim() === 'live_mode' ? 'live_mode' : 'test_mode'
+}
+
 export function dodo(): DodoPayments {
   if (istemci) return istemci
-  const bearerToken = process.env.DODO_PAYMENTS_API_KEY
+  const bearerToken = process.env.DODO_PAYMENTS_API_KEY?.trim()
   if (!bearerToken) throw new Error('Dodo Payments API anahtarı eksik (DODO_PAYMENTS_API_KEY)')
+  const ortamDegiskeni = process.env.DODO_PAYMENTS_ENVIRONMENT
+  const environment = dodoOrtami(bearerToken, ortamDegiskeni)
+  if (ortamDegiskeni && ortamDegiskeni.trim() !== environment) {
+    console.warn(`⚠️ DODO_PAYMENTS_ENVIRONMENT (${JSON.stringify(ortamDegiskeni)}) anahtarla uyuşmuyor; anahtara göre ${environment} kullanılıyor`)
+  }
   istemci = new DodoPayments({
     bearerToken,
-    webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_KEY || undefined,
-    environment: process.env.DODO_PAYMENTS_ENVIRONMENT === 'live_mode' ? 'live_mode' : 'test_mode',
+    webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_KEY?.trim() || undefined,
+    environment,
   })
   return istemci
 }
 
 /** Plan → Dodo ürün kodu. Test ve canlı modda ürün kodları farklıdır, bu yüzden ortam değişkenindedir. */
 export function planUrunu(donem: AbonelikDonemi): string {
-  const id = donem === 'year' ? process.env.DODO_URUN_YILLIK : process.env.DODO_URUN_AYLIK
+  const id = (donem === 'year' ? process.env.DODO_URUN_YILLIK : process.env.DODO_URUN_AYLIK)?.trim()
   if (!id) throw new Error(`Dodo ürün kodu eksik (${donem === 'year' ? 'DODO_URUN_YILLIK' : 'DODO_URUN_AYLIK'})`)
   return id
 }
@@ -62,8 +79,8 @@ export function planUrunu(donem: AbonelikDonemi): string {
 /** Dodo ürün kodundan dönem; tanınmayan ürün için null (istemcinin ya da webhook'un söylediğine güvenilmez) */
 export function urunDonemi(productId: string | null | undefined): AbonelikDonemi | null {
   if (!productId) return null
-  if (productId === process.env.DODO_URUN_AYLIK) return 'month'
-  if (productId === process.env.DODO_URUN_YILLIK) return 'year'
+  if (productId === process.env.DODO_URUN_AYLIK?.trim()) return 'month'
+  if (productId === process.env.DODO_URUN_YILLIK?.trim()) return 'year'
   return null
 }
 
